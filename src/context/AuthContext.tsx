@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import type { UserProfile } from '../types/profile'
 
 export type UserRole = 'guest' | 'user' | 'admin'
 
@@ -22,6 +23,7 @@ export interface RegisterResult {
 
 interface AuthContextValue {
   user: AuthUser | null
+  profile: UserProfile | null
   isAuthenticated: boolean
   login: (email: string, password: string) => boolean
   register: (
@@ -30,15 +32,32 @@ interface AuthContextValue {
     password: string,
     confirmPassword: string,
   ) => RegisterResult
+  updateProfile: (data: Partial<UserProfile>) => void
   logout: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-const DEMO_USER: AuthUser = {
-  email: 'user@parkease.vn',
+export const DEMO_USER: AuthUser = {
+  email: 'user@easyparking.vn',
   name: 'Nguyễn Văn A',
   role: 'user',
+}
+
+function profileKey(email: string) {
+  return `pbms_profile_${email}`
+}
+
+function loadProfile(email: string, name: string): UserProfile {
+  const saved = localStorage.getItem(profileKey(email))
+  if (saved) return JSON.parse(saved) as UserProfile
+  return {
+    email,
+    name,
+    phone: '',
+    vehiclePlate: '51A-12345',
+    address: '',
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -47,20 +66,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return saved ? (JSON.parse(saved) as AuthUser) : null
   })
 
+  const [profile, setProfile] = useState<UserProfile | null>(() =>
+    user ? loadProfile(user.email, user.name) : null,
+  )
+
   const persistUser = useCallback((authUser: AuthUser) => {
     sessionStorage.setItem('pbms_user', JSON.stringify(authUser))
     setUser(authUser)
+    setProfile(loadProfile(authUser.email, authUser.name))
   }, [])
 
   const login = useCallback(
     (email: string, password: string) => {
       if (!email.trim() || !password.trim()) return false
-      const authUser: AuthUser = {
+      persistUser({
         email: email.trim(),
         name: email.split('@')[0] ?? 'Người dùng',
         role: 'user',
-      }
-      persistUser(authUser)
+      })
       return true
     },
     [persistUser],
@@ -70,48 +93,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (name: string, email: string, password: string, confirmPassword: string): RegisterResult => {
       const trimmedName = name.trim()
       const trimmedEmail = email.trim()
-
-      if (!trimmedName) {
-        return { ok: false, message: 'Vui lòng nhập họ và tên.' }
-      }
-      if (!trimmedEmail) {
-        return { ok: false, message: 'Vui lòng nhập email.' }
-      }
+      if (!trimmedName) return { ok: false, message: 'Vui lòng nhập họ và tên.' }
+      if (!trimmedEmail) return { ok: false, message: 'Vui lòng nhập email.' }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
         return { ok: false, message: 'Email không hợp lệ.' }
       }
-      if (password.length < 6) {
-        return { ok: false, message: 'Mật khẩu phải có ít nhất 6 ký tự.' }
-      }
+      if (password.length < 6) return { ok: false, message: 'Mật khẩu phải có ít nhất 6 ký tự.' }
       if (password !== confirmPassword) {
         return { ok: false, message: 'Mật khẩu xác nhận không khớp.' }
       }
-
-      const authUser: AuthUser = {
-        email: trimmedEmail,
-        name: trimmedName,
-        role: 'user',
-      }
-      persistUser(authUser)
+      persistUser({ email: trimmedEmail, name: trimmedName, role: 'user' })
+      const p = loadProfile(trimmedEmail, trimmedName)
+      localStorage.setItem(profileKey(trimmedEmail), JSON.stringify(p))
       return { ok: true, message: '' }
     },
     [persistUser],
   )
 
+  const updateProfile = useCallback(
+    (data: Partial<UserProfile>) => {
+      if (!user) return
+      setProfile((prev) => {
+        const next = { ...(prev ?? loadProfile(user.email, user.name)), ...data, email: user.email }
+        localStorage.setItem(profileKey(user.email), JSON.stringify(next))
+        if (data.name) {
+          const updatedUser = { ...user, name: data.name }
+          sessionStorage.setItem('pbms_user', JSON.stringify(updatedUser))
+          setUser(updatedUser)
+        }
+        return next
+      })
+    },
+    [user],
+  )
+
   const logout = useCallback(() => {
     sessionStorage.removeItem('pbms_user')
     setUser(null)
+    setProfile(null)
   }, [])
 
   const value = useMemo(
     () => ({
       user,
+      profile,
       isAuthenticated: user !== null,
       login,
       register,
+      updateProfile,
       logout,
     }),
-    [user, login, register, logout],
+    [user, profile, login, register, updateProfile, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
@@ -122,5 +154,3 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider')
   return ctx
 }
-
-export { DEMO_USER }

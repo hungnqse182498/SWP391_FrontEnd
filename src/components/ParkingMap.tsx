@@ -1,10 +1,10 @@
-import { ArrowDown, Check, MousePointerClick, Zap } from 'lucide-react'
+import { ArrowDown, MousePointerClick, Zap } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { ParkingFloor, ParkingSpot, SpotStatus } from '../types/parking'
 
 interface ParkingMapProps {
   floors: ParkingFloor[]
-  onConfirm?: (spots: ParkingSpot[], floor: ParkingFloor) => void
+  onContinue?: (spots: ParkingSpot[], floor: ParkingFloor) => void
 }
 
 const STATUS_LABEL: Record<SpotStatus, string> = {
@@ -15,7 +15,7 @@ const STATUS_LABEL: Record<SpotStatus, string> = {
   disabled: 'Không dùng',
 }
 
-export default function ParkingMap({ floors, onConfirm }: ParkingMapProps) {
+export default function ParkingMap({ floors, onContinue }: ParkingMapProps) {
   const [activeFloorId, setActiveFloorId] = useState(floors[0]?.id ?? 1)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
@@ -36,9 +36,7 @@ export default function ParkingMap({ floors, onConfirm }: ParkingMapProps) {
   )
 
   const toggleSpot = (spot: ParkingSpot) => {
-    if (spot.status === 'occupied' || spot.status === 'reserved' || spot.status === 'disabled') {
-      return
-    }
+    if (spot.status === 'occupied' || spot.status === 'reserved' || spot.status === 'disabled') return
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (next.has(spot.id)) next.delete(spot.id)
@@ -50,17 +48,12 @@ export default function ParkingMap({ floors, onConfirm }: ParkingMapProps) {
   const getDisplayStatus = (spot: ParkingSpot): SpotStatus =>
     selectedIds.has(spot.id) ? 'selected' : spot.status
 
-  const handleConfirm = () => {
-    if (!floor || selectedSpots.length === 0) return
-    onConfirm?.(selectedSpots, floor)
-  }
-
   if (!floor) return null
 
   return (
     <section className="parking-map" aria-label="Sơ đồ chọn chỗ đỗ">
       <div className="map-toolbar">
-        <div className="floor-tabs" role="tablist" aria-label="Chọn tầng">
+        <div className="floor-tabs" role="tablist">
           {floors.map((f) => (
             <button
               key={f.id}
@@ -77,23 +70,11 @@ export default function ParkingMap({ floors, onConfirm }: ParkingMapProps) {
             </button>
           ))}
         </div>
-
         <ul className="map-legend">
-          <li>
-            <span className="dot available" /> Trống
-          </li>
-          <li>
-            <span className="dot selected" /> Đang chọn
-          </li>
-          <li>
-            <span className="dot reserved" /> Đã đặt
-          </li>
-          <li>
-            <span className="dot occupied" /> Có xe
-          </li>
-          <li>
-            <span className="dot disabled" /> Không dùng
-          </li>
+          <li><span className="dot available" /> Trống</li>
+          <li><span className="dot selected" /> Đang chọn</li>
+          <li><span className="dot reserved" /> Đã đặt</li>
+          <li><span className="dot occupied" /> Có xe</li>
         </ul>
       </div>
 
@@ -102,14 +83,12 @@ export default function ParkingMap({ floors, onConfirm }: ParkingMapProps) {
           <ArrowDown size={16} strokeWidth={2} />
           <span>Lối vào / Thang máy</span>
         </div>
-
         <div className="map-grid-wrap">
           <div className="map-col-labels" aria-hidden="true">
             {Array.from({ length: floor.cols }, (_, i) => (
               <span key={i}>{i + 1}</span>
             ))}
           </div>
-
           <div className="map-grid">
             {floor.rows.map((row) => (
               <div key={row} className="map-row">
@@ -119,8 +98,7 @@ export default function ParkingMap({ floors, onConfirm }: ParkingMapProps) {
                     .filter((s) => s.row === row)
                     .map((spot) => {
                       const status = getDisplayStatus(spot)
-                      const clickable =
-                        status === 'available' || status === 'selected'
+                      const clickable = status === 'available' || status === 'selected'
                       return (
                         <button
                           key={spot.id}
@@ -130,7 +108,6 @@ export default function ParkingMap({ floors, onConfirm }: ParkingMapProps) {
                           aria-label={`${row}${spot.number} — ${STATUS_LABEL[status]}`}
                           aria-pressed={status === 'selected'}
                           onClick={() => toggleSpot(spot)}
-                          title={`${row}${spot.number}`}
                         >
                           {spot.type === 'ev' ? (
                             <Zap size={12} strokeWidth={2.5} aria-hidden />
@@ -146,10 +123,6 @@ export default function ParkingMap({ floors, onConfirm }: ParkingMapProps) {
             ))}
           </div>
         </div>
-
-        <div className="map-drive-aisle" aria-hidden="true">
-          Làn xe
-        </div>
       </div>
 
       <aside className="map-sidebar">
@@ -157,17 +130,14 @@ export default function ParkingMap({ floors, onConfirm }: ParkingMapProps) {
         {selectedSpots.length === 0 ? (
           <p className="muted">
             <MousePointerClick size={16} strokeWidth={2} aria-hidden />
-            Nhấn vào ô trống trên sơ đồ để chọn chỗ đỗ.
+            Nhấn ô trống trên sơ đồ để chọn chỗ đỗ.
           </p>
         ) : (
           <ul className="selected-list">
             {selectedSpots.map((s) => (
               <li key={s.id}>
-                <strong>
-                  {floor.name} — {s.row}
-                  {s.number}
-                </strong>
-                <span>{s.type === 'ev' ? 'Xe điện' : s.type === 'handicap' ? 'Xe khuyết tật' : 'Tiêu chuẩn'}</span>
+                <strong>{floor.name} — {s.row}{s.number}</strong>
+                <span>{s.type === 'ev' ? 'Xe điện' : s.type === 'handicap' ? 'Khuyết tật' : 'Tiêu chuẩn'}</span>
               </li>
             ))}
           </ul>
@@ -176,12 +146,12 @@ export default function ParkingMap({ floors, onConfirm }: ParkingMapProps) {
           type="button"
           className="btn btn-primary btn-block"
           disabled={selectedSpots.length === 0}
-          onClick={handleConfirm}
+          onClick={() => onContinue?.(selectedSpots, floor)}
         >
-          <Check size={18} strokeWidth={2} aria-hidden />
-          Xác nhận đặt {selectedSpots.length > 0 ? `(${selectedSpots.length})` : ''}
+          Tiếp tục xác nhận
         </button>
       </aside>
     </section>
   )
 }
+

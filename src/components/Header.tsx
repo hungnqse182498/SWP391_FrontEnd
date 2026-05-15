@@ -1,5 +1,5 @@
-import { LogIn, LogOut, UserPlus } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { CalendarDays, Car, LogIn, LogOut, User, UserPlus } from 'lucide-react'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const LOGO_SRC = '/image/logo.png'
@@ -23,6 +23,23 @@ export default function Header() {
             <span className="brand-parking">Parking</span>
           </span>
         </Link>
+
+        {isAuthenticated && (
+          <nav className="main-nav" aria-label="Menu người dùng">
+            <NavLink to="/dat-cho">
+              <Car size={16} strokeWidth={2} aria-hidden />
+              Đặt chỗ
+            </NavLink>
+            <NavLink to="/lich-su">
+              <CalendarDays size={16} strokeWidth={2} aria-hidden />
+              Lịch sử
+            </NavLink>
+            <NavLink to="/tai-khoan">
+              <User size={16} strokeWidth={2} aria-hidden />
+              Tài khoản
+            </NavLink>
+          </nav>
+        )}
 
         <div className="header-actions">
           {isAuthenticated ? (

@@ -3,8 +3,8 @@ import type { ParkingFloor, ParkingSpot, SpotStatus } from '../types/parking'
 const ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 const COLS = 12
 
-function seedStatus(row: string, col: number): SpotStatus {
-  const hash = (row.charCodeAt(0) * 17 + col * 31) % 100
+function seedStatus(row: string, col: number, offset: number): SpotStatus {
+  const hash = (row.charCodeAt(0) * 17 + col * 31 + offset) % 100
   if (hash < 12) return 'occupied'
   if (hash < 18) return 'reserved'
   if (hash < 22) return 'disabled'
@@ -13,7 +13,7 @@ function seedStatus(row: string, col: number): SpotStatus {
 
 function spotType(row: string, col: number): ParkingSpot['type'] {
   if (row === 'A' && col <= 2) return 'handicap'
-  if (col === 11 || col === 12) return 'ev'
+  if (col >= 11) return 'ev'
   return 'standard'
 }
 
@@ -21,14 +21,11 @@ function buildFloor(id: number, name: string, offset: number): ParkingFloor {
   const spots: ParkingSpot[] = []
   for (const row of ROWS) {
     for (let col = 1; col <= COLS; col++) {
-      const n = ((row.charCodeAt(0) + col + offset) % 100) + offset
-      let status = seedStatus(row, col + offset)
-      if (n % 47 === 0) status = 'occupied'
       spots.push({
         id: `F${id}-${row}${col}`,
         row,
         number: col,
-        status,
+        status: seedStatus(row, col, offset),
         type: spotType(row, col),
       })
     }

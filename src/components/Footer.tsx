@@ -23,8 +23,8 @@ export default function Footer() {
           <h4>Liên kết</h4>
           <ul>
             <li><Link to="/dat-cho">Đặt chỗ đỗ</Link></li>
-            <li><Link to="/dang-ky">Đăng ký</Link></li>
-            <li><Link to="/dang-nhap">Đăng nhập</Link></li>
+            <li><Link to="/lich-su">Lịch sử đặt</Link></li>
+            <li><Link to="/tai-khoan">Tài khoản</Link></li>
           </ul>
         </div>
         <div className="footer-contact">
