@@ -3,8 +3,7 @@ import Footer from './Footer'
 import Header from './Header'
 
 export default function Layout() {
-  const { pathname } = useLocation()
-  const isHome = pathname === '/'
+  const isHome = useLocation().pathname === '/'
 
   return (
     <div className="app-shell">

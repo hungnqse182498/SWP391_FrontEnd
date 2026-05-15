@@ -1,8 +1,8 @@
 import { LogIn, LogOut, UserPlus } from 'lucide-react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-const LOGO_SRC = '/image/logo.jpg'
+const LOGO_SRC = '/image/logo.png'
 
 export default function Header() {
   const { user, isAuthenticated, logout } = useAuth()
@@ -16,15 +16,13 @@ export default function Header() {
   return (
     <header className="site-header">
       <div className="header-inner">
-        <Link to="/" className="brand" aria-label="ParkEase — về trang chủ">
-          <img src={LOGO_SRC} alt="ParkEase" className="brand-logo" />
+        <Link to="/" className="brand" aria-label="EasyParking — về trang chủ">
+          <img src={LOGO_SRC} alt="" className="brand-logo" />
+          <span className="brand-name">
+            <span className="brand-easy">Easy</span>
+            <span className="brand-parking">Parking</span>
+          </span>
         </Link>
-
-        <nav className="main-nav" aria-label="Điều hướng chính">
-          {isAuthenticated && (
-            <NavLink to="/dat-cho">Đặt chỗ đỗ</NavLink>
-          )}
-        </nav>
 
         <div className="header-actions">
           {isAuthenticated ? (
@@ -32,18 +30,18 @@ export default function Header() {
               <span className="user-badge" title={user?.email}>
                 {user?.name}
               </span>
-              <button type="button" className="btn btn-ghost" onClick={handleLogout}>
+              <button type="button" className="btn btn-ghost btn-header" onClick={handleLogout}>
                 <LogOut size={18} strokeWidth={2} aria-hidden />
                 Đăng xuất
               </button>
             </>
           ) : (
             <>
-              <Link to="/dang-ky" className="btn btn-outline">
+              <Link to="/dang-ky" className="btn btn-outline btn-header">
                 <UserPlus size={18} strokeWidth={2} aria-hidden />
                 Đăng ký
               </Link>
-              <Link to="/dang-nhap" className="btn btn-primary">
+              <Link to="/dang-nhap" className="btn btn-primary btn-header">
                 <LogIn size={18} strokeWidth={2} aria-hidden />
                 Đăng nhập
               </Link>

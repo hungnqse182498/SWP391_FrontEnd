@@ -10,9 +10,7 @@ export default function Booking() {
   const { isAuthenticated } = useAuth()
   const [success, setSuccess] = useState<string | null>(null)
 
-  if (!isAuthenticated) {
-    return <Navigate to="/dang-nhap" replace />
-  }
+  if (!isAuthenticated) return <Navigate to="/dang-nhap" replace />
 
   const handleConfirm = (spots: ParkingSpot[], floor: ParkingFloor) => {
     const labels = spots.map((s) => `${s.row}${s.number}`).join(', ')
@@ -32,7 +30,6 @@ export default function Booking() {
           Trang chủ
         </Link>
       </header>
-
       {success && (
         <div className="alert alert-success" role="status">
           <CheckCircle2 size={20} strokeWidth={2} aria-hidden />
@@ -42,7 +39,6 @@ export default function Booking() {
           </button>
         </div>
       )}
-
       <ParkingMap floors={parkingFloors} onConfirm={handleConfirm} />
     </section>
   )
