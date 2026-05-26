@@ -26,14 +26,20 @@ export default function Header() {
 
         {isAuthenticated && (
           <nav className="main-nav" aria-label="Menu người dùng">
-            <NavLink to="/dat-cho">
-              <Car size={16} strokeWidth={2} aria-hidden />
-              Đặt chỗ
-            </NavLink>
-            <NavLink to="/lich-su">
-              <CalendarDays size={16} strokeWidth={2} aria-hidden />
-              Lịch sử
-            </NavLink>
+            {user?.role === 'staff' && <NavLink to="/staff/dashboard">Bảng điều khiển</NavLink>}
+            {user?.role === 'admin' && <NavLink to="/admin/dashboard">Bảng điều khiển</NavLink>}
+            {user?.role === 'user' && (
+              <>
+                <NavLink to="/dat-cho">
+                  <Car size={16} strokeWidth={2} aria-hidden />
+                  Đặt chỗ
+                </NavLink>
+                <NavLink to="/lich-su">
+                  <CalendarDays size={16} strokeWidth={2} aria-hidden />
+                  Lịch sử
+                </NavLink>
+              </>
+            )}
             <NavLink to="/tai-khoan">
               <User size={16} strokeWidth={2} aria-hidden />
               Tài khoản

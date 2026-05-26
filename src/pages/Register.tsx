@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext'
 const LOGO_SRC = '/image/logo.png'
 
 export default function Register() {
-  const { register, isAuthenticated } = useAuth()
+  const { register, isAuthenticated, user } = useAuth()
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -15,7 +15,11 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
 
-  if (isAuthenticated) return <Navigate to="/dat-cho" replace />
+  if (isAuthenticated) {
+    if (user?.role === 'staff') return <Navigate to="/staff/dashboard" replace />
+    if (user?.role === 'admin') return <Navigate to="/admin/dashboard" replace />
+    return <Navigate to="/dat-cho" replace />
+  }
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -31,7 +35,7 @@ export default function Register() {
         <div className="auth-header">
           <img src={LOGO_SRC} alt="EasyParking" className="auth-logo" />
           <h1>Đăng ký</h1>
-          <p>Tạo tài khoản để đặt chỗ đỗ xe trước.</p>
+          <p>Tạo tài khoản người dùng để đặt chỗ đỗ xe trước. Tài khoản nhân viên và quản trị viên đã có sẵn.</p>
         </div>
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <FormField label="Họ và tên" name="name" id="name" type="text" icon={User} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nguyễn Văn A" />

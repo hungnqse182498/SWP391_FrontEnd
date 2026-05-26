@@ -7,18 +7,31 @@ import { DEMO_USER, useAuth } from '../context/AuthContext'
 const LOGO_SRC = '/image/logo.png'
 
 export default function Login() {
-  const { login, isAuthenticated } = useAuth()
+  const { login, isAuthenticated, user } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState(DEMO_USER.email)
   const [password, setPassword] = useState('123456')
   const [error, setError] = useState('')
 
-  if (isAuthenticated) return <Navigate to="/dat-cho" replace />
+  if (isAuthenticated) {
+    if (user?.role === 'staff') return <Navigate to="/staff/dashboard" replace />
+    if (user?.role === 'admin') return <Navigate to="/admin/dashboard" replace />
+    return <Navigate to="/dat-cho" replace />
+  }
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     setError('')
-    if (login(email, password)) navigate('/dat-cho')
+    if (login(email, password)) {
+      const lowerEmail = email.trim().toLowerCase()
+      if (lowerEmail === 'staff' || lowerEmail === 'staff@easyparking.vn') {
+        navigate('/staff/dashboard')
+      } else if (lowerEmail === 'admin' || lowerEmail === 'admin@easyparking.vn') {
+        navigate('/admin/dashboard')
+      } else {
+        navigate('/dat-cho')
+      }
+    }
     else setError('Vui lòng nhập email và mật khẩu.')
   }
 
@@ -36,6 +49,7 @@ export default function Login() {
           {error && <p className="form-error form-error--row"><AlertCircle size={16} strokeWidth={2} aria-hidden />{error}</p>}
           <button type="submit" className="btn btn-primary btn-block"><LogIn size={18} strokeWidth={2} aria-hidden />Đăng nhập</button>
         </form>
+       
         <p className="auth-switch">Chưa có tài khoản? <Link to="/dang-ky">Đăng ký ngay</Link></p>
         <p className="auth-footer-link"><Link to="/"><ArrowLeft size={16} strokeWidth={2} aria-hidden />Về trang chủ</Link></p>
       </div>

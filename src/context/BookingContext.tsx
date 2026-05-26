@@ -29,9 +29,11 @@ interface BookingContextValue {
   draft: BookingDraft | null
   setDraft: (draft: BookingDraft | null) => void
   bookings: BookingRecord[]
+  getAllBookings: () => BookingRecord[]
   getMyBookings: () => BookingRecord[]
   completePayment: (method: PaymentMethod) => BookingRecord | null
   cancelBooking: (id: string) => void
+  updateBookingStatus: (id: string, status: BookingRecord['status']) => void
 }
 
 const BookingContext = createContext<BookingContextValue | null>(null)
@@ -47,6 +49,10 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       .filter((b) => b.userEmail === user.email)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }, [bookings, user])
+
+  const getAllBookings = useCallback(() => {
+    return [...bookings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  }, [bookings])
 
   const completePayment = useCallback(
     (method: PaymentMethod): BookingRecord | null => {
@@ -91,16 +97,26 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const updateBookingStatus = useCallback((id: string, status: BookingRecord['status']) => {
+    setBookings((prev) => {
+      const next = prev.map((b) => (b.id === id ? { ...b, status } : b))
+      saveAllBookings(next)
+      return next
+    })
+  }, [])
+
   const value = useMemo(
     () => ({
       draft,
       setDraft,
       bookings,
+      getAllBookings,
       getMyBookings,
       completePayment,
       cancelBooking,
+      updateBookingStatus,
     }),
-    [draft, bookings, getMyBookings, completePayment, cancelBooking],
+    [draft, bookings, getAllBookings, getMyBookings, completePayment, cancelBooking, updateBookingStatus],
   )
 
   return <BookingContext.Provider value={value}>{children}</BookingContext.Provider>

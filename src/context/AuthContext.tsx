@@ -8,7 +8,7 @@ import {
 } from 'react'
 import type { UserProfile } from '../types/profile'
 
-export type UserRole = 'guest' | 'user' | 'admin'
+export type UserRole = 'guest' | 'user' | 'staff' | 'admin'
 
 export interface AuthUser {
   email: string
@@ -48,6 +48,25 @@ function profileKey(email: string) {
   return `pbms_profile_${email}`
 }
 
+const PREDEFINED_ACCOUNTS: Record<string, { password: string; user: AuthUser }> = {
+  staff: {
+    password: '1',
+    user: { email: 'staff', name: 'Parking Staff', role: 'staff' },
+  },
+  'staff@easyparking.vn': {
+    password: '1',
+    user: { email: 'staff@easyparking.vn', name: 'Parking Staff', role: 'staff' },
+  },
+  admin: {
+    password: '1',
+    user: { email: 'admin', name: 'Quản trị viên', role: 'admin' },
+  },
+  'admin@easyparking.vn': {
+    password: '1',
+    user: { email: 'admin@easyparking.vn', name: 'Quản trị viên', role: 'admin' },
+  },
+}
+
 function loadProfile(email: string, name: string): UserProfile {
   const saved = localStorage.getItem(profileKey(email))
   if (saved) return JSON.parse(saved) as UserProfile
@@ -79,6 +98,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     (email: string, password: string) => {
       if (!email.trim() || !password.trim()) return false
+      const normalizedEmail = email.trim().toLowerCase()
+      const account = PREDEFINED_ACCOUNTS[normalizedEmail]
+      if (account) {
+        if (password === account.password) {
+          persistUser(account.user)
+          return true
+        }
+        return false
+      }
       persistUser({
         email: email.trim(),
         name: email.split('@')[0] ?? 'Người dùng',

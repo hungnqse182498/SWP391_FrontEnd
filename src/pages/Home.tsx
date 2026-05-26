@@ -50,8 +50,8 @@ const cardMotion = {
 }
 
 export default function Home() {
-  const { isAuthenticated } = useAuth()
-  const bookHref = isAuthenticated ? '/dat-cho' : '/dang-nhap'
+  const { isAuthenticated, user } = useAuth()
+  const bookHref = user?.role === 'staff' ? '/staff/dashboard' : user?.role === 'admin' ? '/admin/dashboard' : isAuthenticated ? '/dat-cho' : '/dang-nhap'
 
   return (
     <div className="home-page">
