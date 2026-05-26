@@ -5,7 +5,10 @@ import Header from './Header'
 export default function Layout() {
   const location = useLocation()
   const isHome = location.pathname === '/'
-  const isStaffOrAdmin = location.pathname.startsWith('/staff') || location.pathname.startsWith('/admin')
+  const isStaffOrAdmin =
+    location.pathname.startsWith('/staff') ||
+    location.pathname.startsWith('/admin') ||
+    location.pathname.startsWith('/manager')
 
   return (
     <div className="app-shell">

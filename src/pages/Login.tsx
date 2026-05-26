@@ -15,6 +15,7 @@ export default function Login() {
 
   if (isAuthenticated) {
     if (user?.role === 'staff') return <Navigate to="/staff/dashboard" replace />
+    if (user?.role === 'manager') return <Navigate to="/manager/dashboard" replace />
     if (user?.role === 'admin') return <Navigate to="/admin/dashboard" replace />
     return <Navigate to="/dat-cho" replace />
   }
@@ -26,6 +27,8 @@ export default function Login() {
       const lowerEmail = email.trim().toLowerCase()
       if (lowerEmail === 'staff' || lowerEmail === 'staff@easyparking.vn') {
         navigate('/staff/dashboard')
+      } else if (lowerEmail === 'manager' || lowerEmail === 'manager@easyparking.vn') {
+        navigate('/manager/dashboard')
       } else if (lowerEmail === 'admin' || lowerEmail === 'admin@easyparking.vn') {
         navigate('/admin/dashboard')
       } else {

@@ -8,7 +8,7 @@ import {
 } from 'react'
 import type { UserProfile } from '../types/profile'
 
-export type UserRole = 'guest' | 'user' | 'staff' | 'admin'
+export type UserRole = 'guest' | 'user' | 'staff' | 'manager' | 'admin'
 
 export interface AuthUser {
   email: string
@@ -56,6 +56,14 @@ const PREDEFINED_ACCOUNTS: Record<string, { password: string; user: AuthUser }> 
   'staff@easyparking.vn': {
     password: '1',
     user: { email: 'staff@easyparking.vn', name: 'Parking Staff', role: 'staff' },
+  },
+  manager: {
+    password: '1',
+    user: { email: 'manager', name: 'Quản lý bãi', role: 'manager' },
+  },
+  'manager@easyparking.vn': {
+    password: '1',
+    user: { email: 'manager@easyparking.vn', name: 'Quản lý bãi', role: 'manager' },
   },
   admin: {
     password: '1',

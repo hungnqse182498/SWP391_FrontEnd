@@ -27,6 +27,7 @@ export default function Header() {
         {isAuthenticated && (
           <nav className="main-nav" aria-label="Menu người dùng">
             {user?.role === 'staff' && <NavLink to="/staff/dashboard">Bảng điều khiển</NavLink>}
+            {user?.role === 'manager' && <NavLink to="/manager/dashboard">Bảng điều khiển</NavLink>}
             {user?.role === 'admin' && <NavLink to="/admin/dashboard">Bảng điều khiển</NavLink>}
             {user?.role === 'user' && (
               <>
