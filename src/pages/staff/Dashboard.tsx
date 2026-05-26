@@ -1,16 +1,9 @@
 import { useNavigate } from 'react-router-dom'
 import ProtectedRoute from '../../components/ProtectedRoute'
-import { useAuth } from '../../context/AuthContext'
 import { Smartphone, Car, LogOut, AlertCircle } from 'lucide-react'
 
 export default function StaffDashboard() {
   const navigate = useNavigate()
-  const { logout } = useAuth()
-
-  const handleLogout = () => {
-    logout()
-    navigate('/')
-  }
 
   const menuItems = [
     {
@@ -62,15 +55,6 @@ export default function StaffDashboard() {
             </button>
           ))}
         </div>
-
-        <button
-          type="button"
-          className="btn btn-ghost staff-logout-btn"
-          onClick={handleLogout}
-        >
-          <LogOut size={16} />
-          Đăng xuất
-        </button>
       </div>
     </ProtectedRoute>
   )

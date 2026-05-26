@@ -3,7 +3,9 @@ import Footer from './Footer'
 import Header from './Header'
 
 export default function Layout() {
-  const isHome = useLocation().pathname === '/'
+  const location = useLocation()
+  const isHome = location.pathname === '/'
+  const isStaffOrAdmin = location.pathname.startsWith('/staff') || location.pathname.startsWith('/admin')
 
   return (
     <div className="app-shell">
@@ -11,7 +13,7 @@ export default function Layout() {
       <main className={isHome ? 'app-main app-main--home' : 'app-main'}>
         <Outlet />
       </main>
-      <Footer />
+      {!isStaffOrAdmin && <Footer />}
     </div>
   )
 }

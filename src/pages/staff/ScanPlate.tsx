@@ -45,10 +45,6 @@ export default function ScanPlate() {
     }
   }
 
-  const handleLogout = () => {
-    navigate('/')
-  }
-
   return (
     <ProtectedRoute allowedRoles={['staff']}>
       <StaffLayout items={menuItems} activeItem="scan" onSelectItem={(id) => {
@@ -133,14 +129,7 @@ export default function ScanPlate() {
             </div>
           </div>
 
-          <button
-            type="button"
-            className="btn btn-ghost staff-logout-btn"
-            onClick={handleLogout}
-          >
-            <LogOut size={16} />
-            Đăng xuất
-          </button>
+      
         </div>
       </StaffLayout>
     </ProtectedRoute>

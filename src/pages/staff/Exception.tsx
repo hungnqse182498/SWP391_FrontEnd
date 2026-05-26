@@ -40,10 +40,6 @@ export default function Exception() {
     { id: 'wrong-zone', label: 'Xe gửi sai khu vực' },
   ]
 
-  const handleLogout = () => {
-    navigate('/')
-  }
-
   return (
     <ProtectedRoute allowedRoles={['staff']}>
       <StaffLayout items={menuItems} activeItem="exception" onSelectItem={(id) => {
@@ -99,14 +95,7 @@ export default function Exception() {
             </div>
           </div>
 
-          <button
-            type="button"
-            className="btn btn-ghost staff-logout-btn"
-            onClick={handleLogout}
-          >
-            <LogOut size={16} />
-            Đăng xuất
-          </button>
+          
         </div>
       </StaffLayout>
     </ProtectedRoute>
