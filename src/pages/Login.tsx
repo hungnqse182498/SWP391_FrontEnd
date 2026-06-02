@@ -7,7 +7,7 @@ import { DEMO_USER, useAuth } from '../context/AuthContext'
 const LOGO_SRC = '/image/logo.png'
 
 export default function Login() {
-  const { login, isAuthenticated, user } = useAuth()
+  const { login, isAuthenticated, user, isLoading } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState(DEMO_USER.email)
   const [password, setPassword] = useState('123456')
@@ -20,22 +20,31 @@ export default function Login() {
     return <Navigate to="/dat-cho" replace />
   }
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
-    if (login(email, password)) {
-      const lowerEmail = email.trim().toLowerCase()
-      if (lowerEmail === 'staff' || lowerEmail === 'staff@easyparking.vn') {
-        navigate('/staff/dashboard')
-      } else if (lowerEmail === 'manager' || lowerEmail === 'manager@easyparking.vn') {
-        navigate('/manager/dashboard')
-      } else if (lowerEmail === 'admin' || lowerEmail === 'admin@easyparking.vn') {
-        navigate('/admin/dashboard')
+
+    try {
+      const success = await login(email, password)
+      if (success) {
+        const lowerEmail = email.trim().toLowerCase()
+        if (lowerEmail === 'staff' || lowerEmail === 'staff@easyparking.vn') {
+          navigate('/staff/dashboard')
+        } else if (lowerEmail === 'manager' || lowerEmail === 'manager@easyparking.vn') {
+          navigate('/manager/dashboard')
+        } else if (lowerEmail === 'admin' || lowerEmail === 'admin@easyparking.vn') {
+          navigate('/admin/dashboard')
+        } else {
+          navigate('/dat-cho')
+        }
       } else {
-        navigate('/dat-cho')
+        setError('Email hoặc mật khẩu không đúng. Vui lòng thử lại.')
       }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Lỗi đăng nhập. Vui lòng thử lại.'
+      setError(errorMsg)
+      console.error('Login error:', err)
     }
-    else setError('Vui lòng nhập email và mật khẩu.')
   }
 
   return (
@@ -47,10 +56,10 @@ export default function Login() {
           <p>Đăng nhập để đặt chỗ đỗ xe.</p>
         </div>
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
-          <FormField label="Email" name="email" id="email" type="email" icon={Mail} autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@easyparking.vn" />
-          <FormField label="Mật khẩu" name="password" id="password" type="password" icon={Lock} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••" />
+          <FormField label="Email" name="email" id="email" type="email" icon={Mail} autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@easyparking.vn" disabled={isLoading} />
+          <FormField label="Mật khẩu" name="password" id="password" type="password" icon={Lock} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••" disabled={isLoading} />
           {error && <p className="form-error form-error--row"><AlertCircle size={16} strokeWidth={2} aria-hidden />{error}</p>}
-          <button type="submit" className="btn btn-primary btn-block"><LogIn size={18} strokeWidth={2} aria-hidden />Đăng nhập</button>
+          <button type="submit" className="btn btn-primary btn-block" disabled={isLoading}><LogIn size={18} strokeWidth={2} aria-hidden />{isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}</button>
         </form>
        
         <p className="auth-switch">Chưa có tài khoản? <Link to="/dang-ky">Đăng ký ngay</Link></p>

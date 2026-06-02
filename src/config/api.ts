@@ -1,0 +1,148 @@
+// API Configuration for Backend Connection
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5264/api'
+
+export const API_CONFIG = {
+  BASE_URL: API_BASE_URL,
+  TIMEOUT: 30000,
+  HEADERS: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
+}
+
+// API Endpoints
+export const API_ENDPOINTS = {
+  // Auth
+  AUTH_LOGIN: '/auth/login',
+  AUTH_REGISTER: '/auth/register',
+  AUTH_REFRESH: '/auth/refresh-token',
+  AUTH_LOGOUT: '/auth/logout',
+
+  // Users
+  USERS_GET_PROFILE: '/users/profile',
+  USERS_UPDATE_PROFILE: '/users/profile',
+  USERS_LIST: '/users',
+
+  // Floors
+  FLOORS_GET_ALL: '/floors',
+  FLOORS_GET_BY_ID: '/floors/:id',
+  FLOORS_CREATE: '/floors',
+  FLOORS_UPDATE: '/floors/:id',
+  FLOORS_DELETE: '/floors/:id',
+
+  // Parking Slots
+  SLOTS_GET_ALL: '/parking-slots',
+  SLOTS_GET_BY_FLOOR: '/parking-slots/floor/:floorId',
+  SLOTS_UPDATE: '/parking-slots/:id',
+
+  // Vehicle Types
+  VEHICLE_TYPES_GET_ALL: '/vehicle-types',
+  VEHICLE_TYPES_CREATE: '/vehicle-types',
+  VEHICLE_TYPES_UPDATE: '/vehicle-types/:id',
+
+  // Parking Sessions
+  SESSIONS_CREATE: '/parking-sessions',
+  SESSIONS_GET: '/parking-sessions/:id',
+  SESSIONS_CHECKOUT: '/parking-sessions/:id/checkout',
+
+  // Pricing
+  PRICING_GET: '/pricing-policies',
+  PRICING_UPDATE: '/pricing-policies/:id',
+}
+
+// API Client Class
+export class ApiClient {
+  private baseUrl: string
+  private token: string | null = null
+
+  constructor(baseUrl: string = API_CONFIG.BASE_URL) {
+    this.baseUrl = baseUrl
+    this.loadToken()
+  }
+
+  // Load token from localStorage
+  private loadToken() {
+    this.token = localStorage.getItem('auth_token')
+  }
+
+  // Set token
+  setToken(token: string) {
+    this.token = token
+    localStorage.setItem('auth_token', token)
+  }
+
+  // Clear token
+  clearToken() {
+    this.token = null
+    localStorage.removeItem('auth_token')
+  }
+
+  // Get headers with authorization
+  private getHeaders(): Record<string, string> {
+    const headers = { ...API_CONFIG.HEADERS }
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`
+    }
+    return headers
+  }
+
+  // Generic request method
+  async request<T>(
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    endpoint: string,
+    data?: unknown,
+  ): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`
+    const options: RequestInit = {
+      method,
+      headers: this.getHeaders(),
+    }
+
+    if (data && (method === 'POST' || method === 'PUT')) {
+      options.body = JSON.stringify(data)
+    }
+
+    try {
+      const response = await fetch(url, options)
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          this.clearToken()
+          window.location.href = '/login'
+        }
+        const error = await response.text()
+        throw new Error(`HTTP ${response.status}: ${error}`)
+      }
+
+      const contentType = response.headers.get('content-type')
+      if (contentType?.includes('application/json')) {
+        return (await response.json()) as T
+      }
+
+      return response.text() as unknown as T
+    } catch (error) {
+      console.error(`API Error [${method} ${endpoint}]:`, error)
+      throw error
+    }
+  }
+
+  // Convenience methods
+  async get<T>(endpoint: string): Promise<T> {
+    return this.request<T>('GET', endpoint)
+  }
+
+  async post<T>(endpoint: string, data?: unknown): Promise<T> {
+    return this.request<T>('POST', endpoint, data)
+  }
+
+  async put<T>(endpoint: string, data?: unknown): Promise<T> {
+    return this.request<T>('PUT', endpoint, data)
+  }
+
+  async delete<T>(endpoint: string): Promise<T> {
+    return this.request<T>('DELETE', endpoint)
+  }
+}
+
+// Create a default API client instance
+export const apiClient = new ApiClient()

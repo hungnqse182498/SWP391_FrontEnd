@@ -1,24 +1,23 @@
-# Logs
-logs
-*.log
+# ==========================================
+# FRONTEND (Node/JS) - Đặt trong folder FrontEnd
+# ==========================================
+
+# Phụ thuộc và đầu ra của Node
+node_modules/
+dist/
+dist-ssr/
+.next/
+.nuxt/
+out/
+
+# Logs của các Package Manager
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Các file môi trường local
 *.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+.env
+.env.local
+.env.*.local
