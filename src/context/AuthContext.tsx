@@ -93,12 +93,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password: password.trim(),
         })
 
-        if (response.success && response.data) {
-          const { user: backendUser } = response.data
+        if (response.isSuccess && response.result) {
+          const { user: backendUser } = response.result
           persistUser({
             email: backendUser.email,
             name: backendUser.fullName,
-            role: (backendUser.role.toLowerCase() as UserRole) || 'user',
+            role: (backendUser.roleName.toLowerCase() as UserRole) || 'user',
           })
           return true
         }
@@ -156,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const response = await authService.register(registerData)
 
-        if (response.success) {
+        if (response.isSuccess) {
           // Auto login after successful registration
           try {
             const loginResponse = await authService.login({
@@ -164,12 +164,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               password,
             })
 
-            if (loginResponse.success && loginResponse.data) {
-              const { user: backendUser } = loginResponse.data
+            if (loginResponse.isSuccess && loginResponse.result) {
+              const { user: backendUser } = loginResponse.result
               persistUser({
                 email: backendUser.email,
                 name: backendUser.fullName,
-                role: (backendUser.role.toLowerCase() as UserRole) || 'user',
+                role: (backendUser.roleName.toLowerCase() as UserRole) || 'user',
               })
               return { ok: true, message: 'Đăng ký thành công! Đang chuyển hướng...' }
             } else {

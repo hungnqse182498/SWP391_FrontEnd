@@ -7,19 +7,20 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  success: boolean
+  statusCode: number
   message: string
-  data: {
-    accessToken: string
-    refreshToken: string
+  isSuccess: boolean
+  result?: {
     user: {
-      id: string
-      email: string
+      userId: string
       userName: string
+      email: string
       fullName: string
       phoneNumber: string
-      role: string
+      roleName: string
     }
+    accessToken: string
+    refreshToken: string
   }
 }
 
@@ -33,10 +34,11 @@ export interface RegisterRequest {
 }
 
 export interface RegisterResponse {
-  success: boolean
+  statusCode: number
   message: string
-  data?: {
-    id: string
+  isSuccess: boolean
+  result?: {
+    userId: string
     email: string
     userName: string
     fullName: string
@@ -49,9 +51,10 @@ export interface RefreshTokenRequest {
 }
 
 export interface RefreshTokenResponse {
-  success: boolean
+  statusCode: number
   message: string
-  data: {
+  isSuccess: boolean
+  result?: {
     accessToken: string
     refreshToken: string
   }
@@ -67,51 +70,29 @@ export class AuthService {
         credentials,
       )
 
-      if (response.success && response.data?.accessToken) {
-        this.api.setToken(response.data.accessToken)
-        localStorage.setItem('refresh_token', response.data.refreshToken)
-        localStorage.setItem('user_email', response.data.user.email)
-        localStorage.setItem('user_name', response.data.user.fullName)
-        localStorage.setItem('user_role', response.data.user.role)
+      if (response.isSuccess && response.result?.accessToken) {
+        this.api.setToken(response.result.accessToken)
+        localStorage.setItem('refresh_token', response.result.refreshToken)
+        localStorage.setItem('user_email', response.result.user.email)
+        localStorage.setItem('user_name', response.result.user.fullName)
+        localStorage.setItem('user_role', response.result.user.roleName)
         return response
       }
 
       // Handle success: false response
       return {
-        success: false,
+        statusCode: response.statusCode || 400,
         message: response.message || 'Login failed',
-        data: {
-          accessToken: '',
-          refreshToken: '',
-          user: {
-            id: '',
-            email: '',
-            userName: '',
-            fullName: '',
-            phoneNumber: '',
-            role: '',
-          },
-        },
+        isSuccess: false,
       }
     } catch (error) {
       console.error('Login error:', error)
       // Return error response instead of throwing
       const errorMessage = error instanceof Error ? error.message : 'Login failed'
       return {
-        success: false,
+        statusCode: 400,
         message: errorMessage,
-        data: {
-          accessToken: '',
-          refreshToken: '',
-          user: {
-            id: '',
-            email: '',
-            userName: '',
-            fullName: '',
-            phoneNumber: '',
-            role: '',
-          },
-        },
+        isSuccess: false,
       }
     }
   }
@@ -127,8 +108,9 @@ export class AuthService {
       console.error('Register error:', error)
       const errorMessage = error instanceof Error ? error.message : 'Registration failed'
       return {
-        success: false,
+        statusCode: 400,
         message: errorMessage,
+        isSuccess: false,
       }
     }
   }
@@ -151,9 +133,9 @@ export class AuthService {
         { refreshToken } as RefreshTokenRequest,
       )
 
-      if (response.success && response.data.accessToken) {
-        this.api.setToken(response.data.accessToken)
-        localStorage.setItem('refresh_token', response.data.refreshToken)
+      if (response.isSuccess && response.result?.accessToken) {
+        this.api.setToken(response.result.accessToken)
+        localStorage.setItem('refresh_token', response.result.refreshToken)
       }
 
       return response

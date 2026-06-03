@@ -79,7 +79,10 @@ export class ApiClient {
 
   // Get headers with authorization
   private getHeaders(): Record<string, string> {
-    const headers = { ...API_CONFIG.HEADERS }
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    }
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`
     }
