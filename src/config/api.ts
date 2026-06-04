@@ -18,10 +18,18 @@ export const API_ENDPOINTS = {
   AUTH_REFRESH: '/auth/refresh-token',
   AUTH_LOGOUT: '/auth/logout',
 
-  // Users
+  // Users (profile — legacy paths)
   USERS_GET_PROFILE: '/users/profile',
   USERS_UPDATE_PROFILE: '/users/profile',
   USERS_LIST: '/users',
+
+  // User management (admin)
+  USER_GET_ALL: '/User/all',
+  USER_GET_ROLES: '/User/roles',
+  USER_CREATE: '/User/create',
+  USER_UPDATE: '/User/update',
+  USER_DELETE: '/User',
+  USER_STATUS: '/User',
 
   // Floors
   FLOORS_GET_ALL: '/floors',
@@ -91,7 +99,7 @@ export class ApiClient {
 
   // Generic request method
   async request<T>(
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
     endpoint: string,
     data?: unknown,
   ): Promise<T> {
@@ -101,7 +109,7 @@ export class ApiClient {
       headers: this.getHeaders(),
     }
 
-    if (data && (method === 'POST' || method === 'PUT')) {
+    if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
       options.body = JSON.stringify(data)
     }
 
@@ -144,6 +152,10 @@ export class ApiClient {
 
   async delete<T>(endpoint: string): Promise<T> {
     return this.request<T>('DELETE', endpoint)
+  }
+
+  async patch<T>(endpoint: string, data?: unknown): Promise<T> {
+    return this.request<T>('PATCH', endpoint, data)
   }
 }
 
