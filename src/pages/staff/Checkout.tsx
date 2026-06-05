@@ -11,12 +11,7 @@ interface StaffMenuItem {
 }
 
 const menuItems: StaffMenuItem[] = [
-  { id: 'scan', label: 'Quét biển số', icon: <Smartphone size={18} /> },
-  {
-    id: 'checkin',
-    label: 'Tạo lượt gửi xe',
-    icon: <Car size={18} />,
-  },
+
   {
     id: 'checkout',
     label: 'Xử lý xe ra bãi',
@@ -65,9 +60,8 @@ export default function Checkout() {
   return (
     <ProtectedRoute allowedRoles={['staff']}>
       <StaffLayout items={menuItems} activeItem="checkout" onSelectItem={(id) => {
-        if (id === 'scan') navigate('/staff/scan-plate')
-        else if (id === 'checkin') navigate('/staff/create-session')
-        else if (id === 'checkout') navigate('/staff/checkout')
+
+         if (id === 'checkout') navigate('/staff/checkout')
         else if (id === 'exception') navigate('/staff/exception')
       }}>
         <div className="staff-content-wrapper">
