@@ -11,17 +11,7 @@ interface StaffMenuItem {
 }
 
 const menuItems: StaffMenuItem[] = [
-  { id: 'scan', label: 'Quét biển số', icon: <Smartphone size={18} /> },
-  {
-    id: 'checkin',
-    label: 'Tạo lượt gửi xe',
-    icon: <Car size={18} />,
-  },
-  {
-    id: 'checkout',
-    label: 'Xử lý xe ra bãi',
-    icon: <LogOut size={18} />,
-  },
+
   {
     id: 'exception',
     label: 'Xử lý ngoại lệ',

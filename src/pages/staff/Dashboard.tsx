@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import ProtectedRoute from '../../components/ProtectedRoute'
-import { Smartphone, Car, LogOut, AlertCircle } from 'lucide-react'
+import { LogIn, LogOut, } from 'lucide-react'
 
 export default function StaffDashboard() {
   const navigate = useNavigate()
@@ -8,32 +8,20 @@ export default function StaffDashboard() {
   const menuItems = [
     {
       id: 'scan',
-      label: 'Quét biển số',
+      label: 'Cổng vào',
       desc: 'Quét/nhập biển số xe vào bãi',
-      icon: <Smartphone size={32} />,
+      icon: <LogIn size={32} />,
       path: '/staff/scan-plate',
     },
-    {
-      id: 'checkin',
-      label: 'Tạo lượt gửi xe',
-      desc: 'Tạo parking session mới',
-      icon: <Car size={32} />,
-      path: '/staff/create-session',
-    },
+  
     {
       id: 'checkout',
-      label: 'Xử lý xe ra bãi',
+      label: 'Cổng ra',
       desc: 'Tính phí và xác nhận thanh toán',
       icon: <LogOut size={32} />,
       path: '/staff/checkout',
     },
-    {
-      id: 'exception',
-      label: 'Xử lý ngoại lệ',
-      desc: 'Báo cáo và xử lý sự cố',
-      icon: <AlertCircle size={32} />,
-      path: '/staff/exception',
-    },
+    
   ]
 
   return (

@@ -17,11 +17,7 @@ const menuItems: StaffMenuItem[] = [
     label: 'Tạo lượt gửi xe',
     icon: <Car size={18} />,
   },
-  {
-    id: 'checkout',
-    label: 'Xử lý xe ra bãi',
-    icon: <LogOut size={18} />,
-  },
+  
   {
     id: 'exception',
     label: 'Xử lý ngoại lệ',
@@ -48,7 +44,7 @@ export default function CreateSession() {
       <StaffLayout items={menuItems} activeItem="checkin" onSelectItem={(id) => {
         if (id === 'scan') navigate('/staff/scan-plate')
         else if (id === 'checkin') navigate('/staff/create-session')
-        else if (id === 'checkout') navigate('/staff/checkout')
+      
         else if (id === 'exception') navigate('/staff/exception')
       }}>
         <div className="staff-content-wrapper">
