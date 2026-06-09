@@ -26,8 +26,6 @@ import AdminDashboard from './pages/admin/Dashboard'
 
 import AdminUsers from './pages/admin/Users'
 
-import AdminPermissions from './pages/admin/Permissions'
-
 import AdminSystemConfig from './pages/admin/SystemConfig'
 
 import ManagerDashboard from './pages/manager/Dashboard'
@@ -105,8 +103,6 @@ export default function App() {
               <Route path="admin/dashboard" element={<AdminDashboard />} />
 
               <Route path="admin/users" element={<AdminUsers />} />
-
-              <Route path="admin/permissions" element={<AdminPermissions />} />
 
               <Route path="admin/system-config" element={<AdminSystemConfig />} />
 
