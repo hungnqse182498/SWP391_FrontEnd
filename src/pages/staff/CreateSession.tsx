@@ -2,7 +2,7 @@ import { useState } from 'react'
 import StaffLayout from '../../components/StaffLayout'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { useNavigate } from 'react-router-dom'
-import { Smartphone, Car, LogOut, AlertCircle } from 'lucide-react'
+import { Smartphone, Car, AlertCircle } from 'lucide-react'
 
 interface StaffMenuItem {
   id: string
