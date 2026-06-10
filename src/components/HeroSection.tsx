@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 export default function HeroSection() {
   const [vehicle, setVehicle] = useState<"car" | "bike">("car");
+  const [startTime, setStartTime] = useState("");
 
   return (
     <section className="home-hero">
@@ -81,12 +82,20 @@ export default function HeroSection() {
                 <span>Thời gian đến</span>
                 <div>
                   <CalendarDays size={18} strokeWidth={2.2} aria-hidden />
-                  <input type="datetime-local" />
+                  <input
+                    type="datetime-local"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
                 </div>
               </label>
             </div>
 
-            <Link to="/dat-cho" className="hero-search-btn">
+            <Link
+              to="/dat-cho"
+              state={{ vehicle, startTime }}
+              className="hero-search-btn"
+            >
               Tìm chỗ ngay
               <Search size={20} strokeWidth={2.3} aria-hidden />
             </Link>

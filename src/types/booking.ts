@@ -26,6 +26,8 @@ export interface BookingRecord {
   paymentMethod?: PaymentMethod
   createdAt: string
   paidAt?: string
+  isPreRegistered?: boolean
+  vehicleType?: 'car' | 'bike'
 }
 
 export interface BookingDraft {
@@ -35,4 +37,7 @@ export interface BookingDraft {
   startTime: string
   hours: number
   vehiclePlate: string
+  isPreRegistered?: boolean
+  vehicleType?: 'car' | 'bike'
+  depositAmount?: number
 }

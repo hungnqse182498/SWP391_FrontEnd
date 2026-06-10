@@ -32,14 +32,17 @@ function ConfirmContent() {
     return <Navigate to="/dat-cho" replace />
   }
 
-  const total = calcTotal(draft.spots.length, hours)
+  const isPreRegistered = (draft as any).isPreRegistered
+  const total = isPreRegistered
+    ? ((draft as any).depositAmount ?? 25000)
+    : calcTotal(draft.spots.length, hours)
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     if (!plate.trim()) return
     setDraft({
       ...draft,
-      hours,
+      hours: isPreRegistered ? 1 : hours,
       startTime: new Date(startLocal).toISOString(),
       vehiclePlate: plate.trim(),
     })
@@ -65,16 +68,22 @@ function ConfirmContent() {
         <div className="confirm-card">
           <h2>
             <MapPin size={20} strokeWidth={2} aria-hidden />
-            {draft.floorName}
+            {isPreRegistered ? 'Đăng ký giữ chỗ trước' : draft.floorName}
           </h2>
-          <ul className="confirm-spots">
-            {draft.spots.map((s) => (
-              <li key={s.id}>
-                <strong>{s.label}</strong>
-                <span>{s.type === 'ev' ? 'Xe điện' : s.type === 'handicap' ? 'Khuyết tật' : 'Tiêu chuẩn'}</span>
-              </li>
-            ))}
-          </ul>
+          {isPreRegistered ? (
+            <div style={{ padding: '1rem', color: 'var(--text-muted)' }}>
+              Đăng ký trước (Tự động xếp chỗ khi xe vào bãi)
+            </div>
+          ) : (
+            <ul className="confirm-spots">
+              {draft.spots.map((s) => (
+                <li key={s.id}>
+                  <strong>{s.label}</strong>
+                  <span>{s.type === 'ev' ? 'Xe điện' : s.type === 'handicap' ? 'Khuyết tật' : 'Tiêu chuẩn'}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <form className="confirm-form card-panel" onSubmit={handleSubmit}>
@@ -102,31 +111,33 @@ function ConfirmContent() {
               required
             />
           </div>
-          <div className="form-field">
-            <label htmlFor="hours">
-              <Clock size={16} strokeWidth={2} aria-hidden /> Số giờ đỗ
-            </label>
-            <select
-              id="hours"
-              className="input-standalone"
-              value={hours}
-              onChange={(e) => setHours(Number(e.target.value))}
-            >
-              {[1, 2, 3, 4, 6, 8, 12, 24].map((h) => (
-                <option key={h} value={h}>
-                  {h} giờ
-                </option>
-              ))}
-            </select>
-          </div>
+          {!isPreRegistered && (
+            <div className="form-field">
+              <label htmlFor="hours">
+                <Clock size={16} strokeWidth={2} aria-hidden /> Số giờ đỗ
+              </label>
+              <select
+                id="hours"
+                className="input-standalone"
+                value={hours}
+                onChange={(e) => setHours(Number(e.target.value))}
+              >
+                {[1, 2, 3, 4, 6, 8, 12, 24].map((h) => (
+                  <option key={h} value={h}>
+                    {h} giờ
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="confirm-summary">
             <div>
-              <span>Số chỗ</span>
-              <strong>{draft.spots.length}</strong>
+              <span>{isPreRegistered ? 'Hình thức' : 'Số chỗ'}</span>
+              <strong>{isPreRegistered ? 'Đăng ký trước' : draft.spots.length}</strong>
             </div>
             <div>
-              <span>Tổng thanh toán</span>
+              <span>{isPreRegistered ? 'Tiền cọc cần thanh toán' : 'Tổng thanh toán'}</span>
               <strong className="price-total">{formatCurrency(total)}</strong>
             </div>
           </div>

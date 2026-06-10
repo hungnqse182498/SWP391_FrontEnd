@@ -24,7 +24,10 @@ function PaymentContent() {
     return <Navigate to="/dat-cho" replace />
   }
 
-  const total = calcTotal(draft.spots.length, draft.hours)
+  const isPreRegistered = (draft as any).isPreRegistered
+  const total = isPreRegistered
+    ? ((draft as any).depositAmount ?? (draft.vehicleType === 'bike' ? 5000 : 25000))
+    : calcTotal(draft.spots.length, draft.hours)
 
   const handlePay = async () => {
     setLoading(true)
@@ -68,13 +71,15 @@ function PaymentContent() {
 
         <div className="card-panel payment-summary">
           <h2>Chi tiết</h2>
-          <p><strong>{draft.floorName}</strong></p>
+          <p><strong>{isPreRegistered ? 'Đăng ký giữ chỗ trước' : draft.floorName}</strong></p>
           <p className="muted-text">
-            {draft.spots.map((s) => s.label).join(', ')} · {draft.hours} giờ
+            {isPreRegistered
+              ? 'Tự động xếp chỗ · Tiền cọc 1 giờ'
+              : `${draft.spots.map((s) => s.label).join(', ')} · ${draft.hours} giờ`}
           </p>
           <p className="muted-text">Xe: {draft.vehiclePlate}</p>
           <div className="payment-total">
-            <span>Tổng cộng</span>
+            <span>{isPreRegistered ? 'Tiền cọc cần thanh toán' : 'Tổng cộng'}</span>
             <strong>{formatCurrency(total)}</strong>
           </div>
           <button

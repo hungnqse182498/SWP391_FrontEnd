@@ -58,8 +58,11 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     (method: PaymentMethod): BookingRecord | null => {
       if (!user || !draft || draft.spots.length === 0) return null
 
-      const endTime = addHours(draft.startTime, draft.hours)
-      const total = calcTotal(draft.spots.length, draft.hours)
+      const isPreRegistered = draft.isPreRegistered
+      const total = isPreRegistered
+        ? (draft.depositAmount ?? (draft.vehicleType === 'bike' ? 5000 : 25000))
+        : calcTotal(draft.spots.length, draft.hours)
+      const endTime = isPreRegistered ? addHours(draft.startTime, 1) : addHours(draft.startTime, draft.hours)
       const now = new Date().toISOString()
 
       const record: BookingRecord = {
@@ -71,13 +74,15 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         startTime: draft.startTime,
         endTime,
         hours: draft.hours,
-        pricePerHour: PRICE_PER_HOUR,
+        pricePerHour: isPreRegistered ? total : PRICE_PER_HOUR,
         totalAmount: total,
         vehiclePlate: draft.vehiclePlate,
         status: 'paid',
         paymentMethod: method,
         createdAt: now,
         paidAt: now,
+        isPreRegistered,
+        vehicleType: draft.vehicleType,
       }
 
       const next = [record, ...bookings]

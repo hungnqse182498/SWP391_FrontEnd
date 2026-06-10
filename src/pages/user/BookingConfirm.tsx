@@ -15,6 +15,11 @@ function ConfirmContent() {
     )
   }
 
+  const isPreRegistered = (draft as any).isPreRegistered
+  const total = isPreRegistered
+    ? ((draft as any).depositAmount ?? 25000)
+    : draft.spots.length * draft.hours * 15000
+
   return (
     <section className="booking-confirm-page">
       <header className="page-header">
@@ -25,15 +30,19 @@ function ConfirmContent() {
       </header>
       <div className="confirm-summary card-panel">
         <div>
-          <h2>{draft.floorName}</h2>
-          <p>Chỗ: {draft.spots.map((spot) => spot.label).join(', ')}</p>
-          <p>Thời gian: {new Date(draft.startTime).toLocaleString()}</p>
-          <p>Số giờ: {draft.hours}</p>
-          <p>Biển số: {draft.vehiclePlate}</p>
+          <h2>{isPreRegistered ? 'Đăng ký giữ chỗ trước' : draft.floorName}</h2>
+          {isPreRegistered ? (
+            <p><strong>Hình thức:</strong> Đăng ký trước (Tự động xếp chỗ khi vào bãi)</p>
+          ) : (
+            <p><strong>Chỗ:</strong> {draft.spots.map((spot) => spot.label).join(', ')}</p>
+          )}
+          <p><strong>Thời gian vào:</strong> {new Date(draft.startTime).toLocaleString('vi-VN')}</p>
+          {!isPreRegistered && <p><strong>Số giờ:</strong> {draft.hours}</p>}
+          <p><strong>Biển số:</strong> {draft.vehiclePlate}</p>
         </div>
         <div className="confirm-total">
-          <strong>{formatCurrency(draft.spots.length * draft.hours * 15000)}</strong>
-          <span>Tạm tính</span>
+          <strong>{formatCurrency(total)}</strong>
+          <span>{isPreRegistered ? 'Tiền cọc cần thanh toán' : 'Tạm tính'}</span>
         </div>
       </div>
       <Link to="/thanh-toan" className="btn btn-primary btn-block">Tiếp tục thanh toán</Link>
