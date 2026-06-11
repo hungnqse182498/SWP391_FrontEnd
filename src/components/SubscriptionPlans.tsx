@@ -6,14 +6,14 @@ export default function SubscriptionPlans() {
 
   const prices = {
     car: {
-      m1: "1.200k",
-      m3: "3.200k",
-      m12: "11.500k",
+      m1: "1.000.000đ",
+      m3: "2.500.000đ",
+      m12: "10.000.000đ",
     },
     bike: {
-      m1: "450k",
-      m3: "1.200k",
-      m12: "4.200k",
+      m1: "200.000đ",
+      m3: "500.000đ",
+      m12: "1.000.000đ",
     },
   };
 
@@ -49,7 +49,6 @@ export default function SubscriptionPlans() {
             title="1 Tháng"
             description="Phù hợp cho khách vãng lai thường xuyên"
             price={current.m1}
-            period="/tháng"
             features={["Truy cập 24/7 không giới hạn", "Nhận diện biển số tự động"]}
             disabledFeature="Vị trí đỗ cố định"
           />
@@ -59,7 +58,6 @@ export default function SubscriptionPlans() {
             title="3 Tháng"
             description="Lựa chọn tối ưu cho cư dân"
             price={current.m3}
-            period="/3 tháng"
             features={[
               "Ưu tiên vị trí đỗ thuận tiện",
               "Miễn phí sạc xe điện 5h/tuần",
@@ -73,7 +71,6 @@ export default function SubscriptionPlans() {
             title="12 Tháng"
             description="Cam kết dài hạn, ưu đãi tối đa"
             price={current.m12}
-            period="/năm"
             features={[
               "Vị trí đỗ riêng biệt, cố định",
               "Miễn phí rửa xe hằng tháng",
@@ -91,7 +88,6 @@ interface PlanCardProps {
   title: string;
   description: string;
   price: string;
-  period: string;
   features: string[];
   disabledFeature?: string;
   popular?: boolean;
@@ -102,7 +98,6 @@ function PlanCard({
   title,
   description,
   price,
-  period,
   features,
   disabledFeature,
   popular,
@@ -116,9 +111,7 @@ function PlanCard({
       <p>{description}</p>
 
       <div className="plan-price">
-        <span>₫</span>
         <strong>{price}</strong>
-        <small>{period}</small>
       </div>
 
       <ul className="plan-features">
