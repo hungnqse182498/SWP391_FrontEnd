@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import BookingSteps from '../../components/BookingSteps'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { useBooking } from '../../context/BookingContext'
 import { formatCurrency } from '../../utils/pricing'
@@ -22,6 +23,7 @@ function ConfirmContent() {
 
   return (
     <section className="booking-confirm-page">
+      <BookingSteps current={2} />
       <header className="page-header">
         <div>
           <h1>Xác nhận đặt chỗ</h1>
@@ -45,7 +47,10 @@ function ConfirmContent() {
           <span>{isPreRegistered ? 'Tiền cọc cần thanh toán' : 'Tạm tính'}</span>
         </div>
       </div>
-      <Link to="/thanh-toan" className="btn btn-primary btn-block">Tiếp tục thanh toán</Link>
+      <div className="booking-actions-group">
+        <Link to="/dat-cho" className="btn btn-outline btn-block">Quay lại</Link>
+        <Link to="/thanh-toan" className="btn btn-primary btn-block">Tiếp tục thanh toán</Link>
+      </div>
     </section>
   )
 }

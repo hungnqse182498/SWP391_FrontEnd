@@ -2223,3 +2223,24 @@ ul, ol { margin: 0; padding: 0; }
     width: 100%;
   }
 }
+
+.booking-actions-group {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.booking-actions-group .btn {
+  flex: 1;
+  width: auto;
+}
+
+@media (max-width: 768px) {
+  .booking-actions-group {
+    flex-direction: column;
+  }
+  .booking-actions-group .btn {
+    width: 100%;
+  }
+}
