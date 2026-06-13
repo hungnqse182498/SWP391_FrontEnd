@@ -59,9 +59,12 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       if (!user || !draft || draft.spots.length === 0) return null
 
       const isPreRegistered = draft.isPreRegistered
+      const isMonthly = draft.isMonthlyCustomer
       const total = isPreRegistered
         ? (draft.depositAmount ?? (draft.vehicleType === 'bike' ? 5000 : 25000))
-        : calcTotal(draft.spots.length, draft.hours)
+        : isMonthly
+          ? 0
+          : calcTotal(draft.spots.length, draft.hours)
       const endTime = isPreRegistered ? addHours(draft.startTime, 1) : addHours(draft.startTime, draft.hours)
       const now = new Date().toISOString()
 
@@ -83,6 +86,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         paidAt: now,
         isPreRegistered,
         vehicleType: draft.vehicleType,
+        isMonthlyCustomer: draft.isMonthlyCustomer,
       }
 
       const next = [record, ...bookings]

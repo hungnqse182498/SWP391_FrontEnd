@@ -28,6 +28,7 @@ export interface BookingRecord {
   paidAt?: string
   isPreRegistered?: boolean
   vehicleType?: 'car' | 'bike'
+  isMonthlyCustomer?: boolean
 }
 
 export interface BookingDraft {
@@ -40,4 +41,8 @@ export interface BookingDraft {
   isPreRegistered?: boolean
   vehicleType?: 'car' | 'bike'
   depositAmount?: number
+  isMonthlyCustomer?: boolean
+  reservationId?: string
+  paymentUrl?: string
+  orderCode?: string
 }

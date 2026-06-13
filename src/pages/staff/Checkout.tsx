@@ -3,6 +3,8 @@ import StaffLayout from '../../components/StaffLayout'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { useNavigate } from 'react-router-dom'
 import { LogOut, AlertCircle } from 'lucide-react'
+import { parkingOperationApi, type ParkingFeePreview } from '../../utils/apiServices'
+import { formatCurrency } from '../../utils/pricing'
 
 interface StaffMenuItem {
   id: string
@@ -11,57 +13,72 @@ interface StaffMenuItem {
 }
 
 const menuItems: StaffMenuItem[] = [
-
-  {
-    id: 'checkout',
-    label: 'Xử lý xe ra bãi',
-    icon: <LogOut size={18} />,
-  },
-  {
-    id: 'exception',
-    label: 'Xử lý ngoại lệ',
-    icon: <AlertCircle size={18} />,
-  },
+  { id: 'checkout', label: 'Xử lý xe ra bãi', icon: <LogOut size={18} /> },
+  { id: 'exception', label: 'Xử lý ngoại lệ', icon: <AlertCircle size={18} /> },
 ]
 
 export default function Checkout() {
   const navigate = useNavigate()
   const [licensePlate, setLicensePlate] = useState('')
-  const [scannedData, setScannedData] = useState<{
-    plate: string
-    entryTime: string
-    exitTime: string
-    duration: number
-    fee: number
-    paid: boolean
-    location: string
-  } | null>(null)
+  const [cardCode, setCardCode] = useState('CARD-001')
+  const [gateName, setGateName] = useState('Cổng A')
+  const [paymentMethod, setPaymentMethod] = useState('Cash')
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
+  const [preview, setPreview] = useState<ParkingFeePreview | null>(null)
 
-  const handleScan = () => {
-    if (licensePlate.trim()) {
-      // Mock data
-      setScannedData({
-        plate: licensePlate,
-        entryTime: new Date(Date.now() - 2 * 60 * 60 * 1000).toLocaleTimeString('vi-VN'),
-        exitTime: new Date().toLocaleTimeString('vi-VN'),
-        duration: 2,
-        fee: 30000,
-        paid: false,
-        location: 'Tầng 3 - Khu vực A',
+  const handleScan = async () => {
+    if (!licensePlate.trim() && !cardCode.trim()) return
+    setLoading(true)
+    setMessage('')
+    try {
+      const res = await parkingOperationApi.guestCheckOutPreview({
+        licensePlate: licensePlate.trim() || undefined,
+        cardCode: cardCode.trim(),
       })
-      setLicensePlate('')
+      if (res.isSuccess && res.result) {
+        setPreview(res.result)
+      } else {
+        setMessage(res.message || 'Không tìm thấy phiên gửi xe')
+        setPreview(null)
+      }
+    } catch (err) {
+      console.error(err)
+      setMessage('Lỗi kết nối API')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleLogout = () => {
-    navigate('/')
+  const handleCheckout = async () => {
+    setLoading(true)
+    setMessage('')
+    try {
+      const res = await parkingOperationApi.guestCheckOut({
+        licensePlate: licensePlate.trim() || undefined,
+        cardCode: cardCode.trim(),
+        gateName,
+        paymentMethod,
+      })
+      if (res.isSuccess) {
+        setMessage(res.message || 'Checkout thành công')
+        setPreview(null)
+        setLicensePlate('')
+      } else {
+        setMessage(res.message || 'Checkout thất bại')
+      }
+    } catch (err) {
+      console.error(err)
+      setMessage('Lỗi kết nối API')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <ProtectedRoute allowedRoles={['staff']}>
       <StaffLayout items={menuItems} activeItem="checkout" onSelectItem={(id) => {
-
-         if (id === 'checkout') navigate('/staff/checkout')
+        if (id === 'checkout') navigate('/staff/checkout')
         else if (id === 'exception') navigate('/staff/exception')
       }}>
         <div className="staff-content-wrapper">
@@ -70,7 +87,6 @@ export default function Checkout() {
             <p className="section-desc">Quét biển số xe ra bãi, xác nhận thời gian ra, kiểm tra phí cần thanh toán, thu phí gửi xe.</p>
 
             <div className="scan-container">
-              {/* Camera Preview */}
               <div className="camera-preview">
                 <div className="camera-frame">
                   <div className="camera-placeholder">
@@ -83,8 +99,12 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Scanned Info */}
               <div className="scan-form">
+                <div className="form-field">
+                  <label htmlFor="card-code-out">Mã thẻ</label>
+                  <input id="card-code-out" className="input-standalone" value={cardCode} onChange={(e) => setCardCode(e.target.value)} />
+                </div>
+
                 <div className="form-field">
                   <label htmlFor="license-plate-checkout">Biển số xe</label>
                   <div className="input-group">
@@ -95,62 +115,53 @@ export default function Checkout() {
                       placeholder="51A-12345"
                       value={licensePlate}
                       onChange={(e) => setLicensePlate(e.target.value.toUpperCase())}
-                      onKeyPress={(e) => e.key === 'Enter' && handleScan()}
+                      onKeyDown={(e) => e.key === 'Enter' && handleScan()}
                     />
-                    <button type="button" className="btn btn-primary" onClick={handleScan}>
-                      Quét
+                    <button type="button" className="btn btn-primary" onClick={handleScan} disabled={loading}>
+                      {loading ? '...' : 'Quét'}
                     </button>
                   </div>
                 </div>
 
-                {scannedData && (
+                <div className="form-field">
+                  <label>Cổng ra</label>
+                  <select className="input-standalone select" value={gateName} onChange={(e) => setGateName(e.target.value)}>
+                    <option value="Cổng A">Cổng A</option>
+                    <option value="Cổng B">Cổng B</option>
+                  </select>
+                </div>
+
+                <div className="form-field">
+                  <label>Thanh toán</label>
+                  <select className="input-standalone select" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+                    <option value="Cash">Tiền mặt</option>
+                    <option value="PayOS">PayOS</option>
+                  </select>
+                </div>
+
+                {message && <p className="alert-inline">{message}</p>}
+
+                {preview && (
                   <div className="scan-result">
                     <h3>Thông tin xe</h3>
                     <div className="scan-info">
-                      <p>
-                        <strong>Biển số:</strong> {scannedData.plate}
-                      </p>
-                      <p>
-                        <strong>Giờ vào:</strong> {scannedData.entryTime}
-                      </p>
-                      <p>
-                        <strong>Giờ ra:</strong> {scannedData.exitTime}
-                      </p>
-                      <p>
-                        <strong>Thời gian gửi:</strong> {scannedData.duration} giờ
-                      </p>
-                      <p>
-                        <strong>Vị trí:</strong> {scannedData.location}
-                      </p>
-                      <p className="fee-amount">
-                        <strong>Phí gửi:</strong> {scannedData.fee.toLocaleString()} đ
-                      </p>
-                      <p className={scannedData.paid ? 'payment-status-paid' : 'payment-status-unpaid'}>
-                        <strong>Trạng thái:</strong> {scannedData.paid ? 'Đã thanh toán' : 'Chưa thanh toán'}
-                      </p>
+                      <p><strong>Biển số:</strong> {preview.licensePlate}</p>
+                      <p><strong>Giờ vào:</strong> {new Date(preview.entryTime).toLocaleString('vi-VN')}</p>
+                      <p><strong>Giờ ra:</strong> {new Date(preview.exitTime).toLocaleString('vi-VN')}</p>
+                      <p><strong>Thời gian gửi:</strong> {preview.totalHours.toFixed(1)} giờ</p>
+                      <p className="fee-amount"><strong>Phí gửi:</strong> {formatCurrency(preview.amount)}</p>
                     </div>
                     <div className="checkout-actions">
-                      <button type="button" className="btn btn-success btn-block">
+                      <button type="button" className="btn btn-success btn-block" disabled={loading} onClick={handleCheckout}>
                         Xác nhận thanh toán
                       </button>
-                      <button type="button" className="btn btn-ghost btn-block">
-                        Hủy
-                      </button>
+                      <button type="button" className="btn btn-ghost btn-block" onClick={() => setPreview(null)}>Hủy</button>
                     </div>
                   </div>
                 )}
               </div>
             </div>
           </div>
-
-          <button
-            type="button"
-            className="btn btn-ghost staff-logout-btn"
-            onClick={handleLogout}
-          >
-            <LogOut size={16} />
-            Đăng xuất
-          </button>
         </div>
       </StaffLayout>
     </ProtectedRoute>

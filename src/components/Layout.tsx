@@ -4,7 +4,7 @@ import Header from './Header'
 
 export default function Layout() {
   const location = useLocation()
-  const isHome = location.pathname === '/'
+  const isHome = location.pathname === '/' || location.pathname === '/dat-cho'
   const isStaffOrAdmin =
     location.pathname.startsWith('/staff') ||
     location.pathname.startsWith('/admin') ||

@@ -62,7 +62,7 @@ export default function Header() {
 
               {user?.role === "admin" && <NavLink to="/admin/dashboard">Menu</NavLink>}
 
-              {user?.role === "user" && (
+              {(user?.role === "user" || user?.role === "customer") && (
 
                 <>
 

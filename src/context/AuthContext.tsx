@@ -7,14 +7,17 @@ import {
   type ReactNode,
 } from 'react'
 import { authService, type RegisterRequest } from '../utils/authService'
+import { profileApi } from '../utils/apiServices'
 import type { UserProfile } from '../types/profile'
 
-export type UserRole = 'guest' | 'user' | 'staff' | 'manager' | 'admin'
+export type UserRole = 'guest' | 'user' | 'customer' | 'staff' | 'manager' | 'admin'
 
 export interface AuthUser {
+  userId?: string
   email: string
   name: string
   role: UserRole
+  phone?: string
 }
 
 export interface RegisterResult {
@@ -36,7 +39,8 @@ interface AuthContextValue {
     password: string,
     confirmPassword: string,
   ) => Promise<RegisterResult>
-  updateProfile: (data: Partial<UserProfile>) => void
+  updateProfile: (data: Partial<UserProfile>) => Promise<boolean>
+  refreshProfile: () => Promise<void>
   logout: () => void
 }
 
@@ -96,8 +100,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (response.isSuccess && response.result) {
           const { user: backendUser } = response.result
           persistUser({
+            userId: backendUser.userId,
             email: backendUser.email,
             name: backendUser.fullName,
+            phone: backendUser.phoneNumber,
             role: (backendUser.roleName.toLowerCase() as UserRole) || 'user',
           })
           return true
@@ -167,8 +173,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (loginResponse.isSuccess && loginResponse.result) {
               const { user: backendUser } = loginResponse.result
               persistUser({
+                userId: backendUser.userId,
                 email: backendUser.email,
                 name: backendUser.fullName,
+                phone: backendUser.phoneNumber,
                 role: (backendUser.roleName.toLowerCase() as UserRole) || 'user',
               })
               return { ok: true, message: 'Đăng ký thành công! Đang chuyển hướng...' }
@@ -198,20 +206,77 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [persistUser],
   )
 
+  const refreshProfile = useCallback(async () => {
+    if (!user) return
+    try {
+      const res = await profileApi.get()
+      if (res.isSuccess && res.result) {
+        const u = res.result
+        setProfile((prev) => {
+          const nextProfile = {
+            email: u.email,
+            name: u.fullName,
+            phone: u.phoneNumber ?? '',
+            vehiclePlate: prev?.vehiclePlate ?? '',
+            address: prev?.address ?? '',
+          }
+          localStorage.setItem(profileKey(u.email), JSON.stringify(nextProfile))
+          return nextProfile
+        })
+        setUser((prev) =>
+          prev
+            ? {
+                ...prev,
+                userId: u.userId,
+                name: u.fullName,
+                phone: u.phoneNumber,
+                role: (u.roleName.toLowerCase() as UserRole) || prev.role,
+              }
+            : prev,
+        )
+        localStorage.setItem('user_name', u.fullName)
+        localStorage.setItem('user_role', u.roleName)
+        localStorage.setItem('user_phone', u.phoneNumber ?? '')
+        if (u.userId) localStorage.setItem('user_id', u.userId)
+      }
+    } catch (error) {
+      console.error('Refresh profile error:', error)
+    }
+  }, [user])
+
   const updateProfile = useCallback(
-    (data: Partial<UserProfile>) => {
-      if (!user) return
-      setProfile((prev) => {
-        const next = { ...(prev ?? loadProfile(user.email, user.name)), ...data, email: user.email }
-        localStorage.setItem(profileKey(user.email), JSON.stringify(next))
-        if (data.name) {
-          const updatedUser = { ...user, name: data.name }
-          setUser(updatedUser)
+    async (data: Partial<UserProfile>): Promise<boolean> => {
+      if (!user) return false
+      try {
+        const res = await profileApi.update({
+          fullName: data.name,
+          phoneNumber: data.phone,
+        })
+        if (res.isSuccess && res.result) {
+          const u = res.result
+          const nextProfile = {
+            email: u.email || user.email,
+            name: u.fullName,
+            phone: u.phoneNumber ?? '',
+            vehiclePlate: data.vehiclePlate ?? profile?.vehiclePlate ?? '',
+            address: data.address ?? profile?.address ?? '',
+          }
+          setProfile(nextProfile)
+          setUser((prev) =>
+            prev ? { ...prev, name: u.fullName, phone: u.phoneNumber } : prev,
+          )
+          localStorage.setItem(profileKey(nextProfile.email), JSON.stringify(nextProfile))
+          localStorage.setItem('user_name', u.fullName)
+          localStorage.setItem('user_phone', u.phoneNumber ?? '')
+          return true
         }
-        return next
-      })
+        return false
+      } catch (error) {
+        console.error('Update profile error:', error)
+        return false
+      }
     },
-    [user],
+    [user, profile],
   )
 
   const logout = useCallback(async () => {
@@ -229,9 +294,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       updateProfile,
+      refreshProfile,
       logout,
     }),
-    [user, profile, isLoading, login, register, updateProfile, logout],
+    [user, profile, isLoading, login, register, updateProfile, refreshProfile, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
