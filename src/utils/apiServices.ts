@@ -40,8 +40,15 @@ export interface ReservationDto {
   expectedEntryTime: string
   status: string
   createdAt?: string
+  licensePlate?: string
+  user?: {
+    fullName?: string
+    email?: string
+    phoneNumber?: string
+  }
   vehicleType?: { typeName: string }
   payments?: Array<{ amount: number; paymentStatus: string }>
+  parkingSessions?: ParkingSessionDto[]
 }
 
 export interface MonthlySubscriptionDto {
@@ -65,6 +72,31 @@ export interface ParkingFeePreview {
   amount: number
 }
 
+export interface ParkingSessionDto {
+  sessionId: string
+  cardId?: string
+  cardCode?: string
+  driverUserId?: string
+  driverFullName?: string
+  licensePlateIn: string
+  licensePlateOut?: string
+  entryImageUrl?: string
+  exitImageUrl?: string
+  vehicleTypeId: string
+  vehicleTypeName?: string
+  entryTime: string
+  exitTime?: string
+  entryGateId: string
+  entryGateName?: string
+  exitGateId?: string
+  exitGateName?: string
+  assignedSlotId?: string
+  assignedSlotCode?: string
+  actualSlotId?: string
+  actualSlotCode?: string
+  status: string
+}
+
 export const profileApi = {
   get: () => apiClient.get<ApiResponse<UserDto>>('/profile'),
   update: (data: { fullName?: string; phoneNumber?: string; password?: string }) =>
@@ -79,6 +111,14 @@ export const reservationApi = {
   }) => apiClient.post<ApiResponse<CreateReservationResponse>>('/reservations', data),
 
   getMy: () => apiClient.get<ApiResponse<ReservationDto[]>>('/reservations/my-reservations'),
+
+  getAll: (params?: { status?: string; date?: string }) => {
+    const query = new URLSearchParams()
+    if (params?.status) query.set('status', params.status)
+    if (params?.date) query.set('date', params.date)
+    const q = query.toString()
+    return apiClient.get<ApiResponse<ReservationDto[]>>(`/reservations${q ? `?${q}` : ''}`)
+  },
 
   cancel: (id: string) => apiClient.put<ApiResponse>(`/reservations/${id}/cancel`),
 
@@ -109,7 +149,7 @@ export const parkingOperationApi = {
     licensePlate: string
     vehicleTypeId: string
     gateName: string
-    cardCode: string
+    cardCode?: string
   }) => apiClient.post<ApiResponse>('/ParkingOperation/guest/check-in', data),
 
   guestCheckOutPreview: (data: { licensePlate?: string; cardCode?: string }) =>
@@ -117,7 +157,7 @@ export const parkingOperationApi = {
 
   guestCheckOut: (data: {
     licensePlate?: string
-    cardCode: string
+    cardCode?: string
     gateName: string
     paymentMethod: string
   }) => apiClient.post<ApiResponse>('/ParkingOperation/guest/check-out', data),
@@ -126,12 +166,12 @@ export const parkingOperationApi = {
     licensePlate: string
     vehicleTypeId: string
     gateName: string
-    cardCode: string
+    cardCode?: string
   }) => apiClient.post<ApiResponse>('/ParkingOperation/resident/check-in', data),
 
   residentCheckOut: (data: {
     licensePlate?: string
-    cardCode: string
+    cardCode?: string
     gateName: string
   }) => apiClient.post<ApiResponse>('/ParkingOperation/resident/check-out', data),
 
@@ -142,4 +182,8 @@ export const parkingOperationApi = {
     const q = params.toString()
     return apiClient.get<ApiResponse>(`/ParkingOperation/availability${q ? `?${q}` : ''}`)
   },
+}
+
+export const parkingSessionApi = {
+  getAll: () => apiClient.get<ApiResponse<ParkingSessionDto[]>>('/ParkingSession'),
 }

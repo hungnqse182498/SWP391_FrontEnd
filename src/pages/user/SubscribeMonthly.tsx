@@ -26,7 +26,7 @@ const PLANS: PlanOption[] = [
 
 function SubscribeContent() {
   const navigate = useNavigate()
-  const { profile, refreshProfile } = useAuth()
+  const { profile, refreshProfile, upgradeToCustomer } = useAuth()
   const [vehicle, setVehicle] = useState<'car' | 'bike'>('car')
   const [selectedPlan, setSelectedPlan] = useState<PlanOption>(PLANS[1])
   const [licensePlate, setLicensePlate] = useState(profile?.vehiclePlate ?? '')
@@ -41,10 +41,8 @@ function SubscribeContent() {
     if (profile?.vehiclePlate) setLicensePlate(profile.vehiclePlate)
   }, [profile])
 
-  const handleMapContinue = (spots: ParkingSpot[], floor: ParkingFloor) => {
-    if (spots.length > 0) {
-      setSelectedSpot({ floor, spot: spots[0] })
-    }
+  const handleSpotSelect = (spot: ParkingSpot, floor: ParkingFloor) => {
+    setSelectedSpot({ floor, spot })
   }
 
   const handleSubscribe = async () => {
@@ -71,6 +69,7 @@ function SubscribeContent() {
 
       if (res.isSuccess) {
         await refreshProfile()
+        upgradeToCustomer()
         navigate('/dat-cho', { state: { subscribed: true } })
         return
       }
@@ -135,7 +134,7 @@ function SubscribeContent() {
 
         <div className="card-panel">
           <h2>Chọn tầng & chỗ đỗ</h2>
-          <ParkingMap floors={customerFloors} onContinue={handleMapContinue} />
+          <ParkingMap floors={customerFloors} onSelect={handleSpotSelect} />
           {selectedSpot && (
             <p className="selected-spot-info">
               <MapPin size={16} />

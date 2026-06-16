@@ -41,6 +41,7 @@ interface AuthContextValue {
   ) => Promise<RegisterResult>
   updateProfile: (data: Partial<UserProfile>) => Promise<boolean>
   refreshProfile: () => Promise<void>
+  upgradeToCustomer: () => void
   logout: () => void
 }
 
@@ -279,6 +280,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user, profile],
   )
 
+  const upgradeToCustomer = useCallback(() => {
+    setUser((prev) => {
+      if (!prev) return prev
+      const nextUser = { ...prev, role: 'customer' as UserRole }
+      localStorage.setItem('user_role', 'customer')
+      return nextUser
+    })
+  }, [])
+
   const logout = useCallback(async () => {
     await authService.logout()
     setUser(null)
@@ -295,9 +305,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       updateProfile,
       refreshProfile,
+      upgradeToCustomer,
       logout,
     }),
-    [user, profile, isLoading, login, register, updateProfile, refreshProfile, logout],
+    [user, profile, isLoading, login, register, updateProfile, refreshProfile, upgradeToCustomer, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

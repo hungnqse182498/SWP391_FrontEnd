@@ -7,8 +7,7 @@ import ProtectedRoute from '../../components/ProtectedRoute'
 import { useAuth } from '../../context/AuthContext'
 import { useBooking } from '../../context/BookingContext'
 import { parkingFloors } from '../../data/parkingFloors'
-import type { ParkingFloor, ParkingSpot } from '../../types/parking'
-import type { BookingSpot } from '../../types/booking'
+import type { ParkingFloor } from '../../types/parking'
 import {
   depositAmount,
   DEPOSIT_RATES,
@@ -17,20 +16,6 @@ import {
   vehicleTypeLabel,
 } from '../../utils/bookingPricing'
 import { formatCurrency } from '../../utils/pricing'
-
-function spotLabel(spot: ParkingSpot) {
-  return `${spot.row}${spot.number}`
-}
-
-function toBookingSpots(spots: ParkingSpot[]): BookingSpot[] {
-  return spots.map((spot) => ({
-    id: spot.id,
-    label: spotLabel(spot),
-    row: spot.row,
-    number: spot.number,
-    type: spot.type,
-  }))
-}
 
 function CancellationPolicy() {
   return (
@@ -119,25 +104,6 @@ function BookingContent() {
     }
   }, [profile, vehiclePlate])
 
-  const handleSpotContinue = (spots: ParkingSpot[], floor: ParkingFloor) => {
-    if (!vehiclePlate.trim()) {
-      alert('Vui lòng nhập biển số xe')
-      return
-    }
-
-    setDraft({
-      floorId: floor.id,
-      floorName: floor.name,
-      spots: toBookingSpots(spots),
-      startTime: new Date().toISOString(),
-      hours: 24,
-      vehiclePlate: vehiclePlate.trim(),
-      vehicleType: vehicle,
-      isMonthlyCustomer: true,
-    })
-    navigate('/dat-cho/xac-nhan')
-  }
-
   const handlePreRegisterSubmit = () => {
     if (!vehiclePlate.trim()) {
       alert('Vui lòng nhập biển số xe')
@@ -205,47 +171,54 @@ function BookingContent() {
 
            
               {isCustomer ? (
-                <>
-                  <div className="availability-head">
-                    <div className="vehicle-toggle" aria-label="Chọn loại xe">
-                      <button
-                        type="button"
-                        onClick={() => setVehicle('car')}
-                        className={vehicle === 'car' ? 'active' : ''}
-                      >
-                        <Car size={18} strokeWidth={2.2} aria-hidden />
-                        Ô tô (B2, B3)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setVehicle('bike')}
-                        className={vehicle === 'bike' ? 'active' : ''}
-                      >
-                        <Bike size={18} strokeWidth={2.2} aria-hidden />
-                        Xe máy (B1)
-                      </button>
+                <div className="booking-customer-layout">
+                  <section className="booking-section-card booking-customer-form">
+                    <div className="booking-section-heading">
+                      <span>Thông tin xe</span>
+                      <strong>Chọn loại xe và biển số</strong>
                     </div>
-                  </div>
 
-                  <div className="search-grid booking-field-grid">
-                    <label className="hero-field">
-                      <span>Biển số xe</span>
-                      <div>
-                        <Car size={18} strokeWidth={2.2} aria-hidden />
-                        <input
-                          type="text"
-                          placeholder="51A-12345"
-                          value={vehiclePlate}
-                          onChange={(event) => setVehiclePlate(event.target.value)}
-                        />
+                    <div className="availability-head">
+                      <div className="vehicle-toggle" aria-label="Chọn loại xe">
+                        <button
+                          type="button"
+                          onClick={() => setVehicle('car')}
+                          className={vehicle === 'car' ? 'active' : ''}
+                        >
+                          <Car size={18} strokeWidth={2.2} aria-hidden />
+                          Ô tô (B2, B3)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setVehicle('bike')}
+                          className={vehicle === 'bike' ? 'active' : ''}
+                        >
+                          <Bike size={18} strokeWidth={2.2} aria-hidden />
+                          Xe máy (B1)
+                        </button>
                       </div>
-                    </label>
-                  </div>
+                    </div>
 
-                  <div className="booking-map-wrap">
-                    <ParkingMap floors={customerFloors} onContinue={handleSpotContinue} />
+                    <div className="search-grid booking-field-grid">
+                      <label className="hero-field">
+                        <span>Biển số xe</span>
+                        <div>
+                          <Car size={18} strokeWidth={2.2} aria-hidden />
+                          <input
+                            type="text"
+                            placeholder="51A-12345"
+                            value={vehiclePlate}
+                            onChange={(event) => setVehiclePlate(event.target.value)}
+                          />
+                        </div>
+                      </label>
+                    </div>
+                  </section>
+
+                  <div className="booking-map-panel">
+                    <ParkingMap floors={customerFloors} />
                   </div>
-                </>
+                </div>
               ) : (
                 <div className="booking-split-layout">
                   {/* Bên trái: Thông tin đặt chỗ + Bảng giá */}

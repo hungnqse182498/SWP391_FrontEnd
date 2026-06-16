@@ -60,7 +60,13 @@ function ProfileContent() {
         <div className="profile-email">
           <Mail size={18} strokeWidth={2} aria-hidden />
           <span>{user?.email}</span>
-          {user?.role && <span className="user-role-badge">{user.role}</span>}
+          {user?.role && (
+            <span
+              className={`user-role-badge${user.role === 'customer' ? ' user-role-badge--customer' : ''}`}
+            >
+              {user.role === 'customer' ? 'Khách tháng' : user.role}
+            </span>
+          )}
         </div>
 
         <FormField label="Họ và tên" name="name" id="p-name" icon={User} value={name} onChange={(e) => setName(e.target.value)} required />

@@ -7,22 +7,6 @@ import ProtectedRoute from '../components/ProtectedRoute'
 import { useAuth } from '../context/AuthContext'
 import { useBooking } from '../context/BookingContext'
 import { parkingFloors } from '../data/parkingFloors'
-import type { ParkingFloor, ParkingSpot } from '../types/parking'
-import type { BookingSpot } from '../types/booking'
-
-function spotLabel(s: ParkingSpot) {
-  return `${s.row}${s.number}`
-}
-
-function toBookingSpots(spots: ParkingSpot[]): BookingSpot[] {
-  return spots.map((s) => ({
-    id: s.id,
-    label: spotLabel(s),
-    row: s.row,
-    number: s.number,
-    type: s.type,
-  }))
-}
 
 function BookingContent() {
   const navigate = useNavigate()
@@ -57,22 +41,6 @@ function BookingContent() {
       setVehiclePlate(profile.vehiclePlate)
     }
   }, [profile])
-
-  const handleSpotContinue = (spots: ParkingSpot[], floor: ParkingFloor) => {
-    const start = new Date()
-    start.setMinutes(0, 0, 0)
-    start.setHours(start.getHours() + 1)
-
-    setDraft({
-      floorId: floor.id,
-      floorName: floor.name,
-      spots: toBookingSpots(spots),
-      startTime: start.toISOString(),
-      hours: 2,
-      vehiclePlate: vehiclePlate || profile?.vehiclePlate || '',
-    })
-    navigate('/dat-cho/xac-nhan')
-  }
 
   const handlePreRegisterSubmit = () => {
     if (!vehiclePlate.trim()) {
@@ -169,7 +137,7 @@ function BookingContent() {
                   </div>
                 </header>
                 <div style={{ background: '#fff', borderRadius: '12px', padding: '1rem', border: '1px solid var(--border)' }}>
-                  <ParkingMap floors={parkingFloors} onContinue={handleSpotContinue} />
+                  <ParkingMap floors={parkingFloors} />
                 </div>
               </div>
             ) : (

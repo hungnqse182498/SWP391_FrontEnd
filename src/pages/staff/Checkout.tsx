@@ -1,15 +1,15 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { AlertCircle, LogOut } from 'lucide-react'
 import StaffLayout from '../../components/StaffLayout'
 import ProtectedRoute from '../../components/ProtectedRoute'
-import { useNavigate } from 'react-router-dom'
-import { LogOut, AlertCircle } from 'lucide-react'
 import { parkingOperationApi, type ParkingFeePreview } from '../../utils/apiServices'
 import { formatCurrency } from '../../utils/pricing'
 
 interface StaffMenuItem {
   id: string
   label: string
-  icon: React.ReactNode
+  icon: ReactNode
 }
 
 const menuItems: StaffMenuItem[] = [
@@ -20,7 +20,6 @@ const menuItems: StaffMenuItem[] = [
 export default function Checkout() {
   const navigate = useNavigate()
   const [licensePlate, setLicensePlate] = useState('')
-  const [cardCode, setCardCode] = useState('CARD-001')
   const [gateName, setGateName] = useState('Cổng A')
   const [paymentMethod, setPaymentMethod] = useState('Cash')
   const [loading, setLoading] = useState(false)
@@ -28,13 +27,12 @@ export default function Checkout() {
   const [preview, setPreview] = useState<ParkingFeePreview | null>(null)
 
   const handleScan = async () => {
-    if (!licensePlate.trim() && !cardCode.trim()) return
+    if (!licensePlate.trim()) return
     setLoading(true)
     setMessage('')
     try {
       const res = await parkingOperationApi.guestCheckOutPreview({
-        licensePlate: licensePlate.trim() || undefined,
-        cardCode: cardCode.trim(),
+        licensePlate: licensePlate.trim(),
       })
       if (res.isSuccess && res.result) {
         setPreview(res.result)
@@ -56,7 +54,6 @@ export default function Checkout() {
     try {
       const res = await parkingOperationApi.guestCheckOut({
         licensePlate: licensePlate.trim() || undefined,
-        cardCode: cardCode.trim(),
         gateName,
         paymentMethod,
       })
@@ -77,14 +74,20 @@ export default function Checkout() {
 
   return (
     <ProtectedRoute allowedRoles={['staff']}>
-      <StaffLayout items={menuItems} activeItem="checkout" onSelectItem={(id) => {
-        if (id === 'checkout') navigate('/staff/checkout')
-        else if (id === 'exception') navigate('/staff/exception')
-      }}>
+      <StaffLayout
+        items={menuItems}
+        activeItem="checkout"
+        onSelectItem={(id) => {
+          if (id === 'checkout') navigate('/staff/checkout')
+          else if (id === 'exception') navigate('/staff/exception')
+        }}
+      >
         <div className="staff-content-wrapper">
           <div className="staff-section">
             <h2>Xử lý xe ra bãi</h2>
-            <p className="section-desc">Quét biển số xe ra bãi, xác nhận thời gian ra, kiểm tra phí cần thanh toán, thu phí gửi xe.</p>
+            <p className="section-desc">
+              Quét biển số xe ra bãi, xác nhận thời gian ra, kiểm tra phí cần thanh toán và thu phí gửi xe.
+            </p>
 
             <div className="scan-container">
               <div className="camera-preview">
@@ -101,11 +104,6 @@ export default function Checkout() {
 
               <div className="scan-form">
                 <div className="form-field">
-                  <label htmlFor="card-code-out">Mã thẻ</label>
-                  <input id="card-code-out" className="input-standalone" value={cardCode} onChange={(e) => setCardCode(e.target.value)} />
-                </div>
-
-                <div className="form-field">
                   <label htmlFor="license-plate-checkout">Biển số xe</label>
                   <div className="input-group">
                     <input
@@ -114,8 +112,8 @@ export default function Checkout() {
                       className="input-standalone"
                       placeholder="51A-12345"
                       value={licensePlate}
-                      onChange={(e) => setLicensePlate(e.target.value.toUpperCase())}
-                      onKeyDown={(e) => e.key === 'Enter' && handleScan()}
+                      onChange={(event) => setLicensePlate(event.target.value.toUpperCase())}
+                      onKeyDown={(event) => event.key === 'Enter' && handleScan()}
                     />
                     <button type="button" className="btn btn-primary" onClick={handleScan} disabled={loading}>
                       {loading ? '...' : 'Quét'}
@@ -125,7 +123,7 @@ export default function Checkout() {
 
                 <div className="form-field">
                   <label>Cổng ra</label>
-                  <select className="input-standalone select" value={gateName} onChange={(e) => setGateName(e.target.value)}>
+                  <select className="input-standalone select" value={gateName} onChange={(event) => setGateName(event.target.value)}>
                     <option value="Cổng A">Cổng A</option>
                     <option value="Cổng B">Cổng B</option>
                   </select>
@@ -133,7 +131,11 @@ export default function Checkout() {
 
                 <div className="form-field">
                   <label>Thanh toán</label>
-                  <select className="input-standalone select" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+                  <select
+                    className="input-standalone select"
+                    value={paymentMethod}
+                    onChange={(event) => setPaymentMethod(event.target.value)}
+                  >
                     <option value="Cash">Tiền mặt</option>
                     <option value="PayOS">PayOS</option>
                   </select>
@@ -155,7 +157,9 @@ export default function Checkout() {
                       <button type="button" className="btn btn-success btn-block" disabled={loading} onClick={handleCheckout}>
                         Xác nhận thanh toán
                       </button>
-                      <button type="button" className="btn btn-ghost btn-block" onClick={() => setPreview(null)}>Hủy</button>
+                      <button type="button" className="btn btn-ghost btn-block" onClick={() => setPreview(null)}>
+                        Hủy
+                      </button>
                     </div>
                   </div>
                 )}
