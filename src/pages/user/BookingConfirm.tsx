@@ -44,7 +44,9 @@ function ConfirmContent() {
           )}
           <p><strong>Thời gian vào:</strong> {new Date(draft.startTime).toLocaleString('vi-VN')}</p>
           {!isPreRegistered && !isMonthly && <p><strong>Số giờ:</strong> {draft.hours}</p>}
-          <p><strong>Biển số:</strong> {draft.vehiclePlate}</p>
+          {draft.vehiclePlate ? (
+            <p><strong>Biển số:</strong> {draft.vehiclePlate}</p>
+          ) : null}
           {draft.vehicleType && (
             <p><strong>Loại xe:</strong> {vehicleTypeLabel(draft.vehicleType)}</p>
           )}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { AlertTriangle, Bike, CalendarDays, Car, MapPin } from 'lucide-react'
 import BookingSteps from '../../components/BookingSteps'
@@ -35,7 +35,7 @@ function CancellationPolicy() {
 function PriceTable() {
   return (
     <div className="booking-price-table">
-      <h3>Bảng giá giữ xe cố định</h3>
+      <h3>Bảng giá giữ xe ô tô</h3>
       <table>
         <thead>
           <tr>
@@ -53,19 +53,10 @@ function PriceTable() {
             <td>{formatCurrency(HOURLY_RATES.car.day)}/giờ</td>
             <td>{formatCurrency(HOURLY_RATES.car.night)}/giờ</td>
           </tr>
-          <tr>
-            <td>
-              <Bike size={16} aria-hidden />
-              Xe máy
-            </td>
-            <td>{formatCurrency(HOURLY_RATES.bike.day)}/giờ</td>
-            <td>{formatCurrency(HOURLY_RATES.bike.night)}/giờ</td>
-          </tr>
         </tbody>
       </table>
       <p className="booking-price-note">
-        Tiền cọc cố định 1 giờ: Ô tô {formatCurrency(DEPOSIT_RATES.car)} · Xe máy{' '}
-        {formatCurrency(DEPOSIT_RATES.bike)}
+        Tiền cọc cố định 1 giờ: {formatCurrency(DEPOSIT_RATES.car)}. Chỉ áp dụng cho ô tô — xe máy không hỗ trợ đặt trước.
       </p>
     </div>
   )
@@ -74,12 +65,14 @@ function PriceTable() {
 function BookingContent() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const { setDraft } = useBooking()
 
   const isCustomer = user?.role === 'customer'
   const locationState = location.state as { vehicle?: 'car' | 'bike'; startTime?: string } | null
-  const initialVehicle = locationState?.vehicle ?? 'car'
+  const initialVehicle = isCustomer
+    ? (locationState?.vehicle ?? 'car')
+    : 'car'
   const initialStartTime = locationState?.startTime ?? ''
 
   const [vehicle, setVehicle] = useState<'car' | 'bike'>(initialVehicle)
@@ -91,30 +84,19 @@ function BookingContent() {
     const tzoffset = now.getTimezoneOffset() * 60000
     return new Date(now.getTime() - tzoffset).toISOString().slice(0, 16)
   })
-  const [vehiclePlate, setVehiclePlate] = useState(profile?.vehiclePlate ?? '')
 
   const customerFloors = useMemo(
     () => filterCustomerFloors(vehicle, parkingFloors) as ParkingFloor[],
     [vehicle],
   )
 
-  useEffect(() => {
-    if (profile?.vehiclePlate && !vehiclePlate) {
-      setVehiclePlate(profile.vehiclePlate)
-    }
-  }, [profile, vehiclePlate])
-
   const handlePreRegisterSubmit = () => {
-    if (!vehiclePlate.trim()) {
-      alert('Vui lòng nhập biển số xe')
-      return
-    }
     if (!startTime) {
       alert('Vui lòng chọn thời gian vào')
       return
     }
 
-    const deposit = depositAmount(vehicle)
+    const deposit = depositAmount('car')
 
     setDraft({
       floorId: 0,
@@ -130,9 +112,9 @@ function BookingContent() {
       ],
       startTime: new Date(startTime).toISOString(),
       hours: 1,
-      vehiclePlate: vehiclePlate.trim(),
+      vehiclePlate: '',
       isPreRegistered: true,
-      vehicleType: vehicle,
+      vehicleType: 'car',
       depositAmount: deposit,
     })
 
@@ -166,7 +148,7 @@ function BookingContent() {
             <p className="home-hero-lead">
               {isCustomer
                 ? 'Khách hàng tháng: chọn tầng và ô đỗ cố định theo loại xe của bạn.'
-                : 'Điền thông tin, thanh toán tiền cọc 1 giờ để đảm bảo có chỗ khi đến.'}
+                : 'Đặt trước chỉ dành cho ô tô. Chọn giờ vào bãi và thanh toán tiền cọc 1 giờ.'}
             </p>
 
            
@@ -175,7 +157,7 @@ function BookingContent() {
                   <section className="booking-section-card booking-customer-form">
                     <div className="booking-section-heading">
                       <span>Thông tin xe</span>
-                      <strong>Chọn loại xe và biển số</strong>
+                      <strong>Chọn loại xe</strong>
                     </div>
 
                     <div className="availability-head">
@@ -198,21 +180,6 @@ function BookingContent() {
                         </button>
                       </div>
                     </div>
-
-                    <div className="search-grid booking-field-grid">
-                      <label className="hero-field">
-                        <span>Biển số xe</span>
-                        <div>
-                          <Car size={18} strokeWidth={2.2} aria-hidden />
-                          <input
-                            type="text"
-                            placeholder="51A-12345"
-                            value={vehiclePlate}
-                            onChange={(event) => setVehiclePlate(event.target.value)}
-                          />
-                        </div>
-                      </label>
-                    </div>
                   </section>
 
                   <div className="booking-map-panel">
@@ -225,64 +192,12 @@ function BookingContent() {
                   <section className="booking-section-card booking-info-card">
                     <div className="booking-section-heading">
                       <span>Thông tin đặt chỗ</span>
-                      <strong>Nhập thông tin xe và thời gian đến bãi</strong>
+                      <strong>Đặt trước ô tô — chọn giờ vào bãi</strong>
                     </div>
 
-                    <div className="availability-head">
-                      <div className="vehicle-toggle" aria-label="Chọn loại xe">
-                        <button
-                          type="button"
-                          onClick={() => setVehicle('car')}
-                          className={vehicle === 'car' ? 'active' : ''}
-                        >
-                          <Car size={18} strokeWidth={2.2} aria-hidden />
-                          Ô tô
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setVehicle('bike')}
-                          className={vehicle === 'bike' ? 'active' : ''}
-                        >
-                          <Bike size={18} strokeWidth={2.2} aria-hidden />
-                          Xe máy
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="search-grid booking-field-grid">
-                      <label className="hero-field">
-                        <span>Loại xe</span>
-                        <div>
-                          {vehicle === 'car' ? (
-                            <Car size={18} strokeWidth={2.2} aria-hidden />
-                          ) : (
-                            <Bike size={18} strokeWidth={2.2} aria-hidden />
-                          )}
-
-                          <select
-                            value={vehicle}
-                            onChange={(event) =>
-                              setVehicle(event.target.value as 'car' | 'bike')
-                            }
-                          >
-                            <option value="car">Ô tô</option>
-                            <option value="bike">Xe máy</option>
-                          </select>
-                        </div>
-                      </label>
-
-                      <label className="hero-field">
-                        <span>Biển số xe</span>
-                        <div>
-                          <Car size={18} strokeWidth={2.2} aria-hidden />
-                          <input
-                            type="text"
-                            placeholder="51A-12345"
-                            value={vehiclePlate}
-                            onChange={(event) => setVehiclePlate(event.target.value)}
-                          />
-                        </div>
-                      </label>
+                    <div className="booking-vehicle-badge">
+                      <Car size={18} strokeWidth={2.2} aria-hidden />
+                      <span>Loại xe: Ô tô</span>
                     </div>
 
                     <div className="search-grid booking-field-grid booking-field-grid--single">
@@ -313,12 +228,12 @@ function BookingContent() {
                     <div className="booking-payment-summary">
                       <div className="booking-payment-item">
                         <span>Loại xe</span>
-                        <strong>{vehicleTypeLabel(vehicle)}</strong>
+                        <strong>{vehicleTypeLabel('car')}</strong>
                       </div>
 
                       <div className="booking-payment-item booking-payment-item--total">
                         <span>Số tiền thanh toán</span>
-                        <strong>{formatCurrency(depositAmount(vehicle))}</strong>
+                        <strong>{formatCurrency(depositAmount('car'))}</strong>
                       </div>
                     </div>
 

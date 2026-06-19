@@ -1,9 +1,8 @@
-import { Bike, CalendarDays, Car, MapPin, Search } from "lucide-react";
+import { CalendarDays, Car, MapPin, Search } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
 export default function HeroSection() {
-  const [vehicle, setVehicle] = useState<"car" | "bike">("car");
   const [startTime, setStartTime] = useState("");
 
   return (
@@ -38,23 +37,10 @@ export default function HeroSection() {
                 <span>Chỗ trống hiện có</span>
               </div>
 
-              <div className="vehicle-toggle" aria-label="Chọn loại xe">
-                <button
-                  type="button"
-                  onClick={() => setVehicle("car")}
-                  className={vehicle === "car" ? "active" : ""}
-                >
+              <div className="vehicle-toggle vehicle-toggle--single" aria-label="Loại xe">
+                <button type="button" className="active" disabled>
                   <Car size={18} strokeWidth={2.2} aria-hidden />
-                  Ô tô
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setVehicle("bike")}
-                  className={vehicle === "bike" ? "active" : ""}
-                >
-                  <Bike size={18} strokeWidth={2.2} aria-hidden />
-                  Xe máy
+                  Ô tô — đặt trước
                 </button>
               </div>
             </div>
@@ -63,18 +49,8 @@ export default function HeroSection() {
               <label className="hero-field">
                 <span>Loại xe</span>
                 <div>
-                  {vehicle === "car" ? (
-                    <Car size={18} strokeWidth={2.2} aria-hidden />
-                  ) : (
-                    <Bike size={18} strokeWidth={2.2} aria-hidden />
-                  )}
-                  <select
-                    value={vehicle}
-                    onChange={(event) => setVehicle(event.target.value as "car" | "bike")}
-                  >
-                    <option value="car">Ô tô</option>
-                    <option value="bike">Xe máy</option>
-                  </select>
+                  <Car size={18} strokeWidth={2.2} aria-hidden />
+                  <span className="hero-field-static">Ô tô</span>
                 </div>
               </label>
 
@@ -93,7 +69,7 @@ export default function HeroSection() {
 
             <Link
               to="/dat-cho"
-              state={{ vehicle, startTime }}
+              state={{ vehicle: 'car', startTime }}
               className="hero-search-btn"
             >
               Tìm chỗ ngay

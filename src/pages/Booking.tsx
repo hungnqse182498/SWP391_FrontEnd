@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Bike, CalendarDays, Car, MapPin } from 'lucide-react'
+import { CalendarDays, Car, MapPin } from 'lucide-react'
 import BookingSteps from '../components/BookingSteps'
 import ParkingMap from '../components/ParkingMap'
 import ProtectedRoute from '../components/ProtectedRoute'
@@ -16,13 +16,11 @@ function BookingContent() {
 
   // Read initial states passed from Home Page
   const locationState = location.state as { vehicle?: 'car' | 'bike'; startTime?: string } | null
-  const initialVehicle = locationState?.vehicle ?? 'car'
   const initialStartTime = locationState?.startTime ?? ''
 
   const [bookingType, setBookingType] = useState<'spot' | 'preregister'>(
     initialStartTime ? 'preregister' : 'spot'
   )
-  const [vehicle, setVehicle] = useState<'car' | 'bike'>(initialVehicle)
   const [startTime, setStartTime] = useState<string>(() => {
     if (initialStartTime) return initialStartTime
     // Default to tomorrow or 1 hour from now formatted for datetime-local
@@ -52,8 +50,7 @@ function BookingContent() {
       return
     }
 
-    // Fixed deposit amount: 25k for car, 5k for motorbike
-    const depositAmount = vehicle === 'car' ? 25000 : 5000
+    const depositAmount = 25000
 
     setDraft({
       floorId: 0,
@@ -71,7 +68,7 @@ function BookingContent() {
       hours: 1, // Fixed 1 hour deposit
       vehiclePlate: vehiclePlate.trim(),
       isPreRegistered: true,
-      vehicleType: vehicle,
+      vehicleType: 'car',
       depositAmount,
     } as any)
 
@@ -153,24 +150,15 @@ function BookingContent() {
                   </div>
                 </header>
 
-                <div className="search-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                  {/* Vehicle Type selection */}
+                <div className="search-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                   <label className="hero-field">
                     <span>Loại xe</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fff', padding: '0.5rem 0.75rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                      {vehicle === 'car' ? <Car size={18} /> : <Bike size={18} />}
-                      <select
-                        value={vehicle}
-                        onChange={(e) => setVehicle(e.target.value as 'car' | 'bike')}
-                        style={{ border: 'none', background: 'transparent', width: '100%', outline: 'none', fontWeight: 600 }}
-                      >
-                        <option value="car">Ô tô</option>
-                        <option value="bike">Xe máy</option>
-                      </select>
+                      <Car size={18} />
+                      <span style={{ fontWeight: 600 }}>Ô tô</span>
                     </div>
                   </label>
 
-                  {/* Biển số xe */}
                   <label className="hero-field">
                     <span>Biển số xe</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fff', padding: '0.5rem 0.75rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
@@ -205,7 +193,7 @@ function BookingContent() {
                 {/* Price Table - positioned under time select */}
                 <div style={{ background: '#fff', borderRadius: '12px', padding: '1.25rem', border: '1px solid var(--border)', marginBottom: '1.5rem' }}>
                   <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--blue-900)', marginBottom: '0.75rem' }}>
-                    Bảng giá giữ xe cố định
+                    Bảng giá giữ xe ô tô
                   </h3>
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
@@ -217,7 +205,7 @@ function BookingContent() {
                         </tr>
                       </thead>
                       <tbody>
-                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                        <tr>
                           <td style={{ padding: '0.75rem 0.25rem', fontWeight: 600, color: 'var(--text-heading)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                               <Car size={16} className="text-blue-600" />
@@ -226,16 +214,6 @@ function BookingContent() {
                           </td>
                           <td style={{ textAlign: 'center', padding: '0.75rem 0.25rem', color: 'var(--text)' }}>25.000 ₫/giờ</td>
                           <td style={{ textAlign: 'center', padding: '0.75rem 0.25rem', color: 'var(--text)' }}>40.000 ₫/giờ</td>
-                        </tr>
-                        <tr>
-                          <td style={{ padding: '0.75rem 0.25rem', fontWeight: 600, color: 'var(--text-heading)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <Bike size={16} className="text-blue-600" />
-                              Xe máy
-                            </div>
-                          </td>
-                          <td style={{ textAlign: 'center', padding: '0.75rem 0.25rem', color: 'var(--text)' }}>5.000 ₫/giờ</td>
-                          <td style={{ textAlign: 'center', padding: '0.75rem 0.25rem', color: 'var(--text)' }}>10.000 ₫/giờ</td>
                         </tr>
                       </tbody>
                     </table>
@@ -249,7 +227,7 @@ function BookingContent() {
                       Tiền cọc cần thanh toán (cố định 1h)
                     </span>
                     <strong style={{ fontSize: '1.65rem', color: 'var(--blue-700)', fontWeight: 800 }}>
-                      {vehicle === 'car' ? '25.000 ₫' : '5.000 ₫'}
+                      25.000 ₫
                     </strong>
                   </div>
 
