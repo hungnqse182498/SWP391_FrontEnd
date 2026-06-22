@@ -54,6 +54,7 @@ import UserBookingSuccess from './pages/user/BookingSuccess'
 
 import UserProfile from './pages/user/Profile'
 
+import UserSubscribeMonthly from './pages/user/SubscribeMonthly'
 import UserRegister from './pages/user/Register'
 
 import LegalHub from './pages/user/LegalHub'
@@ -87,6 +88,8 @@ export default function App() {
               <Route path="thanh-toan" element={<Payment />} />
 
               <Route path="dat-cho/thanh-cong" element={<UserBookingSuccess />} />
+
+              <Route path="dang-ky-thang" element={<UserSubscribeMonthly />} />
 
               <Route path="lich-su" element={<UserBookingHistory />} />
 

@@ -76,6 +76,8 @@ export class AuthService {
         localStorage.setItem('user_email', response.result.user.email)
         localStorage.setItem('user_name', response.result.user.fullName)
         localStorage.setItem('user_role', response.result.user.roleName)
+        localStorage.setItem('user_id', response.result.user.userId)
+        localStorage.setItem('user_phone', response.result.user.phoneNumber ?? '')
         return response
       }
 
@@ -121,6 +123,8 @@ export class AuthService {
     localStorage.removeItem('user_email')
     localStorage.removeItem('user_name')
     localStorage.removeItem('user_role')
+    localStorage.removeItem('user_id')
+    localStorage.removeItem('user_phone')
   }
 
   async refreshToken(): Promise<RefreshTokenResponse> {
@@ -151,10 +155,18 @@ export class AuthService {
     const email = localStorage.getItem('user_email')
     const name = localStorage.getItem('user_name')
     const role = localStorage.getItem('user_role')
+    const userId = localStorage.getItem('user_id')
+    const phone = localStorage.getItem('user_phone')
 
     if (!email) return null
 
-    return { email, name: name || email, role: (role as any) || 'user' }
+    return {
+      userId,
+      email,
+      name: name || email,
+      role: (role?.toLowerCase() as import('../context/AuthContext').UserRole) || 'user',
+      phone: phone || undefined,
+    }
   }
 
   // Check if user is authenticated

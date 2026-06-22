@@ -119,7 +119,7 @@ export class ApiClient {
       if (!response.ok) {
         if (response.status === 401) {
           this.clearToken()
-          window.location.href = '/login'
+          window.location.href = '/dang-nhap'
         }
         const error = await response.text()
         throw new Error(`HTTP ${response.status}: ${error}`)

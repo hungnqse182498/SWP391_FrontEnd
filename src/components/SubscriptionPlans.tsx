@@ -1,5 +1,6 @@
 import { CheckCircle, XCircle } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 export default function SubscriptionPlans() {
   const [isMotorbike, setIsMotorbike] = useState(false);
@@ -129,9 +130,12 @@ function PlanCard({
         )}
       </ul>
 
-      <button type="button" className={popular ? "btn btn-primary btn-block" : "btn btn-plan btn-block"}>
+      <Link
+        to="/dang-ky-thang"
+        className={popular ? "btn btn-primary btn-block" : "btn btn-plan btn-block"}
+      >
         {popular ? "Chọn gói này" : "Đăng ký ngay"}
-      </button>
+      </Link>
     </article>
   );
 }

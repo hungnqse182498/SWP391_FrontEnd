@@ -1,23 +1,45 @@
 import { motion } from 'framer-motion'
 import { Mail, MapPin, Phone, Save, User } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import FormField from '../../components/FormField'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { useAuth } from '../../context/AuthContext'
 
 function ProfileContent() {
-  const { user, profile, updateProfile } = useAuth()
+  const { user, profile, updateProfile, refreshProfile } = useAuth()
   const [name, setName] = useState(profile?.name ?? '')
-  const [phone, setPhone] = useState(profile?.phone ?? '')
+  const [phone, setPhone] = useState(profile?.phone ?? user?.phone ?? '')
   const [plate, setPlate] = useState(profile?.vehiclePlate ?? '')
   const [address, setAddress] = useState(profile?.address ?? '')
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e: FormEvent) => {
+  useEffect(() => {
+    refreshProfile()
+  }, [refreshProfile])
+
+  useEffect(() => {
+    if (profile) {
+      setName(profile.name)
+      setPhone(profile.phone)
+      setPlate(profile.vehiclePlate)
+      setAddress(profile.address)
+    }
+  }, [profile])
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    updateProfile({ name, phone, vehiclePlate: plate, address })
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+    setLoading(true)
+    setError('')
+    const ok = await updateProfile({ name, phone, vehiclePlate: plate, address })
+    setLoading(false)
+    if (ok) {
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } else {
+      setError('Không thể lưu thông tin. Vui lòng thử lại.')
+    }
   }
 
   return (
@@ -38,6 +60,13 @@ function ProfileContent() {
         <div className="profile-email">
           <Mail size={18} strokeWidth={2} aria-hidden />
           <span>{user?.email}</span>
+          {user?.role && (
+            <span
+              className={`user-role-badge${user.role === 'customer' ? ' user-role-badge--customer' : ''}`}
+            >
+              {user.role === 'customer' ? 'Khách tháng' : user.role}
+            </span>
+          )}
         </div>
 
         <FormField label="Họ và tên" name="name" id="p-name" icon={User} value={name} onChange={(e) => setName(e.target.value)} required />
@@ -57,10 +86,11 @@ function ProfileContent() {
         </div>
 
         {saved && <p className="alert-inline">Đã lưu thông tin.</p>}
+        {error && <p className="alert-inline alert-error">{error}</p>}
 
-        <button type="submit" className="btn btn-primary btn-block">
+        <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
           <Save size={18} strokeWidth={2} aria-hidden />
-          Lưu thay đổi
+          {loading ? 'Đang lưu...' : 'Lưu thay đổi'}
         </button>
       </motion.form>
     </section>

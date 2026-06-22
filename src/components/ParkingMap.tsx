@@ -1,10 +1,11 @@
-import { ArrowDown, MousePointerClick, Zap } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ArrowDown, MapPin, MousePointerClick } from 'lucide-react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import type { ParkingFloor, ParkingSpot, SpotStatus } from '../types/parking'
+import { spotLabel as formatSpotLabel } from '../data/parkingLayoutConfig'
 
 interface ParkingMapProps {
   floors: ParkingFloor[]
-  onContinue?: (spots: ParkingSpot[], floor: ParkingFloor) => void
+  onSelect?: (spot: ParkingSpot, floor: ParkingFloor) => void
 }
 
 const STATUS_LABEL: Record<SpotStatus, string> = {
@@ -15,38 +16,34 @@ const STATUS_LABEL: Record<SpotStatus, string> = {
   disabled: 'Không dùng',
 }
 
-export default function ParkingMap({ floors, onContinue }: ParkingMapProps) {
+export default function ParkingMap({ floors, onSelect }: ParkingMapProps) {
   const [activeFloorId, setActiveFloorId] = useState(floors[0]?.id ?? 1)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const floor = floors.find((f) => f.id === activeFloorId) ?? floors[0]
 
-  const spotMap = useMemo(() => {
-    const map = new Map<string, ParkingSpot>()
-    floor?.spots.forEach((s) => map.set(s.id, s))
-    return map
-  }, [floor])
+  const selectedSpot = useMemo(() => {
+    if (!selectedId || !floor) return null
+    return floor.spots.find((s) => s.id === selectedId) ?? null
+  }, [selectedId, floor])
 
-  const selectedSpots = useMemo(
-    () =>
-      [...selectedIds]
-        .map((id) => spotMap.get(id))
-        .filter((s): s is ParkingSpot => Boolean(s)),
-    [selectedIds, spotMap],
-  )
+  useEffect(() => {
+    if (!floors.some((f) => f.id === activeFloorId)) {
+      setActiveFloorId(floors[0]?.id ?? 1)
+      setSelectedId(null)
+    }
+  }, [floors, activeFloorId])
 
-  const toggleSpot = (spot: ParkingSpot) => {
-    if (spot.status === 'occupied' || spot.status === 'reserved' || spot.status === 'disabled') return
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(spot.id)) next.delete(spot.id)
-      else next.add(spot.id)
-      return next
-    })
+  const selectSpot = (spot: ParkingSpot) => {
+    if (spot.status === 'occupied' || spot.status === 'reserved' || spot.status === 'disabled') {
+      return
+    }
+    setSelectedId(spot.id)
+    if (floor) onSelect?.(spot, floor)
   }
 
   const getDisplayStatus = (spot: ParkingSpot): SpotStatus =>
-    selectedIds.has(spot.id) ? 'selected' : spot.status
+    selectedId === spot.id ? 'selected' : spot.status
 
   if (!floor) return null
 
@@ -63,7 +60,7 @@ export default function ParkingMap({ floors, onContinue }: ParkingMapProps) {
               className={`floor-tab${f.id === activeFloorId ? ' active' : ''}`}
               onClick={() => {
                 setActiveFloorId(f.id)
-                setSelectedIds(new Set())
+                setSelectedId(null)
               }}
             >
               {f.name}
@@ -78,16 +75,39 @@ export default function ParkingMap({ floors, onContinue }: ParkingMapProps) {
         </ul>
       </div>
 
+      <aside className="map-sidebar">
+        <h3>Chỗ đã chọn</h3>
+        {!selectedSpot ? (
+          <p className="muted">
+            <MousePointerClick size={16} strokeWidth={2} aria-hidden />
+            Nhấn ô trống trên sơ đồ bên phải để chọn chỗ đỗ.
+          </p>
+        ) : (
+          <div className="selected-spot-card">
+            <MapPin size={18} strokeWidth={2.2} aria-hidden />
+            <div>
+              <strong>{floor.name}</strong>
+              <span>Vị trí {formatSpotLabel(selectedSpot.row, selectedSpot.number)}</span>
+            </div>
+          </div>
+        )}
+      </aside>
+
       <div className="map-stage">
         <div className="map-entrance" aria-hidden="true">
           <ArrowDown size={16} strokeWidth={2} />
           <span>Lối vào / Thang máy</span>
         </div>
-        <div className="map-grid-wrap">
+        <div
+          className="map-grid-wrap"
+          style={{ '--map-cols': String(floor.cols) } as CSSProperties}
+        >
           <div className="map-col-labels" aria-hidden="true">
+            <span className="map-corner" />
             {Array.from({ length: floor.cols }, (_, i) => (
               <span key={i}>{i + 1}</span>
             ))}
+            <span className="map-corner" />
           </div>
           <div className="map-grid">
             {floor.rows.map((row) => (
@@ -99,21 +119,18 @@ export default function ParkingMap({ floors, onContinue }: ParkingMapProps) {
                     .map((spot) => {
                       const status = getDisplayStatus(spot)
                       const clickable = status === 'available' || status === 'selected'
+                      const label = formatSpotLabel(spot.row, spot.number)
                       return (
                         <button
                           key={spot.id}
                           type="button"
-                          className={`spot spot--${status} spot--${spot.type}`}
+                          className={`spot spot--${status}`}
                           disabled={!clickable}
-                          aria-label={`${row}${spot.number} — ${STATUS_LABEL[status]}`}
+                          aria-label={`${label} — ${STATUS_LABEL[status]}`}
                           aria-pressed={status === 'selected'}
-                          onClick={() => toggleSpot(spot)}
+                          onClick={() => selectSpot(spot)}
                         >
-                          {spot.type === 'ev' ? (
-                            <Zap size={12} strokeWidth={2.5} aria-hidden />
-                          ) : (
-                            <span className="spot-num">{spot.number}</span>
-                          )}
+                          <span className="spot-label">{label}</span>
                         </button>
                       )
                     })}
@@ -124,34 +141,6 @@ export default function ParkingMap({ floors, onContinue }: ParkingMapProps) {
           </div>
         </div>
       </div>
-
-      <aside className="map-sidebar">
-        <h3>Chỗ đã chọn</h3>
-        {selectedSpots.length === 0 ? (
-          <p className="muted">
-            <MousePointerClick size={16} strokeWidth={2} aria-hidden />
-            Nhấn ô trống trên sơ đồ để chọn chỗ đỗ.
-          </p>
-        ) : (
-          <ul className="selected-list">
-            {selectedSpots.map((s) => (
-              <li key={s.id}>
-                <strong>{floor.name} — {s.row}{s.number}</strong>
-                <span>{s.type === 'ev' ? 'Xe điện' : s.type === 'handicap' ? 'Khuyết tật' : 'Tiêu chuẩn'}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <button
-          type="button"
-          className="btn btn-primary btn-block"
-          disabled={selectedSpots.length === 0}
-          onClick={() => onContinue?.(selectedSpots, floor)}
-        >
-          Tiếp tục xác nhận
-        </button>
-      </aside>
     </section>
   )
 }
-
