@@ -20,19 +20,31 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="footer-links">
-          <h4>Dịch vụ</h4>
-          <ul>
-            <li><Link to="/dat-cho">Đặt chỗ ngắn hạn</Link></li>
-            <li><Link to="/dang-ky">Đăng ký thẻ tháng</Link></li>
-            <li><Link to="/lich-su">Lịch sử đặt chỗ</Link></li>
-          </ul>
-        </div>
+        <div style={{ gridColumn: "span 2", display: "flex", gap: "2rem", justifyContent: "space-between" }}>
+          <div className="footer-links" style={{ flex: 1 }}>
+            <h4>Dịch vụ</h4>
+            <ul>
+              <li><Link to="/dat-cho">Đặt chỗ ngắn hạn</Link></li>
+              <li><Link to="/dang-ky">Đăng ký thẻ tháng</Link></li>
+              <li><Link to="/lich-su">Lịch sử đặt chỗ</Link></li>
+            </ul>
+          </div>
 
-        <div className="footer-contact">
-          <h4>Hỗ trợ</h4>
-          <p><Phone size={16} strokeWidth={2} aria-hidden /> Hotline: 1900 6868</p>
-          <p><Mail size={16} strokeWidth={2} aria-hidden /> support@easyparking.vn</p>
+          <div className="footer-links" style={{ flex: 1 }}>
+            <h4>Điều khoản</h4>
+            <ul>
+              <li><Link to={{ pathname: '/legal', hash: '#terms' }}>Điều khoản sử dụng</Link></li>
+              <li><Link to={{ pathname: '/legal', hash: '#privacy' }}>Chính sách bảo mật</Link></li>
+              <li><Link to={{ pathname: '/legal', hash: '#booking-rules' }}>Quy định đặt chỗ</Link></li>
+              <li><Link to={{ pathname: '/legal', hash: '#cancellation' }}>Chính sách hủy &amp; hoàn tiền</Link></li>
+            </ul>
+          </div>
+
+          <div className="footer-contact" style={{ flex: 1 }}>
+            <h4>Hỗ trợ</h4>
+            <p><Phone size={16} strokeWidth={2} aria-hidden /> Hotline: 1900 6868</p>
+            <p><Mail size={16} strokeWidth={2} aria-hidden /> support@easyparking.vn</p>
+          </div>
         </div>
       </div>
 
