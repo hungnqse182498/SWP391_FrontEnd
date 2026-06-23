@@ -12,6 +12,10 @@ import Login from './pages/Login'
 
 import Payment from './pages/Payment'
 
+import PaymentSuccess from './pages/PaymentSuccess'
+
+import PaymentCancel from './pages/PaymentCancel'
+
 import StaffDashboard from './pages/staff/Dashboard'
 
 import StaffScanPlate from './pages/staff/ScanPlate'

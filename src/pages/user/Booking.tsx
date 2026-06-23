@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { AlertTriangle, Bike, CalendarDays, Car, MapPin } from 'lucide-react'
 import BookingSteps from '../../components/BookingSteps'
@@ -9,14 +9,27 @@ import { useBooking } from '../../context/BookingContext'
 import { parkingFloors } from '../../data/parkingFloors'
 import type { ParkingFloor } from '../../types/parking'
 import {
-  depositAmount,
-  DEPOSIT_RATES,
   filterCustomerFloors,
-  HOURLY_RATES,
   vehicleTypeLabel,
 } from '../../utils/bookingPricing'
 import { formatCurrency } from '../../utils/pricing'
+import { apiClient } from '../../config/api'
 
+/* ---------- Types ---------- */
+interface CarPolicyData {
+  basePrice: number
+  extraHourPrice: number
+  nightSurcharge: number
+}
+
+/* ---------- Fallback values (used when API is unavailable) ---------- */
+const FALLBACK_POLICY: CarPolicyData = {
+  basePrice: 30000,
+  extraHourPrice: 10000,
+  nightSurcharge: 20000,
+}
+
+/* ---------- Helpers ---------- */
 function CancellationPolicy() {
   return (
     <div className="cancel-policy-banner cancel-policy-banner--compact" role="note">
@@ -32,36 +45,43 @@ function CancellationPolicy() {
   )
 }
 
-function PriceTable() {
+function PriceTable({ policy }: { policy: CarPolicyData }) {
   return (
     <div className="booking-price-table">
       <h3>Bảng giá giữ xe ô tô</h3>
       <table>
         <thead>
           <tr>
-            <th>Loại xe</th>
-            <th>Giá ban ngày (6h – 22h)</th>
-            <th>Giá ban đêm (22h – 6h)</th>
+            <th>Hạng mục</th>
+            <th>Giá</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td>
               <Car size={16} aria-hidden />
-              Ô tô
+              <strong>Giá giờ đầu</strong>
             </td>
-            <td>{formatCurrency(HOURLY_RATES.car.day)}/giờ</td>
-            <td>{formatCurrency(HOURLY_RATES.car.night)}/giờ</td>
+            <td><strong style={{ fontSize: '1.1em' }}>{formatCurrency(policy.basePrice)}</strong></td>
+          </tr>
+          <tr>
+            <td>Phụ phí giờ tiếp theo (6h – 22h)</td>
+            <td>{formatCurrency(policy.extraHourPrice)}/giờ</td>
+          </tr>
+          <tr>
+            <td>Phụ phí giờ tiếp theo (22h – 6h)</td>
+            <td>{formatCurrency(policy.nightSurcharge)}/giờ</td>
           </tr>
         </tbody>
       </table>
       <p className="booking-price-note">
-        Tiền cọc cố định 1 giờ: {formatCurrency(DEPOSIT_RATES.car)}. Chỉ áp dụng cho ô tô — xe máy không hỗ trợ đặt trước.
+        Tiền cọc cố định 1 giờ: {formatCurrency(policy.basePrice)}. Chỉ áp dụng cho ô tô — xe máy không hỗ trợ đặt trước.
       </p>
     </div>
   )
 }
 
+/* ---------- Main component ---------- */
 function BookingContent() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -85,6 +105,44 @@ function BookingContent() {
     return new Date(now.getTime() - tzoffset).toISOString().slice(0, 16)
   })
 
+  /* --- Dynamic pricing state (guest flow only) --- */
+  const [carPolicy, setCarPolicy] = useState<CarPolicyData | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (isCustomer) return // Customer flow doesn't need API pricing
+
+    let cancelled = false
+    setLoading(true)
+
+    apiClient
+      .get<{ result: Array<{ vehicleTypeName?: string; basePrice: number; extraHourPrice: number; nightSurcharge: number }> }>('/PricingPolicy')
+      .then((data) => {
+        if (cancelled) return
+        const policies = data?.result ?? (Array.isArray(data) ? data : [])
+        const carItem = policies.find((p) => p.vehicleTypeName === 'Ô Tô') ?? policies[0]
+        if (carItem) {
+          setCarPolicy({
+            basePrice: carItem.basePrice,
+            extraHourPrice: carItem.extraHourPrice,
+            nightSurcharge: carItem.nightSurcharge,
+          })
+        } else {
+          setCarPolicy(FALLBACK_POLICY)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCarPolicy(FALLBACK_POLICY)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [isCustomer])
+
+  const effectivePolicy = carPolicy ?? FALLBACK_POLICY
+
   const customerFloors = useMemo(
     () => filterCustomerFloors(vehicle, parkingFloors) as ParkingFloor[],
     [vehicle],
@@ -96,7 +154,7 @@ function BookingContent() {
       return
     }
 
-    const deposit = depositAmount('car')
+    const deposit = effectivePolicy.basePrice
 
     setDraft({
       floorId: 0,
@@ -215,7 +273,11 @@ function BookingContent() {
                     </div>
 
                     {/* Bảng giá chuyển sang bên trái */}
-                    <PriceTable />
+                    {loading ? (
+                      <p style={{ padding: '1rem', opacity: 0.7 }}>Đang tải giá...</p>
+                    ) : (
+                      <PriceTable policy={effectivePolicy} />
+                    )}
                   </section>
 
                   {/* Bên phải: Chỉ thông tin thanh toán */}
@@ -233,7 +295,7 @@ function BookingContent() {
 
                       <div className="booking-payment-item booking-payment-item--total">
                         <span>Số tiền thanh toán</span>
-                        <strong>{formatCurrency(depositAmount('car'))}</strong>
+                        <strong>{loading ? '...' : formatCurrency(effectivePolicy.basePrice)}</strong>
                       </div>
                     </div>
 
@@ -243,8 +305,9 @@ function BookingContent() {
                       type="button"
                       onClick={handlePreRegisterSubmit}
                       className="hero-search-btn booking-continue-btn"
+                      disabled={loading}
                     >
-                      Tiếp tục thanh toán
+                      {loading ? 'Đang tải giá...' : 'Tiếp tục thanh toán'}
                     </button>
                   </aside>
                 </div>
@@ -264,3 +327,4 @@ export default function Booking() {
     </ProtectedRoute>
   )
 }
+
