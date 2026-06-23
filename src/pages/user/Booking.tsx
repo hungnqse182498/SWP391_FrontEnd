@@ -9,10 +9,7 @@ import { useBooking } from '../../context/BookingContext'
 import { parkingFloors } from '../../data/parkingFloors'
 import type { ParkingFloor } from '../../types/parking'
 import {
-  depositAmount,
-  DEPOSIT_RATES,
   filterCustomerFloors,
-  HOURLY_RATES,
   vehicleTypeLabel,
 } from '../../utils/bookingPricing'
 import { formatCurrency } from '../../utils/pricing'
@@ -33,6 +30,9 @@ function CancellationPolicy() {
 }
 
 function PriceTable() {
+  const { getPolicy } = useBooking()
+  const carPolicy = getPolicy('car')
+
   return (
     <div className="booking-price-table">
       <h3>Bảng giá giữ xe ô tô</h3>
@@ -50,13 +50,13 @@ function PriceTable() {
               <Car size={16} aria-hidden />
               Ô tô
             </td>
-            <td>{formatCurrency(HOURLY_RATES.car.day)}/giờ</td>
-            <td>{formatCurrency(HOURLY_RATES.car.night)}/giờ</td>
+            <td>{formatCurrency(carPolicy.basePrice)}/giờ</td>
+            <td>{formatCurrency(carPolicy.nightSurcharge)}/giờ</td>
           </tr>
         </tbody>
       </table>
       <p className="booking-price-note">
-        Tiền cọc cố định 1 giờ: {formatCurrency(DEPOSIT_RATES.car)}. Chỉ áp dụng cho ô tô — xe máy không hỗ trợ đặt trước.
+        Tiền cọc cố định 1 giờ: {formatCurrency(carPolicy.basePrice)}. Chỉ áp dụng cho ô tô — xe máy không hỗ trợ đặt trước.
       </p>
     </div>
   )
@@ -66,7 +66,7 @@ function BookingContent() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
-  const { setDraft } = useBooking()
+  const { setDraft, getPolicy } = useBooking()
 
   const isCustomer = user?.role === 'customer'
   const locationState = location.state as { vehicle?: 'car' | 'bike'; startTime?: string } | null
@@ -96,7 +96,8 @@ function BookingContent() {
       return
     }
 
-    const deposit = depositAmount('car')
+    const policy = getPolicy('car')
+    const deposit = policy.basePrice
 
     setDraft({
       floorId: 0,
@@ -233,7 +234,7 @@ function BookingContent() {
 
                       <div className="booking-payment-item booking-payment-item--total">
                         <span>Số tiền thanh toán</span>
-                        <strong>{formatCurrency(depositAmount('car'))}</strong>
+                        <strong>{formatCurrency(getPolicy('car').basePrice)}</strong>
                       </div>
                     </div>
 

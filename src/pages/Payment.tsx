@@ -7,8 +7,8 @@ import ProtectedRoute from '../components/ProtectedRoute'
 import { useBooking } from '../context/BookingContext'
 import type { PaymentMethod } from '../types/booking'
 import { reservationApi } from '../utils/apiServices'
-import { depositAmount, vehicleTypeLabel } from '../utils/bookingPricing'
-import { calcTotal, formatCurrency } from '../utils/pricing'
+import { vehicleTypeLabel } from '../utils/bookingPricing'
+import { formatCurrency } from '../utils/pricing'
 
 const methods: { id: PaymentMethod; label: string; icon: typeof Wallet }[] = [
   { id: 'momo', label: 'Ví MoMo / PayOS', icon: Smartphone },
@@ -18,7 +18,7 @@ const methods: { id: PaymentMethod; label: string; icon: typeof Wallet }[] = [
 
 function PaymentContent() {
   const navigate = useNavigate()
-  const { draft, setDraft, completePayment } = useBooking()
+  const { draft, setDraft, completePayment, getPolicy } = useBooking()
   const [method, setMethod] = useState<PaymentMethod>('momo')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -29,9 +29,10 @@ function PaymentContent() {
 
   const isPreRegistered = draft.isPreRegistered
   const isMonthly = draft.isMonthlyCustomer
+  const policy = getPolicy(draft.vehicleType ?? 'car')
   const total = isPreRegistered
-    ? (draft.depositAmount ?? depositAmount(draft.vehicleType ?? 'car'))
-    : calcTotal(draft.spots.length, draft.hours)
+    ? (draft.depositAmount ?? policy.basePrice)
+    : draft.spots.length * draft.hours * policy.basePrice
 
   const handlePay = async () => {
     setLoading(true)

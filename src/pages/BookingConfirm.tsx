@@ -7,12 +7,12 @@ import FormField from '../components/FormField'
 import ProtectedRoute from '../components/ProtectedRoute'
 import { useAuth } from '../context/AuthContext'
 import { useBooking } from '../context/BookingContext'
-import { calcTotal, formatCurrency } from '../utils/pricing'
+import { formatCurrency } from '../utils/pricing'
 
 function ConfirmContent() {
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { draft, setDraft } = useBooking()
+  const { draft, setDraft, getPolicy } = useBooking()
   const [hours, setHours] = useState(draft?.hours ?? 2)
   const [startLocal, setStartLocal] = useState('')
   const [plate, setPlate] = useState(draft?.vehiclePlate ?? profile?.vehiclePlate ?? '')
@@ -33,9 +33,10 @@ function ConfirmContent() {
   }
 
   const isPreRegistered = (draft as any).isPreRegistered
+  const policy = getPolicy(draft.vehicleType ?? 'car')
   const total = isPreRegistered
-    ? ((draft as any).depositAmount ?? 25000)
-    : calcTotal(draft.spots.length, hours)
+    ? ((draft as any).depositAmount ?? policy.basePrice)
+    : draft.spots.length * hours * policy.basePrice
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()

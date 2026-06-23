@@ -2,11 +2,11 @@ import { Link } from 'react-router-dom'
 import { AlertTriangle } from 'lucide-react'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { useBooking } from '../../context/BookingContext'
-import { depositAmount, vehicleTypeLabel } from '../../utils/bookingPricing'
+import { vehicleTypeLabel } from '../../utils/bookingPricing'
 import { formatCurrency } from '../../utils/pricing'
 
 function ConfirmContent() {
-  const { draft } = useBooking()
+  const { draft, getPolicy } = useBooking()
 
   if (!draft) {
     return (
@@ -19,9 +19,10 @@ function ConfirmContent() {
 
   const isPreRegistered = draft.isPreRegistered
   const isMonthly = draft.isMonthlyCustomer
+  const policy = getPolicy(draft.vehicleType ?? 'car')
   const total = isPreRegistered
-    ? (draft.depositAmount ?? depositAmount(draft.vehicleType ?? 'car'))
-    : draft.spots.length * draft.hours * 15000
+    ? (draft.depositAmount ?? policy.basePrice)
+    : draft.spots.length * draft.hours * policy.basePrice
 
   return (
     <section className="booking-confirm-page">
