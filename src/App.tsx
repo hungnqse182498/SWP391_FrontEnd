@@ -12,6 +12,10 @@ import Login from './pages/Login'
 
 import Payment from './pages/Payment'
 
+import PaymentSuccess from './pages/PaymentSuccess'
+
+import PaymentCancel from './pages/PaymentCancel'
+
 import StaffDashboard from './pages/staff/Dashboard'
 
 import StaffScanPlate from './pages/staff/ScanPlate'
@@ -86,6 +90,10 @@ export default function App() {
               <Route path="dat-cho/xac-nhan" element={<UserBookingConfirm />} />
 
               <Route path="thanh-toan" element={<Payment />} />
+
+              <Route path="payment-success" element={<PaymentSuccess />} />
+
+              <Route path="payment-cancel" element={<PaymentCancel />} />
 
               <Route path="dat-cho/thanh-cong" element={<UserBookingSuccess />} />
 
