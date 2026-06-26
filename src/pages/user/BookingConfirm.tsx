@@ -61,9 +61,15 @@ function ConfirmContent() {
       </div>
 
       {isPreRegistered && (
-        <div className="cancel-policy-banner cancel-policy-banner--compact" role="note">
-          <AlertTriangle size={18} strokeWidth={2.2} aria-hidden />
-          <p>Hủy đặt chỗ <strong>không hoàn tiền</strong>.</p>
+        <div className="cancel-policy-banner cancel-policy-banner--compact" role="note" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertTriangle size={18} strokeWidth={2.2} aria-hidden />
+            <p>Hủy đặt chỗ <strong>không hoàn tiền</strong>.</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b91c1c' }}>
+            <AlertTriangle size={18} strokeWidth={2.2} aria-hidden />
+            <p><strong>Lưu ý quan trọng:</strong> Nếu đến trễ quá <strong>30 phút</strong> so với giờ đã hẹn, hệ thống sẽ tự động hủy đơn và <strong>không hoàn tiền cọc</strong>.</p>
+          </div>
         </div>
       )}
 

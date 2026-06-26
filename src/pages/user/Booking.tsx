@@ -30,12 +30,13 @@ function CancellationPolicy() {
 }
 
 function PriceTable() {
-  const { getPolicy } = useBooking()
-  const carPolicy = getPolicy('car')
+  const { getAllPolicies } = useBooking()
+  const policies = getAllPolicies()
+  const activePolicies = policies.filter(p => p.status === 'Active')
 
   return (
     <div className="booking-price-table">
-      <h3>Bảng giá giữ xe ô tô</h3>
+      <h3>Bảng giá dịch vụ</h3>
       <table>
         <thead>
           <tr>
@@ -45,18 +46,24 @@ function PriceTable() {
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td>
-              <Car size={16} aria-hidden />
-              Ô tô
-            </td>
-            <td>{formatCurrency(carPolicy.basePrice)}/giờ</td>
-            <td>{formatCurrency(carPolicy.nightSurcharge)}/giờ</td>
-          </tr>
+          {activePolicies.length > 0 ? activePolicies.map(p => (
+            <tr key={p.policyId}>
+              <td>
+                {p.vehicleTypeName.toLowerCase().includes('ô tô') ? <Car size={16} aria-hidden /> : <Bike size={16} aria-hidden />}
+                {p.vehicleTypeName}
+              </td>
+              <td>{formatCurrency(p.basePrice)}/giờ</td>
+              <td>{formatCurrency(p.nightSurcharge)}/giờ</td>
+            </tr>
+          )) : (
+            <tr>
+              <td colSpan={3} style={{ textAlign: 'center' }}>Đang tải bảng giá...</td>
+            </tr>
+          )}
         </tbody>
       </table>
       <p className="booking-price-note">
-        Tiền cọc cố định 1 giờ: {formatCurrency(carPolicy.basePrice)}. Chỉ áp dụng cho ô tô — xe máy không hỗ trợ đặt trước.
+        Tiền cọc cố định 1 giờ. Chỉ áp dụng cho ô tô — xe máy không hỗ trợ đặt trước.
       </p>
     </div>
   )
@@ -96,6 +103,20 @@ function BookingContent() {
       return
     }
 
+    const selectedTime = new Date(startTime).getTime()
+    const nowTime = new Date().getTime()
+    const diffHours = (selectedTime - nowTime) / (1000 * 60 * 60)
+
+    if (diffHours < 0) {
+      alert('Thời gian vào phải lớn hơn thời gian hiện tại')
+      return
+    }
+
+    if (diffHours > 5) {
+      alert('Chỉ được phép đặt trước tối đa 5 tiếng')
+      return
+    }
+
     const policy = getPolicy('car')
     const deposit = policy.basePrice
 
@@ -121,6 +142,13 @@ function BookingContent() {
 
     navigate('/dat-cho/xac-nhan')
   }
+
+  // Calculate min and max time for the input
+  const now = new Date()
+  const tzoffset = now.getTimezoneOffset() * 60000
+  const minTimeStr = new Date(now.getTime() - tzoffset).toISOString().slice(0, 16)
+  const maxTime = new Date(now.getTime() + 5 * 60 * 60 * 1000)
+  const maxTimeStr = new Date(maxTime.getTime() - tzoffset).toISOString().slice(0, 16)
 
   return (
     <div className="home-landing booking-landing">
@@ -209,6 +237,8 @@ function BookingContent() {
                           <input
                             type="datetime-local"
                             value={startTime}
+                            min={minTimeStr}
+                            max={maxTimeStr}
                             onChange={(event) => setStartTime(event.target.value)}
                           />
                         </div>

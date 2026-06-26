@@ -122,6 +122,12 @@ export const reservationApi = {
 
   cancel: (id: string) => apiClient.put<ApiResponse>(`/reservations/${id}/cancel`),
 
+  changeTime: (id: string, newExpectedTime: string) =>
+    apiClient.put<ApiResponse>(`/reservations/${id}/change-time`, newExpectedTime),
+
+  recreatePayment: (id: string) =>
+    apiClient.post<ApiResponse<CreateReservationResponse>>(`/reservations/${id}/recreate-payment`),
+
   checkPayment: (orderCode: string) =>
     apiClient.get<ApiResponse>(`/reservations/check-payment-status/${orderCode}`),
 }
