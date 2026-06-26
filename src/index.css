@@ -2855,12 +2855,23 @@ ul, ol { margin: 0; padding: 0; }
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 0;
   min-width: 0;
 }
 
 .legal-section {
-  margin-bottom: 0 !important;
+  margin-bottom: 2.5rem !important;
+  padding: 2rem !important;
+}
+
+.legal-section p {
+  margin-bottom: 1.25rem;
+  line-height: 1.8;
+}
+
+.legal-section ul li, .legal-section ol li {
+  margin-bottom: 0.5rem;
+  line-height: 1.8;
 }
 
 /* Responsive adjustment */

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { AlertTriangle, Bike, CalendarDays, Car, MapPin } from 'lucide-react'
 import BookingSteps from '../../components/BookingSteps'
 import ParkingMap from '../../components/ParkingMap'
@@ -22,7 +22,10 @@ function CancellationPolicy() {
         <strong>Chính sách hủy đặt chỗ</strong>
         <p>
           Hủy đặt chỗ <strong>không hoàn tiền</strong>. Tiền cọc sẽ không được hoàn lại dưới mọi
-          hình thức.
+          hình thức.{" "}
+          <Link to="/legal#booking-rules" style={{ textDecoration: 'underline', color: 'inherit', fontWeight: 'bold' }}>
+            Tìm hiểu thêm về chính sách của chúng tôi
+          </Link>
         </p>
       </div>
     </div>
