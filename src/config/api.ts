@@ -102,6 +102,7 @@ export class ApiClient {
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
     endpoint: string,
     data?: unknown,
+    _isRetry = false,
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`
     const options: RequestInit = {
@@ -117,10 +118,26 @@ export class ApiClient {
       const response = await fetch(url, options)
 
       if (!response.ok) {
-        if (response.status === 401) {
+        if (response.status === 401 && !_isRetry) {
+          // Attempt token refresh (lazy import to avoid circular dependency)
+          try {
+            const { authService } = await import('../utils/authService')
+            const refreshResult = await authService.refreshToken()
+
+            if (refreshResult.isSuccess && refreshResult.result?.accessToken) {
+              this.setToken(refreshResult.result.accessToken)
+              // Retry the original request once
+              return this.request<T>(method, endpoint, data, true)
+            }
+          } catch {
+            // Refresh failed — fall through to clear and redirect
+          }
+
           this.clearToken()
           window.location.href = '/dang-nhap'
+          throw new Error('Session expired. Redirecting to login.')
         }
+
         const error = await response.text()
         throw new Error(`HTTP ${response.status}: ${error}`)
       }
