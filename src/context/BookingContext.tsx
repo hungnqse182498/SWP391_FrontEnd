@@ -4,11 +4,23 @@ import {
   useContext,
   useMemo,
   useState,
+  useEffect,
   type ReactNode,
 } from 'react'
 import type { BookingDraft, BookingRecord, PaymentMethod } from '../types/booking'
-import { addHours, calcTotal, PRICE_PER_HOUR } from '../utils/pricing'
+import { addHours } from '../utils/pricing'
 import { useAuth } from './AuthContext'
+import { apiClient } from '../config/api'
+
+interface PricingPolicyRaw {
+  policyId: string
+  vehicleTypeName: string
+  basePrice: number
+  baseHours: number
+  extraHourPrice: number
+  nightSurcharge: number
+  status: string
+}
 
 const BOOKINGS_KEY = 'pbms_bookings'
 
@@ -34,6 +46,11 @@ interface BookingContextValue {
   completePayment: (method: PaymentMethod) => BookingRecord | null
   cancelBooking: (id: string) => void
   updateBookingStatus: (id: string, status: BookingRecord['status']) => void
+  getPolicy: (vehicle: 'car' | 'bike') => {
+    basePrice: number
+    nightSurcharge: number
+    extraHourPrice: number
+  }
 }
 
 const BookingContext = createContext<BookingContextValue | null>(null)
@@ -42,6 +59,39 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [draft, setDraft] = useState<BookingDraft | null>(null)
   const [bookings, setBookings] = useState<BookingRecord[]>(() => loadAllBookings())
+  const [policies, setPolicies] = useState<PricingPolicyRaw[]>([])
+
+  useEffect(() => {
+    apiClient.get<{ isSuccess: boolean; result: PricingPolicyRaw[] }>('/PricingPolicy')
+      .then((res) => {
+        if (res && res.isSuccess && Array.isArray(res.result)) {
+          setPolicies(res.result)
+        }
+      })
+      .catch((err) => console.error('Failed to fetch pricing policies:', err))
+  }, [])
+
+  const getPolicy = useCallback(
+    (vehicle: 'car' | 'bike') => {
+      const targetName = vehicle === 'car' ? 'ô tô' : 'xe máy'
+      const found = policies.find(
+        (p) => p.vehicleTypeName.toLowerCase() === targetName && p.status === 'Active',
+      )
+      if (found) {
+        return {
+          basePrice: found.basePrice,
+          nightSurcharge: found.nightSurcharge,
+          extraHourPrice: found.extraHourPrice,
+        }
+      }
+      return {
+        basePrice: vehicle === 'car' ? 25000 : 5000,
+        nightSurcharge: vehicle === 'car' ? 20000 : 5000,
+        extraHourPrice: vehicle === 'car' ? 10000 : 2000,
+      }
+    },
+    [policies],
+  )
 
   const getMyBookings = useCallback(() => {
     if (!user) return []
@@ -60,11 +110,13 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
       const isPreRegistered = draft.isPreRegistered
       const isMonthly = draft.isMonthlyCustomer
+      const policy = getPolicy(draft.vehicleType ?? 'car')
+      const hourlyRate = policy.basePrice
       const total = isPreRegistered
-        ? (draft.depositAmount ?? (draft.vehicleType === 'bike' ? 5000 : 25000))
+        ? (draft.depositAmount ?? hourlyRate)
         : isMonthly
           ? 0
-          : calcTotal(draft.spots.length, draft.hours)
+          : draft.spots.length * draft.hours * hourlyRate
       const endTime = isPreRegistered ? addHours(draft.startTime, 1) : addHours(draft.startTime, draft.hours)
       const now = new Date().toISOString()
 
@@ -77,7 +129,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         startTime: draft.startTime,
         endTime,
         hours: draft.hours,
-        pricePerHour: isPreRegistered ? total : PRICE_PER_HOUR,
+        pricePerHour: isPreRegistered ? total : hourlyRate,
         totalAmount: total,
         vehiclePlate: draft.vehiclePlate,
         status: 'paid',
@@ -95,7 +147,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       setDraft(null)
       return record
     },
-    [user, draft, bookings],
+    [user, draft, bookings, getPolicy],
   )
 
   const cancelBooking = useCallback((id: string) => {
@@ -124,8 +176,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       completePayment,
       cancelBooking,
       updateBookingStatus,
+      getPolicy,
     }),
-    [draft, bookings, getAllBookings, getMyBookings, completePayment, cancelBooking, updateBookingStatus],
+    [draft, bookings, getAllBookings, getMyBookings, completePayment, cancelBooking, updateBookingStatus, getPolicy],
   )
 
   return <BookingContext.Provider value={value}>{children}</BookingContext.Provider>

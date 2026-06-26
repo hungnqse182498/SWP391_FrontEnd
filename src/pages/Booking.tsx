@@ -7,12 +7,14 @@ import ProtectedRoute from '../components/ProtectedRoute'
 import { useAuth } from '../context/AuthContext'
 import { useBooking } from '../context/BookingContext'
 import { parkingFloors } from '../data/parkingFloors'
+import { formatCurrency } from '../utils/pricing'
 
 function BookingContent() {
   const navigate = useNavigate()
   const location = useLocation()
   const { profile } = useAuth()
-  const { setDraft } = useBooking()
+  const { setDraft, getPolicy } = useBooking()
+  const carPolicy = getPolicy('car')
 
   // Read initial states passed from Home Page
   const locationState = location.state as { vehicle?: 'car' | 'bike'; startTime?: string } | null
@@ -50,7 +52,7 @@ function BookingContent() {
       return
     }
 
-    const depositAmount = 25000
+    const depositAmount = carPolicy.basePrice
 
     setDraft({
       floorId: 0,
@@ -212,8 +214,8 @@ function BookingContent() {
                               Ô tô
                             </div>
                           </td>
-                          <td style={{ textAlign: 'center', padding: '0.75rem 0.25rem', color: 'var(--text)' }}>25.000 ₫/giờ</td>
-                          <td style={{ textAlign: 'center', padding: '0.75rem 0.25rem', color: 'var(--text)' }}>40.000 ₫/giờ</td>
+                          <td style={{ textAlign: 'center', padding: '0.75rem 0.25rem', color: 'var(--text)' }}>{formatCurrency(carPolicy.basePrice)}</td>
+                          <td style={{ textAlign: 'center', padding: '0.75rem 0.25rem', color: 'var(--text)' }}>{formatCurrency(carPolicy.nightSurcharge)}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -227,7 +229,7 @@ function BookingContent() {
                       Tiền cọc cần thanh toán (cố định 1h)
                     </span>
                     <strong style={{ fontSize: '1.65rem', color: 'var(--blue-700)', fontWeight: 800 }}>
-                      25.000 ₫
+                      {formatCurrency(carPolicy.basePrice)}
                     </strong>
                   </div>
 
