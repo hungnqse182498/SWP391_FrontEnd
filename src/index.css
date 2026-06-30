@@ -1795,6 +1795,72 @@ ul, ol { margin: 0; padding: 0; }
   font-size: 0.9375rem;
 }
 
+.camera-frame.clickable {
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.camera-frame.clickable:hover {
+  border-color: var(--primary);
+  background-color: var(--blue-50);
+}
+
+.camera-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ocr-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  gap: 0.75rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  z-index: 10;
+}
+
+.ocr-scanning-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--primary);
+  box-shadow: 0 0 12px var(--primary);
+  animation: scanAnimation 2s linear infinite;
+  z-index: 11;
+}
+
+@keyframes scanAnimation {
+  0% {
+    top: 0%;
+  }
+  50% {
+    top: 100%;
+  }
+  100% {
+    top: 0%;
+  }
+}
+
+.upload-hint {
+  font-size: 0.75rem !important;
+  color: var(--text-muted);
+  opacity: 0.7;
+  margin-top: 0.25rem !important;
+}
+
+.upload-input-hidden {
+  display: none;
+}
+
 .scan-form {
   display: flex;
   flex-direction: column;

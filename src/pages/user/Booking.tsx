@@ -1,8 +1,7 @@
 import { useState, useMemo } from 'react'
-import { useNavigate, useLocation, Link } from 'react-router-dom'
-import { AlertTriangle, Bike, Car, MapPin } from 'lucide-react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { AlertTriangle, Bike, CalendarDays, Car, MapPin } from 'lucide-react'
 import BookingSteps from '../../components/BookingSteps'
-import BookingDatetimeField from '../../components/BookingDatetimeField'
 import ParkingMap from '../../components/ParkingMap'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { useAuth } from '../../context/AuthContext'
@@ -14,11 +13,6 @@ import {
   vehicleTypeLabel,
 } from '../../utils/bookingPricing'
 import { formatCurrency } from '../../utils/pricing'
-import {
-  clampBookingDatetimeLocal,
-  defaultBookingDatetimeLocal,
-  isBookingDatetimeLocalValid,
-} from '../../utils/bookingTime'
 
 function CancellationPolicy() {
   return (
@@ -28,10 +22,7 @@ function CancellationPolicy() {
         <strong>Chính sách hủy đặt chỗ</strong>
         <p>
           Hủy đặt chỗ <strong>không hoàn tiền</strong>. Tiền cọc sẽ không được hoàn lại dưới mọi
-          hình thức.{" "}
-          <Link to="/legal#booking-rules" style={{ textDecoration: 'underline', color: 'inherit', fontWeight: 'bold' }}>
-            Tìm hiểu thêm về chính sách của chúng tôi
-          </Link>
+          hình thức.
         </p>
       </div>
     </div>
@@ -39,39 +30,40 @@ function CancellationPolicy() {
 }
 
 function PriceTable() {
-  const { getPolicy } = useBooking()
-  getPolicy('car')
+  const { getAllPolicies } = useBooking()
+  const policies = getAllPolicies()
+  const activePolicies = policies.filter(p => p.status === 'Active')
 
   return (
     <div className="booking-price-table">
-      <h3>Bảng giá giữ xe ô tô</h3>
+      <h3>Bảng giá dịch vụ</h3>
       <table>
         <thead>
           <tr>
-            <th>Hạng mục</th>
-            <th>Giá</th>
+            <th>Loại xe</th>
+            <th>Giá ban ngày (6h – 22h)</th>
+            <th>Giá ban đêm (22h – 6h)</th>
           </tr>
         </thead>
         <tbody>
-          <tr style={{ fontWeight: 'bold', backgroundColor: '#eef6ff' }}>
-            <td>
-              <Car size={16} aria-hidden style={{ marginRight: '8px', verticalAlign: 'middle' }} />
-              Giờ đầu
-            </td>
-            <td>30.000 đ</td>
-          </tr>
-          <tr>
-            <td>Ban ngày (6h – 22h)</td>
-            <td>10.000 đ/giờ</td>
-          </tr>
-          <tr>
-            <td>Ban đêm (22h – 6h)</td>
-            <td>20.000 đ/giờ</td>
-          </tr>
+          {activePolicies.length > 0 ? activePolicies.map(p => (
+            <tr key={p.policyId}>
+              <td>
+                {p.vehicleTypeName.toLowerCase().includes('ô tô') ? <Car size={16} aria-hidden /> : <Bike size={16} aria-hidden />}
+                {p.vehicleTypeName}
+              </td>
+              <td>{formatCurrency(p.basePrice)}/giờ</td>
+              <td>{formatCurrency(p.nightSurcharge)}/giờ</td>
+            </tr>
+          )) : (
+            <tr>
+              <td colSpan={3} style={{ textAlign: 'center' }}>Đang tải bảng giá...</td>
+            </tr>
+          )}
         </tbody>
       </table>
       <p className="booking-price-note">
-        Giờ đầu: 30.000 đ — Các giờ tiếp theo: 10.000 đ/giờ (06:00–22:00), 20.000 đ/giờ (22:00–06:00).
+        Tiền cọc cố định 1 giờ. Chỉ áp dụng cho ô tô — xe máy không hỗ trợ đặt trước.
       </p>
     </div>
   )
@@ -91,11 +83,14 @@ function BookingContent() {
   const initialStartTime = locationState?.startTime ?? ''
 
   const [vehicle, setVehicle] = useState<'car' | 'bike'>(initialVehicle)
-  const [startTime, setStartTime] = useState<string>(() =>
-    initialStartTime
-      ? clampBookingDatetimeLocal(initialStartTime)
-      : defaultBookingDatetimeLocal(),
-  )
+  const [startTime, setStartTime] = useState<string>(() => {
+    if (initialStartTime) return initialStartTime
+    const now = new Date()
+    now.setHours(now.getHours() + 1)
+    now.setMinutes(0, 0, 0)
+    const tzoffset = now.getTimezoneOffset() * 60000
+    return new Date(now.getTime() - tzoffset).toISOString().slice(0, 16)
+  })
 
   const customerFloors = useMemo(
     () => filterCustomerFloors(vehicle, parkingFloors) as ParkingFloor[],
@@ -103,9 +98,22 @@ function BookingContent() {
   )
 
   const handlePreRegisterSubmit = () => {
-    const normalized = clampBookingDatetimeLocal(startTime)
-    if (!isBookingDatetimeLocalValid(normalized)) {
-      alert('Vui lòng chọn thời gian trong vòng 5 giờ tới.')
+    if (!startTime) {
+      alert('Vui lòng chọn thời gian vào')
+      return
+    }
+
+    const selectedTime = new Date(startTime).getTime()
+    const nowTime = new Date().getTime()
+    const diffHours = (selectedTime - nowTime) / (1000 * 60 * 60)
+
+    if (diffHours < 0) {
+      alert('Thời gian vào phải lớn hơn thời gian hiện tại')
+      return
+    }
+
+    if (diffHours > 5) {
+      alert('Chỉ được phép đặt trước tối đa 5 tiếng')
       return
     }
 
@@ -124,7 +132,7 @@ function BookingContent() {
           type: 'standard',
         },
       ],
-      startTime: new Date(normalized).toISOString(),
+      startTime: new Date(startTime).toISOString(),
       hours: 1,
       vehiclePlate: '',
       isPreRegistered: true,
@@ -134,6 +142,13 @@ function BookingContent() {
 
     navigate('/dat-cho/xac-nhan')
   }
+
+  // Calculate min and max time for the input
+  const now = new Date()
+  const tzoffset = now.getTimezoneOffset() * 60000
+  const minTimeStr = new Date(now.getTime() - tzoffset).toISOString().slice(0, 16)
+  const maxTime = new Date(now.getTime() + 5 * 60 * 60 * 1000)
+  const maxTimeStr = new Date(maxTime.getTime() - tzoffset).toISOString().slice(0, 16)
 
   return (
     <div className="home-landing booking-landing">
@@ -215,11 +230,19 @@ function BookingContent() {
                     </div>
 
                     <div className="search-grid booking-field-grid booking-field-grid--single">
-                      <BookingDatetimeField
-                        id="booking-arrival-time"
-                        value={startTime}
-                        onChange={setStartTime}
-                      />
+                      <label className="hero-field">
+                        <span>Thời gian vào bãi</span>
+                        <div>
+                          <CalendarDays size={18} strokeWidth={2.2} aria-hidden />
+                          <input
+                            type="datetime-local"
+                            value={startTime}
+                            min={minTimeStr}
+                            max={maxTimeStr}
+                            onChange={(event) => setStartTime(event.target.value)}
+                          />
+                        </div>
+                      </label>
                     </div>
 
                     {/* Bảng giá chuyển sang bên trái */}

@@ -105,13 +105,23 @@ export class ApiClient {
     _isRetry = false,
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`
+    
+    const headers = this.getHeaders()
+    if (data instanceof FormData) {
+      delete headers['Content-Type']
+    }
+
     const options: RequestInit = {
       method,
-      headers: this.getHeaders(),
+      headers,
     }
 
     if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
-      options.body = JSON.stringify(data)
+      if (data instanceof FormData) {
+        options.body = data
+      } else {
+        options.body = JSON.stringify(data)
+      }
     }
 
     try {
@@ -136,6 +146,11 @@ export class ApiClient {
           this.clearToken()
           window.location.href = '/dang-nhap'
           throw new Error('Session expired. Redirecting to login.')
+        }
+
+        const contentType = response.headers.get('content-type')
+        if (response.status === 422 && contentType?.includes('application/json')) {
+          return (await response.json()) as T
         }
 
         const error = await response.text()

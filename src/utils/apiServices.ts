@@ -122,6 +122,12 @@ export const reservationApi = {
 
   cancel: (id: string) => apiClient.put<ApiResponse>(`/reservations/${id}/cancel`),
 
+  changeTime: (id: string, newExpectedTime: string) =>
+    apiClient.put<ApiResponse>(`/reservations/${id}/change-time`, newExpectedTime),
+
+  recreatePayment: (id: string) =>
+    apiClient.post<ApiResponse<CreateReservationResponse>>(`/reservations/${id}/recreate-payment`),
+
   checkPayment: (orderCode: string) =>
     apiClient.get<ApiResponse>(`/reservations/check-payment-status/${orderCode}`),
 }
@@ -145,11 +151,21 @@ export const vehicleTypeApi = {
 }
 
 export const parkingOperationApi = {
+  uploadAndRecognizePlate: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiClient.post<{ imageUrl: string; licensePlate?: string; message?: string }>(
+      '/ParkingOperation/upload-and-recognize-plate',
+      formData
+    )
+  },
+
   guestCheckIn: (data: {
     licensePlate: string
     vehicleTypeId: string
     gateName: string
     cardCode?: string
+    entryImageUrl?: string
   }) => apiClient.post<ApiResponse>('/ParkingOperation/guest/check-in', data),
 
   guestCheckOutPreview: (data: { licensePlate?: string; cardCode?: string }) =>
@@ -160,6 +176,8 @@ export const parkingOperationApi = {
     cardCode?: string
     gateName: string
     paymentMethod: string
+    licensePlateOut?: string
+    exitImageUrl?: string
   }) => apiClient.post<ApiResponse>('/ParkingOperation/guest/check-out', data),
 
   residentCheckIn: (data: {
@@ -167,12 +185,15 @@ export const parkingOperationApi = {
     vehicleTypeId: string
     gateName: string
     cardCode?: string
+    entryImageUrl?: string
   }) => apiClient.post<ApiResponse>('/ParkingOperation/resident/check-in', data),
 
   residentCheckOut: (data: {
     licensePlate?: string
     cardCode?: string
     gateName: string
+    licensePlateOut?: string
+    exitImageUrl?: string
   }) => apiClient.post<ApiResponse>('/ParkingOperation/resident/check-out', data),
 
   getAvailability: (vehicleTypeId?: string, floorKeyword?: string) => {

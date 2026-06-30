@@ -3,6 +3,7 @@ import { Ban, Calendar, Car, MapPin } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import ProtectedRoute from '../../components/ProtectedRoute'
+import { ConfirmDialog, ToastContainer, useToast } from '../../components/Toast'
 import { reservationApi, type ReservationDto } from '../../utils/apiServices'
 import { formatCurrency, formatDateTime } from '../../utils/pricing'
 
@@ -11,6 +12,9 @@ const statusLabel: Record<string, string> = {
   Confirmed: 'Đã xác nhận',
   Cancelled: 'Đã hủy',
   Completed: 'Hoàn tất',
+  Modified: 'Đã đổi giờ',
+  NoShow: 'Quá hạn',
+  CheckedIn: 'Đã check-in',
   paid: 'Đã thanh toán',
   cancelled: 'Đã hủy',
 }
@@ -18,6 +22,10 @@ const statusLabel: Record<string, string> = {
 function HistoryContent() {
   const [list, setList] = useState<ReservationDto[]>([])
   const [loading, setLoading] = useState(true)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [newTime, setNewTime] = useState('')
+  const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
+  const toast = useToast()
 
   const load = async () => {
     setLoading(true)
@@ -28,6 +36,7 @@ function HistoryContent() {
       }
     } catch (err) {
       console.error(err)
+      toast.error('Không thể tải danh sách đặt chỗ.')
     } finally {
       setLoading(false)
     }
@@ -40,14 +49,113 @@ function HistoryContent() {
   const handleCancel = async (id: string) => {
     try {
       const res = await reservationApi.cancel(id)
-      if (res.isSuccess) load()
-    } catch (err) {
+      if (res.isSuccess) {
+        toast.success('Đã hủy đặt chỗ thành công.')
+        setConfirmCancel(null)
+        load()
+      } else {
+        toast.error(res.message || 'Hủy đặt chỗ thất bại.')
+      }
+    } catch (err: unknown) {
       console.error(err)
+      // parse message từ error nếu có
+      let msg = 'Đã xảy ra lỗi, vui lòng thử lại sau.'
+      if (err instanceof Error) {
+        try {
+          const body = JSON.parse(err.message.replace(/^HTTP \d+: /, ''))
+          if (body?.message) msg = body.message
+        } catch { /* ignore */ }
+      }
+      toast.error(msg)
     }
   }
 
+  const handleRepayment = async (id: string) => {
+    try {
+      const res = await reservationApi.recreatePayment(id)
+      if (res.isSuccess && res.result?.paymentUrl) {
+        window.location.href = res.result.paymentUrl
+      } else {
+        toast.error(res.message || 'Lỗi khi tạo lại link thanh toán.')
+      }
+    } catch (err: unknown) {
+      console.error(err)
+      let msg = 'Đã xảy ra lỗi, vui lòng thử lại sau.'
+      if (err instanceof Error) {
+        try {
+          const body = JSON.parse(err.message.replace(/^HTTP \d+: /, ''))
+          if (body?.message) msg = body.message
+        } catch { /* ignore */ }
+      }
+      toast.error(msg)
+    }
+  }
+
+  const handleChangeTime = async (id: string) => {
+    if (!newTime) {
+      toast.warning('Vui lòng chọn giờ mới.')
+      return
+    }
+
+    const selectedTime = new Date(newTime).getTime()
+    const nowTime = new Date().getTime()
+    const diffHours = (selectedTime - nowTime) / (1000 * 60 * 60)
+
+    if (diffHours < 0) {
+      toast.warning('Giờ hẹn mới phải lớn hơn thời gian hiện tại.')
+      return
+    }
+    if (diffHours > 5) {
+      toast.warning('Giờ hẹn mới không được vượt quá 5 tiếng tính từ thời điểm hiện tại.')
+      return
+    }
+
+    try {
+      const isoTime = new Date(newTime).toISOString()
+      const res = await reservationApi.changeTime(id, isoTime)
+      if (res.isSuccess) {
+        toast.success('Đổi giờ check-in thành công!')
+        setEditingId(null)
+        load()
+      } else {
+        toast.error(res.message || 'Lỗi khi đổi giờ.')
+      }
+    } catch (err: unknown) {
+      console.error(err)
+      let msg = 'Đã xảy ra lỗi, vui lòng thử lại sau.'
+      if (err instanceof Error) {
+        try {
+          const body = JSON.parse(err.message.replace(/^HTTP \d+: /, ''))
+          if (body?.message) msg = body.message
+        } catch { /* ignore */ }
+      }
+      toast.error(msg)
+    }
+  }
+
+  // Calculate time limits for datetime input
+  const nowLocal = new Date()
+  const tzoffset = nowLocal.getTimezoneOffset() * 60000
+  const minTimeStr = new Date(nowLocal.getTime() - tzoffset).toISOString().slice(0, 16)
+  const maxTimeStr = new Date(nowLocal.getTime() + 5 * 60 * 60 * 1000 - tzoffset).toISOString().slice(0, 16)
+
   return (
     <section className="history-page">
+      {/* Toast notifications */}
+      <ToastContainer toasts={toast.toasts} onClose={toast.close} />
+
+      {/* Confirm dialog */}
+      <ConfirmDialog
+        open={!!confirmCancel}
+        title="Hủy đặt chỗ"
+        message="Bạn chắc chắn muốn hủy đặt chỗ này? Tiền cọc sẽ không được hoàn lại."
+        confirmLabel="Xác nhận hủy"
+        cancelLabel="Quay lại"
+        danger
+        onConfirm={() => confirmCancel && handleCancel(confirmCancel)}
+        onCancel={() => setConfirmCancel(null)}
+      />
+
       <header className="page-header">
         <div>
           <h1>Lịch sử đặt chỗ</h1>
@@ -68,6 +176,9 @@ function HistoryContent() {
           {list.map((b, i) => {
             const deposit = b.payments?.[0]?.amount ?? 0
             const paymentStatus = b.payments?.[0]?.paymentStatus
+            const canChangeTime = b.status === 'Confirmed'
+            const alreadyChanged = b.status === 'Modified'
+
             return (
               <motion.li
                 key={b.reservationId}
@@ -87,14 +198,92 @@ function HistoryContent() {
                   <span><Car size={14} /> {b.vehicleType?.typeName ?? 'Xe'}</span>
                   <span><Calendar size={14} /> {formatDateTime(b.expectedEntryTime)}</span>
                 </div>
-                <div className="history-footer">
+                <div className="history-footer" style={{ flexWrap: 'wrap', gap: '8px' }}>
                   <strong>{formatCurrency(deposit)}</strong>
-                  {b.status === 'Confirmed' || paymentStatus === 'Success' ? (
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleCancel(b.reservationId)}>
-                      <Ban size={14} /> Hủy (không hoàn tiền)
+
+                  {/* Thanh toán lại cho đơn Pending */}
+                  {b.status === 'Pending' && (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => handleRepayment(b.reservationId)}
+                    >
+                      Thanh toán lại
                     </button>
-                  ) : null}
+                  )}
+
+                  {/* Đổi giờ + Hủy cho đơn Confirmed / Modified */}
+                  {(b.status === 'Confirmed' || b.status === 'Modified' || paymentStatus === 'Success') && (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        disabled={alreadyChanged}
+                        onClick={() => {
+                          if (!canChangeTime) return
+                          setEditingId(editingId === b.reservationId ? null : b.reservationId)
+                          if (editingId !== b.reservationId) {
+                            setNewTime(minTimeStr)
+                          }
+                        }}
+                        title={alreadyChanged ? 'Bạn đã dùng lượt đổi giờ (tối đa 1 lần)' : 'Đổi giờ check-in'}
+                      >
+                        {alreadyChanged ? 'Đã đổi giờ (Hết lượt)' : 'Đổi giờ check-in'}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setConfirmCancel(b.reservationId)}
+                      >
+                        <Ban size={14} /> Hủy (không hoàn tiền)
+                      </button>
+                    </div>
+                  )}
                 </div>
+
+                {/* Inline form đổi giờ */}
+                {editingId === b.reservationId && (
+                  <div
+                    className="history-edit-time"
+                    style={{
+                      marginTop: '12px',
+                      padding: '14px',
+                      background: '#f0f9ff',
+                      borderRadius: '10px',
+                      border: '1px solid #bae6fd',
+                    }}
+                  >
+                    <p style={{ fontSize: '0.85rem', marginBottom: '10px', color: '#0369a1', fontWeight: 500 }}>
+                      ⏰ Chọn giờ check-in mới — chỉ được đổi <strong>1 lần</strong>, tối đa 5 tiếng kể từ hiện tại:
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <input
+                        type="datetime-local"
+                        className="form-control"
+                        value={newTime}
+                        min={minTimeStr}
+                        max={maxTimeStr}
+                        onChange={(e) => setNewTime(e.target.value)}
+                        style={{ flex: 1, minWidth: '200px' }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleChangeTime(b.reservationId)}
+                      >
+                        Lưu thay đổi
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setEditingId(null)}
+                      >
+                        Hủy bỏ
+                      </button>
+                    </div>
+                  </div>
+                )}
               </motion.li>
             )
           })}

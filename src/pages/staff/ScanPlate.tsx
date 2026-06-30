@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, useRef, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AlertCircle, CalendarClock, Car, Clock, Smartphone, UserRound } from 'lucide-react'
 import StaffLayout from '../../components/StaffLayout'
@@ -70,6 +70,12 @@ export default function ScanPlate() {
   const navigate = useNavigate()
   const location = useLocation()
   const locationState = location.state as { activePanel?: 'scan' | 'reservations' | 'active-vehicles' } | null
+  
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState('')
+  const [entryImageUrl, setEntryImageUrl] = useState('')
+  const [uploading, setUploading] = useState(false)
+  
   const [licensePlate, setLicensePlate] = useState('')
   const [vehicleTypeId, setVehicleTypeId] = useState('')
   const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeDto[]>([])
@@ -139,6 +145,38 @@ export default function ScanPlate() {
     loadGateLists()
   }, [])
 
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Show preview local
+    const localUrl = URL.createObjectURL(file)
+    setImagePreviewUrl(localUrl)
+    setUploading(true)
+    setMessage('')
+    setLicensePlate('')
+
+    try {
+      const res = await parkingOperationApi.uploadAndRecognizePlate(file)
+      if (res && res.imageUrl) {
+        setEntryImageUrl(res.imageUrl)
+        if (res.licensePlate) {
+          setLicensePlate(res.licensePlate.toUpperCase())
+          setMessage('Nhận diện biển số thành công!')
+        } else {
+          setMessage(res.message || 'Tải ảnh lên thành công, nhưng không nhận diện được biển số. Vui lòng nhập thủ công.')
+        }
+      } else {
+        setMessage('Tải ảnh lên thất bại hoặc không nhận được đường dẫn ảnh.')
+      }
+    } catch (err: any) {
+      console.error(err)
+      setMessage(err.message || 'Lỗi kết nối khi upload ảnh.')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const handleScan = () => {
     if (licensePlate.trim()) {
       setScanned({
@@ -157,6 +195,7 @@ export default function ScanPlate() {
         licensePlate: licensePlate.trim(),
         vehicleTypeId,
         gateName,
+        entryImageUrl: entryImageUrl || undefined,
       }
       const res =
         checkInType === 'resident'
@@ -171,6 +210,8 @@ export default function ScanPlate() {
           detail: JSON.stringify(res.result),
         })
         setLicensePlate('')
+        setImagePreviewUrl('')
+        setEntryImageUrl('')
         loadGateLists()
       } else {
         setMessage(res.message || 'Check-in thất bại')
@@ -206,15 +247,39 @@ export default function ScanPlate() {
 
             {activePanel === 'scan' && <div className="scan-container">
               <div className="camera-preview">
-                <div className="camera-frame">
-                  <div className="camera-placeholder">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                      <circle cx="12" cy="13" r="4" />
-                    </svg>
-                    <p>Camera</p>
-                  </div>
+                <div 
+                  className="camera-frame clickable"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {imagePreviewUrl ? (
+                    <img src={imagePreviewUrl} className="camera-preview-img" alt="License Plate Preview" />
+                  ) : (
+                    <div className="camera-placeholder">
+                      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                      </svg>
+                      <p>Nhấp vào đây để tải ảnh xe lên</p>
+                      <span className="upload-hint">Hỗ trợ JPG, JPEG, PNG, GIF</span>
+                    </div>
+                  )}
+
+                  {uploading && (
+                    <>
+                      <div className="ocr-scanning-line" />
+                      <div className="ocr-loading-overlay">
+                        <span>Đang nhận diện biển số...</span>
+                      </div>
+                    </>
+                  )}
                 </div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="upload-input-hidden"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                />
               </div>
 
               <div className="scan-form">

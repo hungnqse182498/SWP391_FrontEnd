@@ -91,6 +91,10 @@ export default function App() {
 
               <Route path="thanh-toan" element={<Payment />} />
 
+              <Route path="payment-success" element={<PaymentSuccess />} />
+
+              <Route path="payment-cancel" element={<PaymentCancel />} />
+
               <Route path="dat-cho/thanh-cong" element={<UserBookingSuccess />} />
 
               <Route path="dang-ky-thang" element={<UserSubscribeMonthly />} />
