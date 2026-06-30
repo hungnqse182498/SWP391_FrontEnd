@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
-import { AlertTriangle, Bike, CalendarDays, Car, MapPin } from 'lucide-react'
+import { AlertTriangle, Bike, Car, MapPin } from 'lucide-react'
 import BookingSteps from '../../components/BookingSteps'
+import BookingDatetimeField from '../../components/BookingDatetimeField'
 import ParkingMap from '../../components/ParkingMap'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { useAuth } from '../../context/AuthContext'
@@ -13,6 +14,11 @@ import {
   vehicleTypeLabel,
 } from '../../utils/bookingPricing'
 import { formatCurrency } from '../../utils/pricing'
+import {
+  clampBookingDatetimeLocal,
+  defaultBookingDatetimeLocal,
+  isBookingDatetimeLocalValid,
+} from '../../utils/bookingTime'
 
 function CancellationPolicy() {
   return (
@@ -85,14 +91,11 @@ function BookingContent() {
   const initialStartTime = locationState?.startTime ?? ''
 
   const [vehicle, setVehicle] = useState<'car' | 'bike'>(initialVehicle)
-  const [startTime, setStartTime] = useState<string>(() => {
-    if (initialStartTime) return initialStartTime
-    const now = new Date()
-    now.setHours(now.getHours() + 1)
-    now.setMinutes(0, 0, 0)
-    const tzoffset = now.getTimezoneOffset() * 60000
-    return new Date(now.getTime() - tzoffset).toISOString().slice(0, 16)
-  })
+  const [startTime, setStartTime] = useState<string>(() =>
+    initialStartTime
+      ? clampBookingDatetimeLocal(initialStartTime)
+      : defaultBookingDatetimeLocal(),
+  )
 
   const customerFloors = useMemo(
     () => filterCustomerFloors(vehicle, parkingFloors) as ParkingFloor[],
@@ -100,8 +103,9 @@ function BookingContent() {
   )
 
   const handlePreRegisterSubmit = () => {
-    if (!startTime) {
-      alert('Vui lòng chọn thời gian vào')
+    const normalized = clampBookingDatetimeLocal(startTime)
+    if (!isBookingDatetimeLocalValid(normalized)) {
+      alert('Vui lòng chọn thời gian trong vòng 5 giờ tới.')
       return
     }
 
@@ -120,7 +124,7 @@ function BookingContent() {
           type: 'standard',
         },
       ],
-      startTime: new Date(startTime).toISOString(),
+      startTime: new Date(normalized).toISOString(),
       hours: 1,
       vehiclePlate: '',
       isPreRegistered: true,
@@ -211,17 +215,11 @@ function BookingContent() {
                     </div>
 
                     <div className="search-grid booking-field-grid booking-field-grid--single">
-                      <label className="hero-field">
-                        <span>Thời gian vào bãi</span>
-                        <div>
-                          <CalendarDays size={18} strokeWidth={2.2} aria-hidden />
-                          <input
-                            type="datetime-local"
-                            value={startTime}
-                            onChange={(event) => setStartTime(event.target.value)}
-                          />
-                        </div>
-                      </label>
+                      <BookingDatetimeField
+                        id="booking-arrival-time"
+                        value={startTime}
+                        onChange={setStartTime}
+                      />
                     </div>
 
                     {/* Bảng giá chuyển sang bên trái */}

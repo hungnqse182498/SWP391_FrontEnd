@@ -1588,6 +1588,7 @@ ul, ol { margin: 0; padding: 0; }
     grid-row: 3;
   }
   .booking-customer-layout { grid-template-columns: 1fr; }
+  .booking-datetime-picker { grid-template-columns: 1fr; }
 }
 
 /* Staff Layout */
@@ -2578,6 +2579,74 @@ ul, ol { margin: 0; padding: 0; }
   width: 100%;
 }
 .booking-customer-form { align-self: start; }
+.booking-datetime-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.booking-datetime-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(88px, 0.8fr) minmax(72px, 0.6fr);
+  gap: 0.55rem;
+  align-items: stretch;
+}
+.booking-datetime-part {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 48px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--blue-700);
+}
+.booking-datetime-part svg,
+.booking-datetime-part-icon {
+  flex-shrink: 0;
+  color: var(--blue-600);
+  font-weight: 800;
+}
+.booking-datetime-part select {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text-heading);
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  outline: none;
+  cursor: pointer;
+}
+.booking-time-hint {
+  display: block;
+  margin-top: 0.45rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.booking-entry-window {
+  margin-bottom: 0.75rem;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border-color: #f59e0b;
+}
+.booking-entry-window svg {
+  color: #d97706;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+.booking-entry-window strong {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: #92400e;
+}
+.booking-entry-window p {
+  margin: 0;
+  color: #78350f;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
 .booking-vehicle-badge {
   display: inline-flex;
   align-items: center;

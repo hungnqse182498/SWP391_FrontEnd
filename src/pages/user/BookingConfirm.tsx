@@ -61,10 +61,23 @@ function ConfirmContent() {
       </div>
 
       {isPreRegistered && (
-        <div className="cancel-policy-banner cancel-policy-banner--compact" role="note">
-          <AlertTriangle size={18} strokeWidth={2.2} aria-hidden />
-          <p>Hủy đặt chỗ <strong>không hoàn tiền</strong>.</p>
-        </div>
+        <>
+          <div className="cancel-policy-banner cancel-policy-banner--compact booking-entry-window" role="note">
+            <AlertTriangle size={18} strokeWidth={2.2} aria-hidden />
+            <div>
+              <strong>Lưu ý thời gian vào bãi</strong>
+              <p>
+                Xe chỉ được phép vào bãi <b>30 phút trước</b> và <b>30 phút sau</b> giờ đặt chỗ. Đến muộn hơn sẽ <b>mất tiền cọc</b>
+
+              </p>
+            </div>
+          </div>
+
+          <div className="cancel-policy-banner cancel-policy-banner--compact" role="note">
+            <AlertTriangle size={18} strokeWidth={2.2} aria-hidden />
+            <p>Hủy đặt chỗ <strong>không hoàn tiền</strong>.</p>
+          </div>
+        </>
       )}
 
       <Link to="/thanh-toan" className="btn btn-primary btn-block">

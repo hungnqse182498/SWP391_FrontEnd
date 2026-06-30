@@ -1,9 +1,30 @@
-import { CalendarDays, Car, MapPin, Search } from "lucide-react";
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Car, MapPin, Search } from "lucide-react";
+import { useState, type MouseEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import BookingDatetimeField from "./BookingDatetimeField";
+import {
+  clampBookingDatetimeLocal,
+  defaultBookingDatetimeLocal,
+  isBookingDatetimeLocalValid,
+} from "../utils/bookingTime";
 
 export default function HeroSection() {
-  const [startTime, setStartTime] = useState("");
+  const navigate = useNavigate();
+  const [startTime, setStartTime] = useState(defaultBookingDatetimeLocal);
+
+  const handleSearch = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    const normalized = startTime
+      ? clampBookingDatetimeLocal(startTime)
+      : defaultBookingDatetimeLocal();
+
+    if (!isBookingDatetimeLocalValid(normalized)) {
+      alert("Vui lòng chọn thời gian trong vòng 5 giờ tới.");
+      return;
+    }
+
+    navigate("/dat-cho", { state: { vehicle: "car", startTime: normalized } });
+  };
 
   return (
     <section className="home-hero">
@@ -54,22 +75,17 @@ export default function HeroSection() {
                 </div>
               </label>
 
-              <label className="hero-field">
-                <span>Thời gian đến</span>
-                <div>
-                  <CalendarDays size={18} strokeWidth={2.2} aria-hidden />
-                  <input
-                    type="datetime-local"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                  />
-                </div>
-              </label>
+              <BookingDatetimeField
+                id="home-booking-time"
+                label="Thời gian đến"
+                value={startTime}
+                onChange={setStartTime}
+              />
             </div>
 
             <Link
               to="/dat-cho"
-              state={{ vehicle: 'car', startTime }}
+              onClick={handleSearch}
               className="hero-search-btn"
             >
               Tìm chỗ ngay
