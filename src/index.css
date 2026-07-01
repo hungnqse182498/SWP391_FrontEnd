@@ -1745,6 +1745,18 @@ ul, ol { margin: 0; padding: 0; }
   font-size: 0.9375rem;
 }
 
+.staff-page-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.staff-page-heading .section-desc {
+  margin-bottom: 0;
+}
+
 .staff-form-group {
   display: flex;
   flex-direction: column;
@@ -1756,6 +1768,22 @@ ul, ol { margin: 0; padding: 0; }
   grid-template-columns: 1fr 1fr;
   gap: 2rem;
   align-items: start;
+}
+
+.scan-entry-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(360px, 1.15fr);
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.scan-entry-camera {
+  min-width: 0;
+}
+
+.camera-frame--compact {
+  aspect-ratio: 16 / 10;
+  min-height: 220px;
 }
 
 .camera-preview {
@@ -1865,6 +1893,45 @@ ul, ol { margin: 0; padding: 0; }
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+.scan-entry-form {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.scan-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.scan-entry-grid .form-field:first-child {
+  grid-column: 1 / -1;
+}
+
+.plate-input {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.field-hint {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.scan-entry-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.scan-entry-actions .btn-success {
+  flex: 1;
 }
 
 .scan-result {
@@ -2032,6 +2099,9 @@ ul, ol { margin: 0; padding: 0; }
 
 @media (max-width: 1024px) {
   .scan-container {
+    grid-template-columns: 1fr;
+  }
+  .scan-entry-layout {
     grid-template-columns: 1fr;
   }
   .staff-gate-grid {

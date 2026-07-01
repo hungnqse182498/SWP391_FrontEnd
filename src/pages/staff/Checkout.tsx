@@ -1,4 +1,4 @@
-import { useState, useRef, type ReactNode } from 'react'
+import { useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertCircle, LogOut } from 'lucide-react'
 import StaffLayout from '../../components/StaffLayout'
@@ -19,20 +19,26 @@ const menuItems: StaffMenuItem[] = [
 
 export default function Checkout() {
   const navigate = useNavigate()
-  
   const fileInputRef = useRef<HTMLInputElement>(null)
+
   const [checkOutType, setCheckOutType] = useState<'guest' | 'resident'>('guest')
   const [imagePreviewUrl, setImagePreviewUrl] = useState('')
   const [exitImageUrl, setExitImageUrl] = useState('')
   const [uploading, setUploading] = useState(false)
-  
   const [licensePlate, setLicensePlate] = useState('')
+  const [exitTimePreview, setExitTimePreview] = useState('')
   const [gateName, setGateName] = useState('Cổng A')
   const [paymentMethod, setPaymentMethod] = useState('Cash')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [preview, setPreview] = useState<ParkingFeePreview | null>(null)
   const [showResidentCard, setShowResidentCard] = useState(false)
+
+  const setPlateForCheckout = (plate: string) => {
+    const nextPlate = plate.toUpperCase()
+    setLicensePlate(nextPlate)
+    setExitTimePreview(nextPlate.trim() ? new Date().toLocaleString('vi-VN') : '')
+  }
 
   const triggerPreview = async (plate: string) => {
     if (!plate.trim()) return
@@ -57,51 +63,46 @@ export default function Checkout() {
     }
   }
 
-  const handleScan = async () => {
-    if (!licensePlate.trim()) return
+  const preparePlateForCheckout = async (plate: string) => {
+    setPlateForCheckout(plate)
+    setPreview(null)
+    setShowResidentCard(false)
+
+    if (!plate.trim()) return
     if (checkOutType === 'guest') {
-      await triggerPreview(licensePlate)
+      await triggerPreview(plate)
     } else {
       setShowResidentCard(true)
     }
   }
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
-    // Show preview local
-    const localUrl = URL.createObjectURL(file)
-    setImagePreviewUrl(localUrl)
+    setImagePreviewUrl(URL.createObjectURL(file))
     setUploading(true)
     setMessage('')
-    setLicensePlate('')
+    setPlateForCheckout('')
     setPreview(null)
     setShowResidentCard(false)
 
     try {
       const res = await parkingOperationApi.uploadAndRecognizePlate(file)
-      if (res && res.imageUrl) {
+      if (res?.imageUrl) {
         setExitImageUrl(res.imageUrl)
         if (res.licensePlate) {
           const recognizedPlate = res.licensePlate.toUpperCase()
-          setLicensePlate(recognizedPlate)
-          setMessage('Nhận diện biển số thành công!')
-          
-          if (checkOutType === 'guest') {
-            await triggerPreview(recognizedPlate)
-          } else {
-            setShowResidentCard(true)
-          }
+          await preparePlateForCheckout(recognizedPlate)
         } else {
-          setMessage(res.message || 'Tải ảnh lên thành công, nhưng không nhận diện được biển số. Vui lòng nhập thủ công.')
+          setMessage(res.message || 'Không nhận diện được biển số.')
         }
       } else {
-        setMessage('Tải ảnh lên thất bại hoặc không nhận được đường dẫn ảnh.')
+        setMessage('Tải ảnh thất bại hoặc không nhận được đường dẫn ảnh.')
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      setMessage(err.message || 'Lỗi kết nối khi upload ảnh.')
+      setMessage(err instanceof Error ? err.message : 'Lỗi kết nối khi upload ảnh.')
     } finally {
       setUploading(false)
     }
@@ -121,7 +122,7 @@ export default function Checkout() {
       if (res.isSuccess) {
         setMessage(res.message || 'Checkout thành công')
         setPreview(null)
-        setLicensePlate('')
+        setPlateForCheckout('')
         setImagePreviewUrl('')
         setExitImageUrl('')
       } else {
@@ -148,7 +149,7 @@ export default function Checkout() {
       })
       if (res.isSuccess) {
         setMessage(res.message || 'Checkout cư dân thành công')
-        setLicensePlate('')
+        setPlateForCheckout('')
         setImagePreviewUrl('')
         setExitImageUrl('')
         setShowResidentCard(false)
@@ -177,15 +178,12 @@ export default function Checkout() {
           <div className="staff-section">
             <h2>Xử lý xe ra bãi</h2>
             <p className="section-desc">
-              Quét biển số xe ra bãi, xác nhận thời gian ra, kiểm tra phí cần thanh toán và thu phí gửi xe.
+              Kiểm tra biển số và xác nhận xe ra bãi.
             </p>
 
             <div className="scan-container">
               <div className="camera-preview">
-                <div 
-                  className="camera-frame clickable"
-                  onClick={() => fileInputRef.current?.click()}
-                >
+                <div className="camera-frame clickable" onClick={() => fileInputRef.current?.click()}>
                   {imagePreviewUrl ? (
                     <img src={imagePreviewUrl} className="camera-preview-img" alt="Exit Plate Preview" />
                   ) : (
@@ -194,8 +192,7 @@ export default function Checkout() {
                         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                         <circle cx="12" cy="13" r="4" />
                       </svg>
-                      <p>Nhấp vào đây để tải ảnh xe ra bãi</p>
-                      <span className="upload-hint">Hỗ trợ JPG, JPEG, PNG, GIF</span>
+                      <p>Tải ảnh xe ra bãi</p>
                     </div>
                   )}
 
@@ -237,20 +234,22 @@ export default function Checkout() {
 
                 <div className="form-field">
                   <label htmlFor="license-plate-checkout">Biển số xe</label>
-                  <div className="input-group">
-                    <input
-                      id="license-plate-checkout"
-                      type="text"
-                      className="input-standalone"
-                      placeholder="51A-12345"
-                      value={licensePlate}
-                      onChange={(event) => setLicensePlate(event.target.value.toUpperCase())}
-                      onKeyDown={(event) => event.key === 'Enter' && handleScan()}
-                    />
-                    <button type="button" className="btn btn-primary" onClick={handleScan} disabled={loading}>
-                      {loading ? '...' : checkOutType === 'guest' ? 'Quét' : 'Kiểm tra'}
-                    </button>
-                  </div>
+                  <input
+                    id="license-plate-checkout"
+                    type="text"
+                    className="input-standalone"
+                    placeholder="Nhập biển số"
+                    value={licensePlate}
+                    onChange={(event) => {
+                      setPlateForCheckout(event.target.value)
+                      setPreview(null)
+                      setShowResidentCard(false)
+                    }}
+                    onBlur={() => preparePlateForCheckout(licensePlate)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') preparePlateForCheckout(licensePlate)
+                    }}
+                  />
                 </div>
 
                 <div className="form-field">
@@ -279,16 +278,16 @@ export default function Checkout() {
 
                 {checkOutType === 'guest' && preview && (
                   <div className="scan-result">
-                    <h3>Thông tin xe</h3>
+                    <h3>Thông tin xe ra bãi</h3>
                     <div className="scan-info">
                       <p><strong>Biển số:</strong> {preview.licensePlate}</p>
+                      <p><strong>Giờ hiện tại:</strong> {new Date(preview.exitTime).toLocaleString('vi-VN')}</p>
                       <p><strong>Giờ vào:</strong> {new Date(preview.entryTime).toLocaleString('vi-VN')}</p>
-                      <p><strong>Giờ ra:</strong> {new Date(preview.exitTime).toLocaleString('vi-VN')}</p>
                       <p><strong>Thời gian gửi:</strong> {preview.totalHours.toFixed(1)} giờ</p>
                       <p className="fee-amount"><strong>Phí gửi:</strong> {formatCurrency(preview.amount)}</p>
                     </div>
                     <div className="checkout-actions">
-                      <button type="button" className="btn btn-success btn-block" disabled={loading} onClick={handleCheckout}>
+                      <button type="button" className="btn btn-success btn-block" disabled={loading || uploading} onClick={handleCheckout}>
                         Xác nhận thanh toán
                       </button>
                       <button type="button" className="btn btn-ghost btn-block" onClick={() => setPreview(null)}>
@@ -303,11 +302,12 @@ export default function Checkout() {
                     <h3>Thông tin xe cư dân</h3>
                     <div className="scan-info">
                       <p><strong>Biển số:</strong> {licensePlate}</p>
+                      <p><strong>Giờ hiện tại:</strong> {exitTimePreview || new Date().toLocaleString('vi-VN')}</p>
                       <p className="fee-amount"><strong>Phí gửi:</strong> Miễn phí (Gói tháng)</p>
                     </div>
                     <div className="checkout-actions">
-                      <button type="button" className="btn btn-success btn-block" disabled={loading} onClick={handleResidentCheckout}>
-                        Xác nhận checkout cư dân
+                      <button type="button" className="btn btn-success btn-block" disabled={loading || uploading} onClick={handleResidentCheckout}>
+                        Xác nhận xe ra bãi
                       </button>
                       <button type="button" className="btn btn-ghost btn-block" onClick={() => setShowResidentCard(false)}>
                         Hủy

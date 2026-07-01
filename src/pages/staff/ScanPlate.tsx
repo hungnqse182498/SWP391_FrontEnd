@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AlertCircle, CalendarClock, Car, Clock, Smartphone, UserRound } from 'lucide-react'
 import StaffLayout from '../../components/StaffLayout'
@@ -13,6 +13,8 @@ import {
   type VehicleTypeDto,
 } from '../../utils/apiServices'
 
+type GatePanel = 'scan' | 'reservations' | 'active-vehicles'
+
 interface StaffMenuItem {
   id: string
   label: string
@@ -26,6 +28,21 @@ const menuItems: StaffMenuItem[] = [
   { id: 'checkin', label: 'Tạo lượt gửi xe', icon: <Car size={18} /> },
   { id: 'exception', label: 'Xử lý ngoại lệ', icon: <AlertCircle size={18} /> },
 ]
+
+const panelCopy: Record<GatePanel, { title: string; desc: string }> = {
+  scan: {
+    title: 'Quét xe vào bãi',
+    desc: 'Kiểm tra biển số và xác nhận xe vào bãi.',
+  },
+  reservations: {
+    title: 'Đơn đặt trước',
+    desc: 'Danh sách đơn đặt trước đang chờ xe đến cổng vào.',
+  },
+  'active-vehicles': {
+    title: 'Xe đang trong bãi',
+    desc: 'Danh sách xe đã check-in và chưa checkout.',
+  },
+}
 
 function formatDateTime(value?: string) {
   if (!value) return 'Chưa có'
@@ -69,24 +86,21 @@ function PlateVisual({ plate, muted = false }: { plate?: string; muted?: boolean
 export default function ScanPlate() {
   const navigate = useNavigate()
   const location = useLocation()
-  const locationState = location.state as { activePanel?: 'scan' | 'reservations' | 'active-vehicles' } | null
-  
+  const locationState = location.state as { activePanel?: GatePanel } | null
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [activePanel, setActivePanel] = useState<GatePanel>(locationState?.activePanel ?? 'scan')
   const [imagePreviewUrl, setImagePreviewUrl] = useState('')
   const [entryImageUrl, setEntryImageUrl] = useState('')
   const [uploading, setUploading] = useState(false)
-  
   const [licensePlate, setLicensePlate] = useState('')
+  const [entryTimePreview, setEntryTimePreview] = useState('')
   const [vehicleTypeId, setVehicleTypeId] = useState('')
   const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeDto[]>([])
   const [gateName, setGateName] = useState('Cổng A')
   const [checkInType, setCheckInType] = useState<'guest' | 'resident'>('guest')
-  const [activePanel, setActivePanel] = useState<'scan' | 'reservations' | 'active-vehicles'>(
-    locationState?.activePanel ?? 'scan',
-  )
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
-  const [scanned, setScanned] = useState<{ plate: string; time: string; detail?: string } | null>(null)
   const [reservations, setReservations] = useState<ReservationDto[]>([])
   const [activeSessions, setActiveSessions] = useState<ParkingSessionDto[]>([])
   const [listLoading, setListLoading] = useState(false)
@@ -145,44 +159,46 @@ export default function ScanPlate() {
     loadGateLists()
   }, [])
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const setPlateForConfirm = (plate: string) => {
+    const nextPlate = plate.toUpperCase()
+    setLicensePlate(nextPlate)
+    setEntryTimePreview(nextPlate.trim() ? new Date().toLocaleString('vi-VN') : '')
+  }
+
+  const resetScan = () => {
+    setImagePreviewUrl('')
+    setEntryImageUrl('')
+    setPlateForConfirm('')
+    setMessage('')
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
-    // Show preview local
-    const localUrl = URL.createObjectURL(file)
-    setImagePreviewUrl(localUrl)
+    setImagePreviewUrl(URL.createObjectURL(file))
     setUploading(true)
     setMessage('')
-    setLicensePlate('')
+    setPlateForConfirm('')
 
     try {
       const res = await parkingOperationApi.uploadAndRecognizePlate(file)
-      if (res && res.imageUrl) {
+      if (res?.imageUrl) {
         setEntryImageUrl(res.imageUrl)
         if (res.licensePlate) {
-          setLicensePlate(res.licensePlate.toUpperCase())
-          setMessage('Nhận diện biển số thành công!')
+          setPlateForConfirm(res.licensePlate)
         } else {
-          setMessage(res.message || 'Tải ảnh lên thành công, nhưng không nhận diện được biển số. Vui lòng nhập thủ công.')
+          setMessage(res.message || 'Không nhận diện được biển số.')
         }
       } else {
-        setMessage('Tải ảnh lên thất bại hoặc không nhận được đường dẫn ảnh.')
+        setMessage('Tải ảnh thất bại hoặc không nhận được đường dẫn ảnh.')
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      setMessage(err.message || 'Lỗi kết nối khi upload ảnh.')
+      setMessage(err instanceof Error ? err.message : 'Lỗi kết nối khi upload ảnh.')
     } finally {
       setUploading(false)
-    }
-  }
-
-  const handleScan = () => {
-    if (licensePlate.trim()) {
-      setScanned({
-        plate: licensePlate,
-        time: new Date().toLocaleTimeString('vi-VN'),
-      })
     }
   }
 
@@ -204,14 +220,7 @@ export default function ScanPlate() {
 
       if (res.isSuccess) {
         setMessage(res.message || 'Check-in thành công')
-        setScanned({
-          plate: licensePlate,
-          time: new Date().toLocaleTimeString('vi-VN'),
-          detail: JSON.stringify(res.result),
-        })
-        setLicensePlate('')
-        setImagePreviewUrl('')
-        setEntryImageUrl('')
+        resetScan()
         loadGateLists()
       } else {
         setMessage(res.message || 'Check-in thất bại')
@@ -224,244 +233,238 @@ export default function ScanPlate() {
     }
   }
 
+  const handleSelectSidebar = (id: string) => {
+    if (id === 'scan' || id === 'reservations' || id === 'active-vehicles') {
+      setActivePanel(id)
+      if (id !== 'scan') loadGateLists()
+    } else if (id === 'checkin') navigate('/staff/create-session')
+    else if (id === 'exception') navigate('/staff/exception')
+  }
+
   return (
     <ProtectedRoute allowedRoles={['staff']}>
-      <StaffLayout
-        items={menuItems}
-        activeItem={activePanel}
-        onSelectItem={(id) => {
-          if (id === 'scan' || id === 'reservations' || id === 'active-vehicles') {
-            setActivePanel(id)
-            if (id !== 'scan') loadGateLists()
-          }
-          else if (id === 'checkin') navigate('/staff/create-session')
-          else if (id === 'exception') navigate('/staff/exception')
-        }}
-      >
+      <StaffLayout items={menuItems} activeItem={activePanel} onSelectItem={handleSelectSidebar}>
         <div className="staff-content-wrapper">
           <div className="staff-section">
-            <h2>Quét biển số xe vào bãi</h2>
-            <p className="section-desc">
-              Kiểm tra xe vào bãi, đối chiếu đơn đặt trước và danh sách xe đang gửi.
-            </p>
-
-            {activePanel === 'scan' && <div className="scan-container">
-              <div className="camera-preview">
-                <div 
-                  className="camera-frame clickable"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {imagePreviewUrl ? (
-                    <img src={imagePreviewUrl} className="camera-preview-img" alt="License Plate Preview" />
-                  ) : (
-                    <div className="camera-placeholder">
-                      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                        <circle cx="12" cy="13" r="4" />
-                      </svg>
-                      <p>Nhấp vào đây để tải ảnh xe lên</p>
-                      <span className="upload-hint">Hỗ trợ JPG, JPEG, PNG, GIF</span>
-                    </div>
-                  )}
-
-                  {uploading && (
-                    <>
-                      <div className="ocr-scanning-line" />
-                      <div className="ocr-loading-overlay">
-                        <span>Đang nhận diện biển số...</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="upload-input-hidden"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                />
+            <header className="staff-page-heading">
+              <div>
+                <h2>{panelCopy[activePanel].title}</h2>
+                <p className="section-desc">{panelCopy[activePanel].desc}</p>
               </div>
+              {activePanel !== 'scan' && (
+                <button type="button" className="btn btn-outline btn-sm" onClick={loadGateLists} disabled={listLoading}>
+                  {listLoading ? 'Đang tải...' : 'Làm mới'}
+                </button>
+              )}
+            </header>
 
-              <div className="scan-form">
-                <div className="form-field">
-                  <label>Loại check-in</label>
-                  <select
-                    className="input-standalone select"
-                    value={checkInType}
-                    onChange={(event) => setCheckInType(event.target.value as 'guest' | 'resident')}
-                  >
-                    <option value="guest">Khách vãng lai</option>
-                    <option value="resident">Khách tháng (customer)</option>
-                  </select>
-                </div>
+            {activePanel === 'scan' && (
+              <div className="scan-entry-layout">
+                <div className="camera-preview scan-entry-camera">
+                  <div className="camera-frame clickable camera-frame--compact" onClick={() => fileInputRef.current?.click()}>
+                    {imagePreviewUrl ? (
+                      <img src={imagePreviewUrl} className="camera-preview-img" alt="Ảnh biển số xe" />
+                    ) : (
+                      <div className="camera-placeholder">
+                        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                          <circle cx="12" cy="13" r="4" />
+                        </svg>
+                        <p>Tải ảnh xe lên</p>
+                      </div>
+                    )}
 
-                <div className="form-field">
-                  <label htmlFor="vehicle-type">Loại phương tiện</label>
-                  <select
-                    id="vehicle-type"
-                    className="input-standalone select"
-                    value={vehicleTypeId}
-                    onChange={(event) => setVehicleTypeId(event.target.value)}
-                  >
-                    {vehicleTypes.map((vehicleType) => (
-                      <option key={vehicleType.vehicleTypeId} value={vehicleType.vehicleTypeId}>
-                        {vehicleType.typeName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="gate">Cổng vào</label>
-                  <select
-                    id="gate"
-                    className="input-standalone select"
-                    value={gateName}
-                    onChange={(event) => setGateName(event.target.value)}
-                  >
-                    <option value="Cổng A">Cổng A</option>
-                    <option value="Cổng B">Cổng B</option>
-                    <option value="Cổng C">Cổng C</option>
-                  </select>
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="license-plate">Biển số xe</label>
-                  <div className="input-group">
-                    <input
-                      id="license-plate"
-                      type="text"
-                      className="input-standalone"
-                      placeholder="51A-12345"
-                      value={licensePlate}
-                      onChange={(event) => setLicensePlate(event.target.value.toUpperCase())}
-                      onKeyDown={(event) => event.key === 'Enter' && handleScan()}
-                    />
-                    <button type="button" className="btn btn-primary" onClick={handleScan}>
-                      Quét
-                    </button>
+                    {uploading && (
+                      <>
+                        <div className="ocr-scanning-line" />
+                        <div className="ocr-loading-overlay">
+                          <span>Đang nhận diện biển số...</span>
+                        </div>
+                      </>
+                    )}
                   </div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="upload-input-hidden"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                  />
+                  <button type="button" className="btn btn-outline btn-block" onClick={() => fileInputRef.current?.click()}>
+                    Tải ảnh
+                  </button>
                 </div>
 
-                {message && <p className="alert-inline">{message}</p>}
-
-                {scanned && (
-                  <div className="scan-result">
-                    <h3>Thông tin xe</h3>
-                    <div className="scan-info">
-                      <p><strong>Biển số:</strong> {scanned.plate}</p>
-                      <p><strong>Thời gian:</strong> {scanned.time}</p>
-                      {scanned.detail && <p className="muted-text">{scanned.detail}</p>}
+                <div className="scan-entry-form card-panel">
+                  <div className="scan-entry-grid">
+                    <div className="form-field">
+                      <label htmlFor="license-plate">Biển số xe</label>
+                      <input
+                        id="license-plate"
+                        type="text"
+                        className="input-standalone plate-input"
+                        placeholder="Nhập biển số"
+                        value={licensePlate}
+                        onChange={(event) => setPlateForConfirm(event.target.value)}
+                      />
                     </div>
+
+                    <div className="form-field">
+                      <label>Giờ hiện tại</label>
+                      <div className="input-readonly">{entryTimePreview || new Date().toLocaleString('vi-VN')}</div>
+                    </div>
+
+                    <div className="form-field">
+                      <label>Loại check-in</label>
+                      <select
+                        className="input-standalone select"
+                        value={checkInType}
+                        onChange={(event) => setCheckInType(event.target.value as 'guest' | 'resident')}
+                      >
+                        <option value="guest">Khách vãng lai</option>
+                        <option value="resident">Khách tháng (customer)</option>
+                      </select>
+                    </div>
+
+                    <div className="form-field">
+                      <label htmlFor="vehicle-type">Loại phương tiện</label>
+                      <select
+                        id="vehicle-type"
+                        className="input-standalone select"
+                        value={vehicleTypeId}
+                        onChange={(event) => setVehicleTypeId(event.target.value)}
+                      >
+                        {vehicleTypes.map((vehicleType) => (
+                          <option key={vehicleType.vehicleTypeId} value={vehicleType.vehicleTypeId}>
+                            {vehicleType.typeName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-field">
+                      <label htmlFor="gate">Cổng vào</label>
+                      <select
+                        id="gate"
+                        className="input-standalone select"
+                        value={gateName}
+                        onChange={(event) => setGateName(event.target.value)}
+                      >
+                        <option value="Cổng A">Cổng A</option>
+                        <option value="Cổng B">Cổng B</option>
+                        <option value="Cổng C">Cổng C</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {message && <p className="alert-inline">{message}</p>}
+
+                  <div className="scan-entry-actions">
                     <button
                       type="button"
-                      className="btn btn-success btn-block"
-                      disabled={loading}
+                      className="btn btn-success"
+                      disabled={loading || uploading || !licensePlate.trim()}
                       onClick={handleConfirmCheckIn}
                     >
                       {loading ? 'Đang xử lý...' : 'Xác nhận vào bãi'}
                     </button>
+                    <button type="button" className="btn btn-ghost" onClick={resetScan}>
+                      Làm lại
+                    </button>
                   </div>
-                )}
-              </div>
-            </div>}
-
-            {activePanel !== 'scan' && <section className="staff-gate-board">
-              <div className="staff-gate-board-head">
-                <div>
-                  <h3>Thông tin cổng vào</h3>
-                  <p>Theo dõi đơn đặt trước và xe đang trong bãi để đối chiếu khi xe đến.</p>
                 </div>
-                <button type="button" className="btn btn-outline btn-sm" onClick={loadGateLists} disabled={listLoading}>
-                  {listLoading ? 'Đang tải...' : 'Làm mới'}
-                </button>
               </div>
+            )}
 
-              {listError && <p className="alert-inline alert-error">{listError}</p>}
+            {activePanel !== 'scan' && (
+              <section className="staff-gate-board">
+                {listError && <p className="alert-inline alert-error">{listError}</p>}
 
-              <div className="staff-gate-grid staff-gate-grid--single">
-                {activePanel === 'reservations' && <div className="staff-gate-column card-panel">
-                  <div className="staff-gate-column-head">
-                    <CalendarClock size={20} strokeWidth={2.2} aria-hidden />
-                    <div>
-                      <h4>Đơn đã đặt trước</h4>
-                      <span>{reservations.length} đơn đang chờ xe vào</span>
+                <div className="staff-gate-grid staff-gate-grid--single">
+                  {activePanel === 'reservations' && (
+                    <div className="staff-gate-column card-panel">
+                      <div className="staff-gate-column-head">
+                        <CalendarClock size={20} strokeWidth={2.2} aria-hidden />
+                        <div>
+                          <h4>Đơn đã đặt trước</h4>
+                          <span>{reservations.length} đơn đang chờ xe vào</span>
+                        </div>
+                      </div>
+
+                      <div className="staff-vehicle-card-list">
+                        {reservations.length === 0 ? (
+                          <div className="staff-empty-state">Chưa có đơn đặt trước cần xử lý.</div>
+                        ) : (
+                          reservations.map((reservation) => {
+                            const reservationPlate = getReservationPlate(reservation)
+                            return (
+                              <article key={reservation.reservationId} className="staff-vehicle-card">
+                                <PlateVisual plate={reservationPlate} muted={reservationPlate === 'Chưa ghi nhận'} />
+                                <div className="staff-vehicle-info">
+                                  <div className="staff-vehicle-title">
+                                    <strong>{reservation.user?.fullName || 'Khách đặt trước'}</strong>
+                                    <span>{statusLabel(reservation.status)}</span>
+                                  </div>
+                                  <p>
+                                    <UserRound size={15} aria-hidden />
+                                    {reservation.user?.phoneNumber ||
+                                      reservation.user?.email ||
+                                      'Chưa có thông tin liên hệ'}
+                                  </p>
+                                  <p>
+                                    <Clock size={15} aria-hidden />
+                                    Giờ dự kiến vào: {formatDateTime(reservation.expectedEntryTime)}
+                                  </p>
+                                </div>
+                              </article>
+                            )
+                          })
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="staff-vehicle-card-list">
-                    {reservations.length === 0 ? (
-                      <div className="staff-empty-state">Chưa có đơn đặt trước cần xử lý.</div>
-                    ) : (
-                      reservations.map((reservation) => {
-                        const reservationPlate = getReservationPlate(reservation)
-                        return (
-                          <article key={reservation.reservationId} className="staff-vehicle-card">
-                            <PlateVisual
-                              plate={reservationPlate}
-                              muted={reservationPlate === 'Chưa ghi nhận'}
-                            />
-                            <div className="staff-vehicle-info">
-                              <div className="staff-vehicle-title">
-                                <strong>{reservation.user?.fullName || 'Khách đặt trước'}</strong>
-                                <span>{statusLabel(reservation.status)}</span>
+                  {activePanel === 'active-vehicles' && (
+                    <div className="staff-gate-column card-panel">
+                      <div className="staff-gate-column-head">
+                        <Car size={20} strokeWidth={2.2} aria-hidden />
+                        <div>
+                          <h4>Xe đang trong bãi</h4>
+                          <span>{activeSessions.length} xe chưa ra</span>
+                        </div>
+                      </div>
+
+                      <div className="staff-vehicle-card-list">
+                        {activeSessions.length === 0 ? (
+                          <div className="staff-empty-state">Chưa có xe đang trong bãi.</div>
+                        ) : (
+                          activeSessions.map((session) => (
+                            <article key={session.sessionId} className="staff-vehicle-card">
+                              <PlateVisual plate={session.licensePlateIn} />
+                              <div className="staff-vehicle-info">
+                                <div className="staff-vehicle-title">
+                                  <strong>{session.driverFullName || 'Khách vãng lai'}</strong>
+                                  <span>{statusLabel(session.status)}</span>
+                                </div>
+                                <p>
+                                  <Car size={15} aria-hidden />
+                                  {session.vehicleTypeName || 'Chưa rõ loại xe'}
+                                  {session.assignedSlotCode ? ` · Ô ${session.assignedSlotCode}` : ''}
+                                </p>
+                                <p>
+                                  <Clock size={15} aria-hidden />
+                                  Giờ vào: {formatDateTime(session.entryTime)}
+                                </p>
                               </div>
-                              <p>
-                                <UserRound size={15} aria-hidden />
-                                {reservation.user?.phoneNumber ||
-                                  reservation.user?.email ||
-                                  'Chưa có thông tin liên hệ'}
-                              </p>
-                              <p>
-                                <Clock size={15} aria-hidden />
-                                Giờ dự kiến vào: {formatDateTime(reservation.expectedEntryTime)}
-                              </p>
-                            </div>
-                          </article>
-                        )
-                      })
-                    )}
-                  </div>
-                </div>}
-
-                {activePanel === 'active-vehicles' && <div className="staff-gate-column card-panel">
-                  <div className="staff-gate-column-head">
-                    <Car size={20} strokeWidth={2.2} aria-hidden />
-                    <div>
-                      <h4>Xe đang trong bãi</h4>
-                      <span>{activeSessions.length} xe chưa ra</span>
+                            </article>
+                          ))
+                        )}
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="staff-vehicle-card-list">
-                    {activeSessions.length === 0 ? (
-                      <div className="staff-empty-state">Chưa có xe đang trong bãi.</div>
-                    ) : (
-                      activeSessions.map((session) => (
-                        <article key={session.sessionId} className="staff-vehicle-card">
-                          <PlateVisual plate={session.licensePlateIn} />
-                          <div className="staff-vehicle-info">
-                            <div className="staff-vehicle-title">
-                              <strong>{session.driverFullName || 'Khách vãng lai'}</strong>
-                              <span>{statusLabel(session.status)}</span>
-                            </div>
-                            <p>
-                              <Car size={15} aria-hidden />
-                              {session.vehicleTypeName || 'Chưa rõ loại xe'}
-                              {session.assignedSlotCode ? ` · Ô ${session.assignedSlotCode}` : ''}
-                            </p>
-                            <p>
-                              <Clock size={15} aria-hidden />
-                              Giờ vào: {formatDateTime(session.entryTime)}
-                            </p>
-                          </div>
-                        </article>
-                      ))
-                    )}
-                  </div>
-                </div>}
-              </div>
-            </section>}
+                  )}
+                </div>
+              </section>
+            )}
           </div>
         </div>
       </StaffLayout>
