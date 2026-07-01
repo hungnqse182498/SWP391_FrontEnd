@@ -139,6 +139,12 @@ export default function App() {
 
               <Route path="manager/advanced" element={<ManagerAdvanced />} />
 
+              <Route path="manager/gates" element={<ManagerGates />} />
+
+              <Route path="manager/subscriptions" element={<ManagerSubscriptionPackages />} />
+
+              <Route path="manager/renewals" element={<ManagerSubscriptionRenewals />} />
+
               <Route path="*" element={<Navigate to="/" replace />} />
 
             </Route>
