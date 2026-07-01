@@ -48,6 +48,12 @@ import ManagerReports from './pages/manager/Reports'
 
 import ManagerAdvanced from './pages/manager/Advanced'
 
+import ManagerGates from './pages/manager/Gates'
+
+import ManagerSubscriptionPackages from './pages/manager/SubscriptionPackages'
+
+import ManagerSubscriptionRenewals from './pages/manager/SubscriptionRenewals'
+
 import UserBooking from './pages/user/Booking'
 
 import UserBookingConfirm from './pages/user/BookingConfirm'
