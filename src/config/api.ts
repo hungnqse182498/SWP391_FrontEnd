@@ -141,27 +141,29 @@ export class ApiClient {
     try {
       const response = await fetch(url, options)
 
-      if (!response.ok) {
-        if (response.status === 401 && !_isRetry) {
-          // Attempt token refresh (lazy import to avoid circular dependency)
-          try {
-            const { authService } = await import('../utils/authService')
-            const refreshResult = await authService.refreshToken()
+      // ── 401 Unauthorized → attempt token refresh BEFORE other error handling ──
+      if (response.status === 401 && !_isRetry) {
+        try {
+          const { authService } = await import('../utils/authService')
+          const refreshResult = await authService.refreshToken()
 
-            if (refreshResult.isSuccess && refreshResult.result?.accessToken) {
-              this.setToken(refreshResult.result.accessToken)
-              // Retry the original request once
-              return this.request<T>(method, endpoint, data, true)
-            }
-          } catch {
-            // Refresh failed — fall through to clear and redirect
+          if (refreshResult.isSuccess && refreshResult.result?.accessToken) {
+            this.setToken(refreshResult.result.accessToken)
+            // Retry the original request once with the new token
+            return this.request<T>(method, endpoint, data, true)
           }
-
-          this.clearToken()
-          window.location.href = '/dang-nhap'
-          throw new Error('Session expired. Redirecting to login.')
+        } catch (e) {
+          console.error('Token refresh failed:', e)
         }
 
+        // Refresh failed or returned no token → clear session and redirect
+        this.clearToken()
+        window.location.href = '/dang-nhap'
+        throw new Error('Session expired. Redirecting to login.')
+      }
+
+      // ── Handle all other non-OK responses ──
+      if (!response.ok) {
         const contentType = response.headers.get('content-type')
         if (response.status === 422 && contentType?.includes('application/json')) {
           return (await response.json()) as T

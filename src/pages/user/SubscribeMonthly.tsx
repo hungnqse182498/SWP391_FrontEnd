@@ -92,11 +92,11 @@ function SubscribeContent() {
           setPackages(res.result)
           setSelectedPackageId(res.result.find(isActivePackage)?.packageId ?? '')
         } else {
-          setError(res.message || 'Cannot load subscription packages.')
+          setError(res.message || 'Không thể tải danh sách gói thuê bao.')
         }
       } catch (err) {
         console.error(err)
-        if (!ignore) setError(getApiErrorMessage(err) || 'Cannot connect to the server. Please try again.')
+        if (!ignore) setError(getApiErrorMessage(err) || 'Không thể kết nối đến máy chủ. Vui lòng thử lại.')
       } finally {
         if (!ignore) setLoadingPackages(false)
       }
@@ -120,11 +120,11 @@ function SubscribeContent() {
 
   const handleSubscribe = async () => {
     if (!selectedPackage) {
-      setError('Please select an active subscription package.')
+      setError('Vui lòng chọn một gói thuê bao đang hoạt động.')
       return
     }
     if (!licensePlate.trim()) {
-      setError('Please enter a license plate.')
+      setError('Vui lòng nhập biển số xe.')
       return
     }
 
@@ -142,10 +142,10 @@ function SubscribeContent() {
         return
       }
 
-      setError(res.message || 'Subscription registration failed.')
+      setError(res.message || 'Đăng ký gói thuê bao thất bại.')
     } catch (err) {
       console.error(err)
-      setError(getApiErrorMessage(err) || 'Cannot connect to the server. Please try again.')
+      setError(getApiErrorMessage(err) || 'Không thể kết nối đến máy chủ. Vui lòng thử lại.')
     } finally {
       setSubmitting(false)
     }
@@ -155,46 +155,46 @@ function SubscribeContent() {
     <section className="subscribe-page">
       <header className="page-header">
         <div>
-          <h1>Monthly Subscription Plan</h1>
-          <p>Select an active backend package, enter the vehicle plate, then complete PayOS payment.</p>
+          <h1>Đăng ký gói thuê bao tháng</h1>
+          <p>Chọn gói thuê bao phù hợp, nhập biển số xe và tiến hành thanh toán qua cổng PayOS.</p>
         </div>
       </header>
 
       <div className="subscribe-layout">
         <div className="card-panel">
-          <h2>Vehicle</h2>
+          <h2>Thông tin xe</h2>
           <div className="vehicle-toggle subscribe-vehicle-toggle">
             <button type="button" className={vehicle === 'all' ? 'active' : ''} onClick={() => setVehicle('all')}>
-              All
+              Tất cả
             </button>
             <button type="button" className={vehicle === 'car' ? 'active' : ''} onClick={() => setVehicle('car')}>
-              <Car size={18} /> Car
+              <Car size={18} /> Ô tô
             </button>
             <button type="button" className={vehicle === 'bike' ? 'active' : ''} onClick={() => setVehicle('bike')}>
-              <Bike size={18} /> Bike
+              <Bike size={18} /> Xe máy
             </button>
           </div>
 
           <label className="hero-field">
-            <span>License plate</span>
+            <span>Biển số xe</span>
             <div>
               <Car size={18} />
               <input
                 type="text"
                 value={licensePlate}
                 onChange={(event) => setLicensePlate(event.target.value.toUpperCase())}
-                placeholder="51A-12345"
+                placeholder="VD: 51A-12345"
               />
             </div>
           </label>
         </div>
 
         <div className="card-panel">
-          <h2>Package</h2>
+          <h2>Chọn gói dịch vụ</h2>
           {loadingPackages ? (
-            <p className="section-desc">Loading packages...</p>
+            <p className="section-desc">Đang tải danh sách gói...</p>
           ) : visiblePackages.length === 0 ? (
-            <p className="alert-inline alert-error">No active package is available for this vehicle type.</p>
+            <p className="alert-inline alert-error">Hiện tại không có gói thuê bao nào khả dụng cho loại xe này.</p>
           ) : (
             <div className="subscribe-plans">
               {visiblePackages.map((pkg) => (
@@ -204,13 +204,13 @@ function SubscribeContent() {
                   className={`subscribe-plan-btn${selectedPackage?.packageId === pkg.packageId ? ' active' : ''}`}
                   onClick={() => setSelectedPackageId(pkg.packageId)}
                 >
-                  <span className="plan-tag">{pkg.vehicleTypeName || 'Vehicle'}</span>
+                  <span className="plan-tag">{pkg.vehicleTypeName || 'Phương tiện'}</span>
                   <strong>{pkg.packageName}</strong>
                   <span>{formatCurrency(pkg.price)}</span>
                   <small>
-                    <CalendarDays size={14} /> {pkg.durationMonths} month{pkg.durationMonths > 1 ? 's' : ''}
+                    <CalendarDays size={14} /> Thời hạn: {pkg.durationMonths} tháng
                   </small>
-                  {pkg.requireFixedSlot && <small>Fixed slot required</small>}
+                  {pkg.requireFixedSlot && <small>Yêu cầu ô đỗ cố định</small>}
                 </button>
               ))}
             </div>
@@ -220,9 +220,9 @@ function SubscribeContent() {
 
       <div className="subscribe-footer card-panel">
         <div>
-          <span>Total payment</span>
+          <span>Tổng tiền thanh toán</span>
           <strong>{selectedPackage ? formatCurrency(selectedPackage.price) : formatCurrency(0)}</strong>
-          <small>{selectedPackage?.packageName ?? 'No package selected'}</small>
+          <small>{selectedPackage ? `Gói đang chọn: ${selectedPackage.packageName}` : 'Chưa chọn gói dịch vụ'}</small>
         </div>
         {error && <p className="alert-inline alert-error">{error}</p>}
         <button
@@ -232,7 +232,7 @@ function SubscribeContent() {
           onClick={handleSubscribe}
         >
           <CreditCard size={18} />
-          {submitting ? 'Creating payment...' : 'Register and pay'}
+          {submitting ? 'Đang kết nối cổng thanh toán...' : 'Đăng ký & Thanh toán'}
         </button>
       </div>
     </section>

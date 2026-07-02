@@ -1,22 +1,67 @@
-import { CheckCircle, XCircle } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { CheckCircle, XCircle } from "lucide-react";
+import { apiClient } from "../config/api";
+
+const fallbackPrices = {
+  car: {
+    m1: "1.000.000 đ",
+    m3: "2.500.000 đ",
+    m12: "10.000.000 đ",
+  },
+  bike: {
+    m1: "200.000 đ",
+    m3: "500.000 đ",
+    m12: "1.000.000 đ",
+  },
+};
 
 export default function SubscriptionPlans() {
   const [isMotorbike, setIsMotorbike] = useState(false);
+  const [prices, setPrices] = useState(fallbackPrices);
 
-  const prices = {
-    car: {
-      m1: "1.000.000đ",
-      m3: "2.500.000đ",
-      m12: "10.000.000đ",
-    },
-    bike: {
-      m1: "200.000đ",
-      m3: "500.000đ",
-      m12: "1.000.000đ",
-    },
-  };
+  useEffect(() => {
+    async function loadPrices() {
+      try {
+        const res = await apiClient.get<any>('/SubscriptionPackage');
+        const packages = res?.isSuccess ? res.result : null;
+        if (!packages || !Array.isArray(packages)) {
+          throw new Error("Invalid response format");
+        }
+
+        const activePkgs = packages.filter((p: any) => p.status?.toLowerCase() === 'active');
+
+        const carPrices = { ...fallbackPrices.car };
+        const bikePrices = { ...fallbackPrices.bike };
+
+        const formatPrice = (val: number) => val.toLocaleString('vi-VN') + ' đ';
+
+        activePkgs.forEach((p: any) => {
+          const typeName = (p.vehicleTypeName || '').toLowerCase();
+          const duration = p.durationMonths;
+          const formatted = formatPrice(p.price);
+
+          const isCar = typeName.includes('car') || typeName.includes('oto') || typeName.includes('o to') || typeName.includes('ô tô');
+          const isBike = typeName.includes('bike') || typeName.includes('motor') || typeName.includes('xe may') || typeName.includes('xe máy');
+
+          if (isCar) {
+            if (duration === 1) carPrices.m1 = formatted;
+            else if (duration === 3) carPrices.m3 = formatted;
+            else if (duration === 12) carPrices.m12 = formatted;
+          } else if (isBike) {
+            if (duration === 1) bikePrices.m1 = formatted;
+            else if (duration === 3) bikePrices.m3 = formatted;
+            else if (duration === 12) bikePrices.m12 = formatted;
+          }
+        });
+
+        setPrices({ car: carPrices, bike: bikePrices });
+      } catch (err) {
+        console.error("Failed to load real prices, using fallback:", err);
+      }
+    }
+    loadPrices();
+  }, []);
 
   const current = isMotorbike ? prices.bike : prices.car;
 

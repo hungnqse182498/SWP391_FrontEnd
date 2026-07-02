@@ -90,6 +90,10 @@ export default function Header() {
                     <Car size={16} strokeWidth={2} aria-hidden />
                     Đặt chỗ
                   </NavLink>
+                  <NavLink to="/dang-ky-thang">
+                    <CreditCard size={16} strokeWidth={2} aria-hidden />
+                    Mua gói
+                  </NavLink>
                   <NavLink to="/lich-su">
                     <CalendarDays size={16} strokeWidth={2} aria-hidden />
                     Lịch sử
