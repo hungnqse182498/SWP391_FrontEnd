@@ -119,7 +119,7 @@ export class ApiClient {
     _isRetry = false,
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`
-    
+
     const headers = this.getHeaders()
     if (data instanceof FormData) {
       delete headers['Content-Type']
@@ -141,8 +141,39 @@ export class ApiClient {
     try {
       const response = await fetch(url, options)
 
+      // Check for token expiration even on 200 OK
+      if (response.status === 200 && response.headers.get('content-type')?.includes('application/json')) {
+        const json = await response.clone().json()
+        if (
+          !json.isSuccess &&
+          (json.message?.toLowerCase().includes('token') ||
+            json.message?.toLowerCase().includes('expired') ||
+            json.message?.toLowerCase().includes('hết hạn') ||
+            json.message?.toLowerCase().includes('không hợp lệ'))
+        ) {
+          // Treat as token expired → trigger refresh
+          if (!_isRetry) {
+            try {
+              const { authService } = await import('../utils/authService')
+              const refreshResult = await authService.refreshToken()
+              if (refreshResult.isSuccess && refreshResult.result?.accessToken) {
+                this.setToken(refreshResult.result.accessToken)
+                // Retry the original request once with the new token
+                return this.request<T>(method, endpoint, data, true)
+              }
+            } catch (e) {
+              console.error('Refresh failed:', e)
+            }
+            console.log('Token expired response:', { status: response.status, body: json })
+            this.clearToken()
+            window.location.href = '/dang-nhap'
+            throw new Error('Session expired')
+          }
+        }
+      }
+
       // ── 401 Unauthorized → attempt token refresh BEFORE other error handling ──
-      if (response.status === 401 && !_isRetry) {
+      if ((response.status === 401 || response.status === 403) && !_isRetry) {
         try {
           const { authService } = await import('../utils/authService')
           const refreshResult = await authService.refreshToken()

@@ -47,7 +47,7 @@ export interface RegisterResponse {
 }
 
 export interface RefreshTokenRequest {
-  refreshToken: string
+  RefreshTokenKey: string
 }
 
 export interface RefreshTokenResponse {
@@ -134,7 +134,7 @@ export class AuthService {
 
       const response = await this.api.post<RefreshTokenResponse>(
         API_ENDPOINTS.AUTH_REFRESH,
-        { refreshToken } as RefreshTokenRequest,
+        { RefreshTokenKey: refreshToken } as RefreshTokenRequest,
       )
 
       if (response.isSuccess && response.result?.accessToken) {

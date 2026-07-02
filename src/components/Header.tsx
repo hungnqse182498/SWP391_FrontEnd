@@ -9,6 +9,7 @@ import {
   Settings,
   UserCircle,
   UserPlus,
+  Package,
 } from 'lucide-react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
@@ -97,6 +98,10 @@ export default function Header() {
                   <NavLink to="/lich-su">
                     <CalendarDays size={16} strokeWidth={2} aria-hidden />
                     Lịch sử
+                  </NavLink>
+                  <NavLink to="/my-subscriptions">
+                    <Package size={16} strokeWidth={2} aria-hidden />
+                    Gói của tôi
                   </NavLink>
                 </>
               )}
