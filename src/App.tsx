@@ -48,6 +48,12 @@ import ManagerReports from './pages/manager/Reports'
 
 import ManagerAdvanced from './pages/manager/Advanced'
 
+import ManagerGates from './pages/manager/Gates'
+
+import ManagerSubscriptionPackages from './pages/manager/SubscriptionPackages'
+
+import ManagerSubscriptionRenewals from './pages/manager/SubscriptionRenewals'
+
 import UserBooking from './pages/user/Booking'
 
 import UserBookingConfirm from './pages/user/BookingConfirm'
@@ -136,6 +142,12 @@ export default function App() {
               <Route path="manager/reports" element={<ManagerReports />} />
 
               <Route path="manager/advanced" element={<ManagerAdvanced />} />
+
+              <Route path="manager/gates" element={<ManagerGates />} />
+
+              <Route path="manager/subscriptions" element={<ManagerSubscriptionPackages />} />
+
+              <Route path="manager/renewals" element={<ManagerSubscriptionRenewals />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
 
