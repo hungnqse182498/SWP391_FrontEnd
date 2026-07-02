@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { ConfirmDialog, ToastContainer, useToast } from '../../components/Toast'
 import { reservationApi, type ReservationDto } from '../../utils/apiServices'
+import { parseBackendUtcDate } from '../../utils/dateTime'
 import { formatCurrency, formatDateTime } from '../../utils/pricing'
 
 const statusLabel: Record<string, string> = {
@@ -17,6 +18,31 @@ const statusLabel: Record<string, string> = {
   CheckedIn: 'Đã check-in',
   paid: 'Đã thanh toán',
   cancelled: 'Đã hủy',
+}
+
+function getOrderCreatedTime(order: ReservationDto) {
+  const value = order.createdAt || order.expectedEntryTime
+  return value ? parseBackendUtcDate(value).getTime() : 0
+}
+
+function getHistoryStatus(order: ReservationDto) {
+  const paymentStatus = order.payments?.[0]?.paymentStatus
+  if (paymentStatus?.toLowerCase() === 'success') return 'Success'
+  return order.status || 'Pending'
+}
+
+function getStatusBadgeClass(status: string) {
+  const normalized = status.toLowerCase()
+  if (['confirmed', 'success', 'completed', 'checkedin', 'modified', 'paid'].includes(normalized)) {
+    return 'badge-history-success'
+  }
+  if (['cancelled', 'canceled', 'cancel'].includes(normalized)) {
+    return 'badge-history-cancelled'
+  }
+  if (['pending', 'pendingpayment', 'pending_payment'].includes(normalized)) {
+    return 'badge-history-pending'
+  }
+  return 'badge-history-neutral'
 }
 
 function HistoryContent() {
@@ -32,7 +58,7 @@ function HistoryContent() {
     try {
       const res = await reservationApi.getMy()
       if (res.isSuccess && res.result) {
-        setList(res.result)
+        setList([...res.result].sort((a, b) => getOrderCreatedTime(b) - getOrderCreatedTime(a)))
       }
     } catch (err) {
       console.error(err)
@@ -176,6 +202,7 @@ function HistoryContent() {
           {list.map((b, i) => {
             const deposit = b.payments?.[0]?.amount ?? 0
             const paymentStatus = b.payments?.[0]?.paymentStatus
+            const displayStatus = getHistoryStatus(b)
             const canChangeTime = b.status === 'Confirmed'
             const alreadyChanged = b.status === 'Modified'
 
@@ -189,8 +216,8 @@ function HistoryContent() {
               >
                 <div className="history-item-head">
                   <strong>{b.reservationId.slice(0, 8).toUpperCase()}</strong>
-                  <span className={`badge badge-${b.status?.toLowerCase()}`}>
-                    {statusLabel[b.status] ?? b.status}
+                  <span className={`badge ${getStatusBadgeClass(displayStatus)}`}>
+                    {statusLabel[displayStatus] ?? statusLabel[b.status] ?? displayStatus}
                   </span>
                 </div>
                 <div className="history-meta">

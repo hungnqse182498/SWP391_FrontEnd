@@ -3,6 +3,7 @@ import { AlertTriangle } from 'lucide-react'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { useBooking } from '../../context/BookingContext'
 import { vehicleTypeLabel } from '../../utils/bookingPricing'
+import { formatUtcToVietnamDateTime } from '../../utils/dateTime'
 import { formatCurrency } from '../../utils/pricing'
 
 function ConfirmContent() {
@@ -43,7 +44,7 @@ function ConfirmContent() {
           ) : (
             <p><strong>Chỗ:</strong> {draft.spots.map((spot) => spot.label).join(', ')}</p>
           )}
-          <p><strong>Thời gian vào:</strong> {new Date(draft.startTime).toLocaleString('vi-VN')}</p>
+          <p><strong>Thời gian vào:</strong> {formatUtcToVietnamDateTime(draft.startTime)}</p>
           {!isPreRegistered && !isMonthly && <p><strong>Số giờ:</strong> {draft.hours}</p>}
           {draft.vehiclePlate ? (
             <p><strong>Biển số:</strong> {draft.vehiclePlate}</p>

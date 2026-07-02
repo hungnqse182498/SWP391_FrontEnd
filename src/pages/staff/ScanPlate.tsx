@@ -12,6 +12,7 @@ import {
   type ReservationDto,
   type VehicleTypeDto,
 } from '../../utils/apiServices'
+import { formatNowInVietnamTime, formatUtcToVietnamDateTime } from '../../utils/dateTime'
 
 type GatePanel = 'scan' | 'reservations' | 'active-vehicles'
 
@@ -46,15 +47,7 @@ const panelCopy: Record<GatePanel, { title: string; desc: string }> = {
 
 function formatDateTime(value?: string) {
   if (!value) return 'Chưa có'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(date)
+  return formatUtcToVietnamDateTime(value)
 }
 
 function statusLabel(status?: string) {
@@ -162,7 +155,7 @@ export default function ScanPlate() {
   const setPlateForConfirm = (plate: string) => {
     const nextPlate = plate.toUpperCase()
     setLicensePlate(nextPlate)
-    setEntryTimePreview(nextPlate.trim() ? new Date().toLocaleString('vi-VN') : '')
+    setEntryTimePreview(nextPlate.trim() ? formatNowInVietnamTime() : '')
   }
 
   const resetScan = () => {
@@ -311,7 +304,7 @@ export default function ScanPlate() {
 
                     <div className="form-field">
                       <label>Giờ hiện tại</label>
-                      <div className="input-readonly">{entryTimePreview || new Date().toLocaleString('vi-VN')}</div>
+                      <div className="input-readonly">{entryTimePreview || formatNowInVietnamTime()}</div>
                     </div>
 
                     <div className="form-field">

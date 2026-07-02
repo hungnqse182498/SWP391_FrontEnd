@@ -4,6 +4,7 @@ import { AlertCircle, CalendarClock, Car, Smartphone } from 'lucide-react'
 import StaffLayout from '../../components/StaffLayout'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { parkingOperationApi, vehicleTypeApi, type VehicleTypeDto } from '../../utils/apiServices'
+import { formatNowInVietnamTime } from '../../utils/dateTime'
 
 interface StaffMenuItem {
   id: string
@@ -127,7 +128,7 @@ export default function CreateSession() {
 
               <div className="form-field">
                 <label>Thời gian vào</label>
-                <div className="input-readonly">{new Date().toLocaleString('vi-VN')}</div>
+                <div className="input-readonly">{formatNowInVietnamTime()}</div>
               </div>
 
               {message && <p className="alert-inline">{message}</p>}

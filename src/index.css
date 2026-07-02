@@ -1550,6 +1550,26 @@ ul, ol { margin: 0; padding: 0; }
 }
 .badge-paid { background: #dcfce7; color: #166534; }
 .badge-cancelled { background: #fee2e2; color: #991b1b; }
+.badge-history-success {
+  background: rgba(16, 185, 129, 0.14);
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+}
+.badge-history-cancelled {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.24);
+}
+.badge-history-pending {
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.badge-history-neutral {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
 .history-item.status-cancelled { opacity: 0.75; }
 .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8125rem; }
 .empty-state { text-align: center; padding: 3rem 1.5rem; color: var(--text-muted); }

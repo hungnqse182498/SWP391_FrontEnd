@@ -101,9 +101,9 @@ export default function Header() {
             <>
               <NavLink to="/dat-cho">
                 <Car size={16} strokeWidth={2} aria-hidden />
-                Tìm chỗ đỗ
+                Đặt chỗ ngay
               </NavLink>
-              <a href="/#subscriptions">Gói đăng ký</a>
+              <a href="/#subscriptions">Đăng ký gói</a>
               <a href="#support">Hỗ trợ</a>
             </>
           )}

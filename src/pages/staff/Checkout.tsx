@@ -4,6 +4,7 @@ import { AlertCircle, LogOut } from 'lucide-react'
 import StaffLayout from '../../components/StaffLayout'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { parkingOperationApi, type ParkingFeePreview } from '../../utils/apiServices'
+import { formatNowInVietnamTime, formatUtcToVietnamDateTime } from '../../utils/dateTime'
 import { formatCurrency } from '../../utils/pricing'
 
 interface StaffMenuItem {
@@ -37,7 +38,7 @@ export default function Checkout() {
   const setPlateForCheckout = (plate: string) => {
     const nextPlate = plate.toUpperCase()
     setLicensePlate(nextPlate)
-    setExitTimePreview(nextPlate.trim() ? new Date().toLocaleString('vi-VN') : '')
+    setExitTimePreview(nextPlate.trim() ? formatNowInVietnamTime() : '')
   }
 
   const triggerPreview = async (plate: string) => {
@@ -281,8 +282,8 @@ export default function Checkout() {
                     <h3>Thông tin xe ra bãi</h3>
                     <div className="scan-info">
                       <p><strong>Biển số:</strong> {preview.licensePlate}</p>
-                      <p><strong>Giờ hiện tại:</strong> {new Date(preview.exitTime).toLocaleString('vi-VN')}</p>
-                      <p><strong>Giờ vào:</strong> {new Date(preview.entryTime).toLocaleString('vi-VN')}</p>
+                      <p><strong>Giờ hiện tại:</strong> {formatUtcToVietnamDateTime(preview.exitTime)}</p>
+                      <p><strong>Giờ vào:</strong> {formatUtcToVietnamDateTime(preview.entryTime)}</p>
                       <p><strong>Thời gian gửi:</strong> {preview.totalHours.toFixed(1)} giờ</p>
                       <p className="fee-amount"><strong>Phí gửi:</strong> {formatCurrency(preview.amount)}</p>
                     </div>
@@ -302,7 +303,7 @@ export default function Checkout() {
                     <h3>Thông tin xe cư dân</h3>
                     <div className="scan-info">
                       <p><strong>Biển số:</strong> {licensePlate}</p>
-                      <p><strong>Giờ hiện tại:</strong> {exitTimePreview || new Date().toLocaleString('vi-VN')}</p>
+                      <p><strong>Giờ hiện tại:</strong> {exitTimePreview || formatNowInVietnamTime()}</p>
                       <p className="fee-amount"><strong>Phí gửi:</strong> Miễn phí (Gói tháng)</p>
                     </div>
                     <div className="checkout-actions">

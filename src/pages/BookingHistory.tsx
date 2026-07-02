@@ -3,6 +3,7 @@ import { Ban, Calendar, Car, MapPin } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import ProtectedRoute from '../components/ProtectedRoute'
 import { useBooking } from '../context/BookingContext'
+import { parseBackendUtcDate } from '../utils/dateTime'
 import { formatCurrency, formatDateTime } from '../utils/pricing'
 
 const statusLabel: Record<string, string> = {
@@ -12,9 +13,18 @@ const statusLabel: Record<string, string> = {
   pending_payment: 'Chờ thanh toán',
 }
 
+function getStatusBadgeClass(status: string) {
+  if (['paid', 'completed', 'confirmed', 'success'].includes(status)) return 'badge-history-success'
+  if (['cancelled', 'canceled'].includes(status)) return 'badge-history-cancelled'
+  if (['pending_payment', 'pending'].includes(status)) return 'badge-history-pending'
+  return 'badge-history-neutral'
+}
+
 function HistoryContent() {
   const { getMyBookings, cancelBooking } = useBooking()
-  const list = getMyBookings()
+  const list = [...getMyBookings()].sort(
+    (a, b) => parseBackendUtcDate(b.createdAt || b.startTime).getTime() - parseBackendUtcDate(a.createdAt || a.startTime).getTime(),
+  )
 
   return (
     <section className="history-page">
@@ -43,7 +53,9 @@ function HistoryContent() {
             >
               <div className="history-item-head">
                 <strong>{b.id}</strong>
-                <span className={`badge badge-${b.status}`}>{statusLabel[b.status] ?? b.status}</span>
+                <span className={`badge ${getStatusBadgeClass(b.status)}`}>
+                  {statusLabel[b.status] ?? b.status}
+                </span>
               </div>
               <div className="history-meta">
                 <span><MapPin size={14} /> {b.floorName}</span>

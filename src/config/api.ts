@@ -58,6 +58,20 @@ export const API_ENDPOINTS = {
   PRICING_UPDATE: '/pricing-policies/:id',
 }
 
+export class ApiRequestError extends Error {
+  statusCode: number
+  data: unknown
+  response: { status: number; data: unknown }
+
+  constructor(statusCode: number, message: string, data: unknown) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.statusCode = statusCode
+    this.data = data
+    this.response = { status: statusCode, data }
+  }
+}
+
 // API Client Class
 export class ApiClient {
   private baseUrl: string
@@ -153,8 +167,17 @@ export class ApiClient {
           return (await response.json()) as T
         }
 
+        if (contentType?.includes('application/json')) {
+          const errorBody = await response.json()
+          const message =
+            typeof errorBody?.message === 'string'
+              ? errorBody.message
+              : `HTTP ${response.status}`
+          throw new ApiRequestError(response.status, message, errorBody)
+        }
+
         const error = await response.text()
-        throw new Error(`HTTP ${response.status}: ${error}`)
+        throw new ApiRequestError(response.status, error || `HTTP ${response.status}`, error)
       }
 
       const contentType = response.headers.get('content-type')

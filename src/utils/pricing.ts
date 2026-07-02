@@ -1,3 +1,5 @@
+import { formatUtcToVietnamDateTime } from './dateTime'
+
 export const PRICE_PER_HOUR = 15_000
 
 export function formatCurrency(amount: number): string {
@@ -15,8 +17,5 @@ export function addHours(isoStart: string, hours: number): string {
 }
 
 export function formatDateTime(iso: string): string {
-  return new Intl.DateTimeFormat('vi-VN', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(iso))
+  return formatUtcToVietnamDateTime(iso)
 }
