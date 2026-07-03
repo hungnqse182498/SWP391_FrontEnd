@@ -1,23 +1,53 @@
 # ==========================================
-# FRONTEND (Node/JS) - Đặt trong folder FrontEnd
+# 1. FRONTEND (Node/React/Vite trong thư mục fe)
 # ==========================================
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/.next/
+**/.nuxt/
+**/out/
+**/.vite/
 
-# Phụ thuộc và đầu ra của Node
-node_modules/
-dist/
-dist-ssr/
-.next/
-.nuxt/
-out/
-
-# Logs của các Package Manager
+# Logs của hệ thống Node
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Các file môi trường local
+# Các file môi trường local chứa mật khẩu, key (KHÔNG ĐƯỢC UP)
 *.local
 .env
 .env.local
 .env.*.local
+
+# ==========================================
+# 2. BACKEND (.NET / C#)
+# ==========================================
+**/bin/
+**/obj/
+[Bb]in/
+[Oo]bj/
+**/artifacts/
+
+# ==========================================
+# 3. VISUAL STUDIO & IDE CONFIG (Chặn sạch folder .vs)
+# ==========================================
+.vs/
+**/.vs/
+**/[Cc]onfig/applicationhost.config
+**/CopilotIndices/
+**/FileContentIndex/
+**/ProjectEvaluation/
+**/v17/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# ==========================================
+# 4. HỆ ĐIỀU HÀNH & FILE KHÁC
+# ==========================================
+Thumbs.db
+Desktop.ini
+.DS_Store
