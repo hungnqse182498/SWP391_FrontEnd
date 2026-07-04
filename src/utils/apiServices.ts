@@ -24,6 +24,11 @@ export interface VehicleTypeDto {
   typeName: string
 }
 
+export interface ParkingSessionTicket {
+  qrPayload: string
+  qrCodeDataUrl: string
+}
+
 export interface CreateReservationResponse {
   reservationId: string
   paymentId: string
@@ -31,6 +36,14 @@ export interface CreateReservationResponse {
   paymentLinkId: string
   paymentUrl: string
   orderCode: string
+  ticket?: ParkingSessionTicket
+}
+
+export interface ReservationPaymentStatusResponse {
+  paymentStatus?: string
+  reservationStatus?: string
+  reservationId?: string
+  ticket?: ParkingSessionTicket
 }
 
 export interface ReservationDto {
@@ -49,6 +62,7 @@ export interface ReservationDto {
   vehicleType?: { typeName: string }
   payments?: Array<{ amount: number; paymentStatus: string }>
   parkingSessions?: ParkingSessionDto[]
+  ticket?: ParkingSessionTicket
 }
 
 export interface MonthlySubscriptionDto {
@@ -151,7 +165,7 @@ export const reservationApi = {
     apiClient.post<ApiResponse<CreateReservationResponse>>(`/reservations/${id}/recreate-payment`),
 
   checkPayment: (orderCode: string) =>
-    apiClient.get<ApiResponse>(`/reservations/check-payment-status/${orderCode}`),
+    apiClient.get<ApiResponse<ReservationPaymentStatusResponse>>(`/reservations/check-payment-status/${orderCode}`),
 }
 
 export const subscriptionApi = {

@@ -205,6 +205,13 @@ function HistoryContent() {
             const displayStatus = getHistoryStatus(b)
             const canChangeTime = b.status === 'Confirmed'
             const alreadyChanged = b.status === 'Modified'
+            const ticket = b.ticket
+            const canShowTicket =
+              Boolean(ticket?.qrCodeDataUrl) &&
+              (
+                ['confirmed', 'modified', 'checkedin', 'completed'].includes(b.status?.toLowerCase()) ||
+                paymentStatus?.toLowerCase() === 'success'
+              )
 
             return (
               <motion.li
@@ -225,6 +232,15 @@ function HistoryContent() {
                   <span><Car size={14} /> {b.vehicleType?.typeName ?? 'Xe'}</span>
                   <span><Calendar size={14} /> {formatDateTime(b.expectedEntryTime)}</span>
                 </div>
+                {canShowTicket && ticket && (
+                  <div className="reservation-ticket-card history-reservation-ticket">
+                    <img src={ticket.qrCodeDataUrl} alt="Mã QR đặt trước" className="reservation-ticket-qr" />
+                    <div>
+                      <span>Mã QR đặt trước để staff quét lúc check-in</span>
+                      <code className="reservation-ticket-code">{ticket.qrPayload || b.reservationId}</code>
+                    </div>
+                  </div>
+                )}
                 <div className="history-footer" style={{ flexWrap: 'wrap', gap: '8px' }}>
                   <strong>{formatCurrency(deposit)}</strong>
 

@@ -1,14 +1,22 @@
 import { useMemo } from 'react'
 import { CheckCircle2 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { useBooking } from '../../context/BookingContext'
 import type { BookingRecord } from '../../types/booking'
+import type { ParkingSessionTicket } from '../../utils/apiServices'
 import { formatCurrency, formatDateTime } from '../../utils/pricing'
 
 function SuccessContent() {
+  const location = useLocation()
+  const state = location.state as {
+    reservationId?: string
+    ticket?: ParkingSessionTicket
+  } | null
   const { bookings } = useBooking()
   const latest = useMemo(() => bookings[0] ?? null, [bookings]) as BookingRecord | null
+  const ticket = state?.ticket
+  const reservationCode = ticket?.qrPayload || state?.reservationId
 
   if (!latest) {
     return (
@@ -27,9 +35,17 @@ function SuccessContent() {
         <p>Đơn đã được ghi nhận và chờ thanh toán.</p>
         <div className="success-summary">
           <p><strong>Mã đơn:</strong> {latest.id}</p>
+          {reservationCode && <p><strong>Mã đặt trước:</strong> {reservationCode}</p>}
           <p><strong>Thời gian:</strong> {formatDateTime(latest.startTime)}</p>
           <p><strong>Tổng:</strong> {formatCurrency(latest.totalAmount)}</p>
         </div>
+        {ticket?.qrCodeDataUrl && (
+          <div className="reservation-ticket-card success-reservation-ticket">
+            <span>Đưa mã này cho staff quét khi check-in</span>
+            <img src={ticket.qrCodeDataUrl} alt="Mã QR đặt trước" className="reservation-ticket-qr" />
+            <code className="reservation-ticket-code">{ticket.qrPayload}</code>
+          </div>
+        )}
         <Link to="/lich-su" className="btn btn-primary">Xem lịch sử</Link>
       </div>
     </section>
