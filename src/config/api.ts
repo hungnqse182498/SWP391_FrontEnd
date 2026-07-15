@@ -14,7 +14,8 @@ export const API_CONFIG = {
 export const API_ENDPOINTS = {
   // Auth
   AUTH_LOGIN: '/auth/login',
-  AUTH_REGISTER: '/auth/register',
+  AUTH_SEND_REGISTER_OTP: '/auth/send-register-otp',
+  AUTH_VERIFY_REGISTER_OTP: '/auth/verify-register-otp',
   AUTH_REFRESH: '/auth/refresh-token',
   AUTH_LOGOUT: '/auth/logout',
 
@@ -76,6 +77,8 @@ export class ApiRequestError extends Error {
 export class ApiClient {
   private baseUrl: string
   private token: string | null = null
+  private refreshPromise: Promise<string | null> | null = null
+  private redirectingToLogin = false
 
   constructor(baseUrl: string = API_CONFIG.BASE_URL) {
     this.baseUrl = baseUrl
@@ -90,6 +93,7 @@ export class ApiClient {
   // Set token
   setToken(token: string) {
     this.token = token
+    this.redirectingToLogin = false
     localStorage.setItem('auth_token', token)
   }
 
@@ -99,8 +103,83 @@ export class ApiClient {
     localStorage.removeItem('auth_token')
   }
 
+  private clearSessionTokens() {
+    this.clearToken()
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('user_email')
+    localStorage.removeItem('user_name')
+    localStorage.removeItem('user_role')
+    localStorage.removeItem('user_id')
+    localStorage.removeItem('user_phone')
+  }
+
+  private redirectToLogin() {
+    if (this.redirectingToLogin) return
+    this.redirectingToLogin = true
+    this.clearSessionTokens()
+
+    if (window.location.pathname !== '/dang-nhap') {
+      window.location.replace('/dang-nhap')
+    }
+  }
+
+  /**
+   * Refresh outside request() so a failed refresh response cannot enter the
+   * 401 interceptor recursively. Concurrent 401s share this same promise.
+   */
+  async refreshAccessToken(): Promise<string | null> {
+    if (this.refreshPromise) return this.refreshPromise
+
+    const refreshToken = localStorage.getItem('refresh_token')
+    if (!refreshToken || refreshToken === 'undefined' || refreshToken === 'null') {
+      return null
+    }
+
+    this.refreshPromise = (async () => {
+      try {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.AUTH_REFRESH}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({ refreshTokenKey: refreshToken }),
+        })
+
+        if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+          return null
+        }
+
+        const body = (await response.json()) as {
+          isSuccess?: boolean
+          result?: { accessToken?: string; refreshToken?: string }
+        }
+        const accessToken = body.isSuccess ? body.result?.accessToken : undefined
+        if (!accessToken) return null
+
+        this.setToken(accessToken)
+        // Current backend keeps the old refresh token. Only rotate it if a
+        // future backend response explicitly supplies a replacement.
+        if (body.result?.refreshToken) {
+          localStorage.setItem('refresh_token', body.result.refreshToken)
+        }
+        return accessToken
+      } catch (error) {
+        console.error('Token refresh failed:', error)
+        return null
+      } finally {
+        this.refreshPromise = null
+      }
+    })()
+
+    return this.refreshPromise
+  }
+
   // Get headers with authorization
   private getHeaders(): Record<string, string> {
+    const storedToken = localStorage.getItem('auth_token')
+    if (storedToken !== this.token) this.token = storedToken
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
@@ -141,56 +220,18 @@ export class ApiClient {
     try {
       const response = await fetch(url, options)
 
-      // Check for token expiration even on 200 OK
-      if (response.status === 200 && response.headers.get('content-type')?.includes('application/json')) {
-        const json = await response.clone().json()
-        if (
-          !json.isSuccess &&
-          (json.message?.toLowerCase().includes('token') ||
-            json.message?.toLowerCase().includes('expired') ||
-            json.message?.toLowerCase().includes('hết hạn') ||
-            json.message?.toLowerCase().includes('không hợp lệ'))
-        ) {
-          // Treat as token expired → trigger refresh
-          if (!_isRetry) {
-            try {
-              const { authService } = await import('../utils/authService')
-              const refreshResult = await authService.refreshToken()
-              if (refreshResult.isSuccess && refreshResult.result?.accessToken) {
-                this.setToken(refreshResult.result.accessToken)
-                // Retry the original request once with the new token
-                return this.request<T>(method, endpoint, data, true)
-              }
-            } catch (e) {
-              console.error('Refresh failed:', e)
-            }
-            console.log('Token expired response:', { status: response.status, body: json })
-            this.clearToken()
-            window.location.href = '/dang-nhap'
-            throw new Error('Session expired')
-          }
-        }
-      }
-
-      // ── 401 Unauthorized → attempt token refresh BEFORE other error handling ──
-      if ((response.status === 401 || response.status === 403) && !_isRetry) {
-        try {
-          const { authService } = await import('../utils/authService')
-          const refreshResult = await authService.refreshToken()
-
-          if (refreshResult.isSuccess && refreshResult.result?.accessToken) {
-            this.setToken(refreshResult.result.accessToken)
-            // Retry the original request once with the new token
+      // Only 401 means the access token needs refreshing. A 403 is an
+      // authorization failure and must be returned to the caller unchanged.
+      if (response.status === 401 && !endpoint.startsWith('/auth/')) {
+        if (!_isRetry) {
+          const newAccessToken = await this.refreshAccessToken()
+          if (newAccessToken) {
             return this.request<T>(method, endpoint, data, true)
           }
-        } catch (e) {
-          console.error('Token refresh failed:', e)
         }
 
-        // Refresh failed or returned no token → clear session and redirect
-        this.clearToken()
-        window.location.href = '/dang-nhap'
-        throw new Error('Session expired. Redirecting to login.')
+        this.redirectToLogin()
+        throw new ApiRequestError(401, 'Phiên đăng nhập đã hết hạn.', null)
       }
 
       // ── Handle all other non-OK responses ──

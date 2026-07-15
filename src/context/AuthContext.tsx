@@ -23,6 +23,7 @@ export interface AuthUser {
 export interface RegisterResult {
   ok: boolean
   message: string
+  authenticated?: boolean
 }
 
 interface AuthContextValue {
@@ -39,6 +40,7 @@ interface AuthContextValue {
     password: string,
     confirmPassword: string,
   ) => Promise<RegisterResult>
+  verifyRegisterOtp: (email: string, otp: string, password: string) => Promise<RegisterResult>
   updateProfile: (data: Partial<UserProfile>) => Promise<boolean>
   refreshProfile: () => Promise<void>
   upgradeToCustomer: () => void
@@ -142,8 +144,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { ok: false, message: 'Email không hợp lệ.' }
       }
       if (!trimmedPhone) return { ok: false, message: 'Vui lòng nhập số điện thoại.' }
-      if (!/^[0-9\s\-\+\(\)]{10,}$/.test(trimmedPhone)) {
-        return { ok: false, message: 'Số điện thoại không hợp lệ.' }
+      if (!/^(0|\+84)(3|5|7|8|9)[0-9]{8}$/.test(trimmedPhone)) {
+        return { ok: false, message: 'Số điện thoại phải là số di động Việt Nam hợp lệ.' }
       }
       if (password.length < 6) return { ok: false, message: 'Mật khẩu phải có ít nhất 6 ký tự.' }
       if (password !== confirmPassword) {
@@ -161,45 +163,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           confirmPassword,
         }
 
-        const response = await authService.register(registerData)
+        const response = await authService.sendRegisterOtp(registerData)
 
         if (response.isSuccess) {
-          // Auto login after successful registration
-          try {
-            const loginResponse = await authService.login({
-              email: trimmedEmail,
-              password,
-            })
-
-            if (loginResponse.isSuccess && loginResponse.result) {
-              const { user: backendUser } = loginResponse.result
-              persistUser({
-                userId: backendUser.userId,
-                email: backendUser.email,
-                name: backendUser.fullName,
-                phone: backendUser.phoneNumber,
-                role: (backendUser.roleName.toLowerCase() as UserRole) || 'user',
-              })
-              return { ok: true, message: 'Đăng ký thành công! Đang chuyển hướng...' }
-            } else {
-              return {
-                ok: false,
-                message: 'Đăng ký thành công! Vui lòng đăng nhập với tài khoản mới.',
-              }
-            }
-          } catch (loginError) {
-            console.error('Auto-login after registration failed:', loginError)
-            return {
-              ok: false,
-              message: 'Đăng ký thành công! Vui lòng đăng nhập với tài khoản mới.',
-            }
-          }
+          return { ok: true, message: response.message || 'Mã OTP đã được gửi đến email của bạn.' }
         }
 
         return { ok: false, message: response.message || 'Đăng ký thất bại.' }
       } catch (error) {
         console.error('Register error:', error)
         return { ok: false, message: 'Lỗi đăng ký. Vui lòng thử lại.' }
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [],
+  )
+
+  const verifyRegisterOtp = useCallback(
+    async (email: string, otp: string, password: string): Promise<RegisterResult> => {
+      const trimmedEmail = email.trim().toLowerCase()
+      const trimmedOtp = otp.trim()
+      if (!/^\d{6}$/.test(trimmedOtp)) {
+        return { ok: false, message: 'Mã OTP phải gồm đúng 6 chữ số.' }
+      }
+
+      setIsLoading(true)
+      try {
+        const response = await authService.verifyRegisterOtp({ email: trimmedEmail, otp: trimmedOtp })
+        if (!response.isSuccess) {
+          return { ok: false, message: response.message || 'Xác thực OTP thất bại.' }
+        }
+
+        const loginResponse = await authService.login({ email: trimmedEmail, password })
+        if (loginResponse.isSuccess && loginResponse.result) {
+          const { user: backendUser } = loginResponse.result
+          persistUser({
+            userId: backendUser.userId,
+            email: backendUser.email,
+            name: backendUser.fullName,
+            phone: backendUser.phoneNumber,
+            role: (backendUser.roleName.toLowerCase() as UserRole) || 'user',
+          })
+          return { ok: true, authenticated: true, message: 'Đăng ký thành công.' }
+        }
+
+        return {
+          ok: true,
+          authenticated: false,
+          message: 'Đăng ký thành công. Vui lòng đăng nhập.',
+        }
+      } catch (error) {
+        console.error('Verify register OTP error:', error)
+        return { ok: false, message: 'Không thể xác thực OTP. Vui lòng thử lại.' }
       } finally {
         setIsLoading(false)
       }
@@ -303,12 +319,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       login,
       register,
+      verifyRegisterOtp,
       updateProfile,
       refreshProfile,
       upgradeToCustomer,
       logout,
     }),
-    [user, profile, isLoading, login, register, updateProfile, refreshProfile, upgradeToCustomer, logout],
+    [user, profile, isLoading, login, register, verifyRegisterOtp, updateProfile, refreshProfile, upgradeToCustomer, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

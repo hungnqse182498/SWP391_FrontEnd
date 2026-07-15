@@ -67,6 +67,7 @@ import UserProfile from './pages/user/Profile'
 import UserSubscribeMonthly from './pages/user/SubscribeMonthly'
 import UserRegister from './pages/user/Register'
 import UserMySubscriptions from './pages/user/MySubscriptions'
+import UserParkingSessions from './pages/user/ParkingSessions'
 
 import LegalHub from './pages/user/LegalHub'
 
@@ -107,6 +108,8 @@ export default function App() {
               <Route path="dang-ky-thang" element={<UserSubscribeMonthly />} />
 
               <Route path="my-subscriptions" element={<UserMySubscriptions />} />
+
+              <Route path="phien-gui-xe" element={<UserParkingSessions />} />
 
               <Route path="lich-su" element={<UserBookingHistory />} />
 

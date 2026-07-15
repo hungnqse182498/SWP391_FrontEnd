@@ -46,8 +46,9 @@ export interface RegisterResponse {
   }
 }
 
-export interface RefreshTokenRequest {
-  RefreshTokenKey: string
+export interface VerifyRegisterOtpRequest {
+  email: string
+  otp: string
 }
 
 export interface RefreshTokenResponse {
@@ -56,7 +57,7 @@ export interface RefreshTokenResponse {
   isSuccess: boolean
   result?: {
     accessToken: string
-    refreshToken: string
+    refreshToken?: string
   }
 }
 
@@ -99,16 +100,33 @@ export class AuthService {
     }
   }
 
-  async register(data: RegisterRequest): Promise<RegisterResponse> {
+  async sendRegisterOtp(data: RegisterRequest): Promise<RegisterResponse> {
     try {
       const response = await this.api.post<RegisterResponse>(
-        API_ENDPOINTS.AUTH_REGISTER,
+        API_ENDPOINTS.AUTH_SEND_REGISTER_OTP,
         data,
       )
       return response
     } catch (error) {
       console.error('Register error:', error)
       const errorMessage = error instanceof Error ? error.message : 'Registration failed'
+      return {
+        statusCode: 400,
+        message: errorMessage,
+        isSuccess: false,
+      }
+    }
+  }
+
+  async verifyRegisterOtp(data: VerifyRegisterOtpRequest): Promise<RegisterResponse> {
+    try {
+      return await this.api.post<RegisterResponse>(
+        API_ENDPOINTS.AUTH_VERIFY_REGISTER_OTP,
+        data,
+      )
+    } catch (error) {
+      console.error('Verify register OTP error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'OTP verification failed'
       return {
         statusCode: 400,
         message: errorMessage,
@@ -128,30 +146,25 @@ export class AuthService {
   }
 
   async refreshToken(): Promise<RefreshTokenResponse> {
-    try {
-      const refreshToken = localStorage.getItem('refresh_token')
-      if (!refreshToken) throw new Error('No refresh token found')
-
-      const response = await this.api.post<RefreshTokenResponse>(
-        API_ENDPOINTS.AUTH_REFRESH,
-        { RefreshTokenKey: refreshToken } as RefreshTokenRequest,
-      )
-
-      if (response.isSuccess && response.result?.accessToken) {
-        this.api.setToken(response.result.accessToken)
-        localStorage.setItem('refresh_token', response.result.refreshToken)
-      }
-
-      return response
-    } catch (error) {
-      console.error('Refresh token error:', error)
-      this.logout()
-      throw error
-    }
+    const accessToken = await this.api.refreshAccessToken()
+    return accessToken
+      ? {
+          statusCode: 200,
+          message: 'Cấp token mới thành công',
+          isSuccess: true,
+          result: { accessToken },
+        }
+      : {
+          statusCode: 401,
+          message: 'Refresh token không hợp lệ hoặc đã hết hạn',
+          isSuccess: false,
+        }
   }
 
   // Get stored user info
   getStoredUser() {
+    if (!localStorage.getItem('auth_token')) return null
+
     const email = localStorage.getItem('user_email')
     const name = localStorage.getItem('user_name')
     const role = localStorage.getItem('user_role')

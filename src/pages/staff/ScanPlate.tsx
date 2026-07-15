@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { AlertCircle, CalendarClock, Car, Clock, Smartphone, UserRound } from 'lucide-react'
+import { AlertCircle, CalendarClock, Car, Clock, QrCode, Smartphone, UserRound, X } from 'lucide-react'
 import StaffLayout from '../../components/StaffLayout'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import {
@@ -8,6 +8,10 @@ import {
   parkingSessionApi,
   reservationApi,
   vehicleTypeApi,
+  gateApi,
+  type GateDto,
+  type ParkingSessionTicket,
+  type ParkingQrDecodeResult,
   type ParkingSessionDto,
   type ReservationDto,
   type VehicleTypeDto,
@@ -20,6 +24,34 @@ interface StaffMenuItem {
   id: string
   label: string
   icon: ReactNode
+}
+
+interface CheckInTicketView {
+  sessionId: string
+  qrPayload: string
+  qrCodeDataUrl: string
+  licensePlate?: string
+  vehicleTypeName?: string
+  slotCode?: string
+  entryTime?: string
+}
+
+type LooseParkingSessionTicket = ParkingSessionTicket & {
+  QrPayload?: string
+  QrCodeDataUrl?: string
+}
+
+type CheckInResult = Partial<ParkingSessionDto> & {
+  licensePlate?: string
+  ticket?: LooseParkingSessionTicket
+  Ticket?: LooseParkingSessionTicket
+  SessionId?: string
+  LicensePlate?: string
+  LicensePlateIn?: string
+  VehicleTypeName?: string
+  ActualSlotCode?: string
+  AssignedSlotCode?: string
+  EntryTime?: string
 }
 
 const menuItems: StaffMenuItem[] = [
@@ -68,6 +100,23 @@ function getReservationPlate(reservation: ReservationDto) {
   )
 }
 
+function toCheckInTicketView(result?: CheckInResult): CheckInTicketView | null {
+  const ticket = result?.ticket ?? result?.Ticket
+  const qrPayload = ticket?.qrPayload ?? ticket?.QrPayload
+  const qrCodeDataUrl = ticket?.qrCodeDataUrl ?? ticket?.QrCodeDataUrl
+  if (!qrCodeDataUrl || !qrPayload) return null
+
+  return {
+    sessionId: result?.sessionId || result?.SessionId || qrPayload,
+    qrPayload,
+    qrCodeDataUrl,
+    licensePlate: result?.licensePlateIn || result?.LicensePlateIn || result?.licensePlate || result?.LicensePlate,
+    vehicleTypeName: result?.vehicleTypeName || result?.VehicleTypeName,
+    slotCode: result?.actualSlotCode || result?.ActualSlotCode || result?.assignedSlotCode || result?.AssignedSlotCode,
+    entryTime: result?.entryTime || result?.EntryTime,
+  }
+}
+
 function PlateVisual({ plate, muted = false }: { plate?: string; muted?: boolean }) {
   return (
     <div className={`license-plate-visual${muted ? ' license-plate-visual--muted' : ''}`}>
@@ -81,6 +130,7 @@ export default function ScanPlate() {
   const location = useLocation()
   const locationState = location.state as { activePanel?: GatePanel } | null
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const qrInputRef = useRef<HTMLInputElement>(null)
 
   const [activePanel, setActivePanel] = useState<GatePanel>(locationState?.activePanel ?? 'scan')
   const [imagePreviewUrl, setImagePreviewUrl] = useState('')
@@ -90,12 +140,19 @@ export default function ScanPlate() {
   const [entryTimePreview, setEntryTimePreview] = useState('')
   const [vehicleTypeId, setVehicleTypeId] = useState('')
   const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeDto[]>([])
-  const [gateName, setGateName] = useState('Cổng A')
-  const [checkInType, setCheckInType] = useState<'guest' | 'resident'>('guest')
+  const [gateId, setGateId] = useState('')
+  const [entryGates, setEntryGates] = useState<GateDto[]>([])
+  const [checkInType, setCheckInType] = useState<'guest' | 'resident' | 'reservation'>('guest')
+  const [reservationId, setReservationId] = useState('')
+  const [qrPayload, setQrPayload] = useState('')
+  const [qrDecode, setQrDecode] = useState<ParkingQrDecodeResult | null>(null)
+  const [qrUploading, setQrUploading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [checkInTicket, setCheckInTicket] = useState<CheckInTicketView | null>(null)
   const [reservations, setReservations] = useState<ReservationDto[]>([])
   const [activeSessions, setActiveSessions] = useState<ParkingSessionDto[]>([])
+  const [ticketSession, setTicketSession] = useState<ParkingSessionDto | null>(null)
   const [listLoading, setListLoading] = useState(false)
   const [listError, setListError] = useState('')
 
@@ -149,6 +206,17 @@ export default function ScanPlate() {
       })
       .catch(console.error)
 
+    gateApi
+      .getAll()
+      .then((res) => {
+        if (res.isSuccess && res.result) {
+          const gates = res.result.filter((gate) => gate.gateType?.toLowerCase() === 'entry')
+          setEntryGates(gates)
+          if (gates[0]) setGateId(gates[0].gateId)
+        }
+      })
+      .catch(console.error)
+
     loadGateLists()
   }, [])
 
@@ -158,12 +226,19 @@ export default function ScanPlate() {
     setEntryTimePreview(nextPlate.trim() ? formatNowInVietnamTime() : '')
   }
 
-  const resetScan = () => {
+  const resetScan = (options: { keepResult?: boolean } = {}) => {
     setImagePreviewUrl('')
     setEntryImageUrl('')
+    setReservationId('')
+    setQrPayload('')
+    setQrDecode(null)
     setPlateForConfirm('')
-    setMessage('')
+    if (!options.keepResult) {
+      setMessage('')
+      setCheckInTicket(null)
+    }
     if (fileInputRef.current) fileInputRef.current.value = ''
+    if (qrInputRef.current) qrInputRef.current.value = ''
   }
 
   const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -173,6 +248,7 @@ export default function ScanPlate() {
     setImagePreviewUrl(URL.createObjectURL(file))
     setUploading(true)
     setMessage('')
+    setCheckInTicket(null)
     setPlateForConfirm('')
 
     try {
@@ -196,33 +272,77 @@ export default function ScanPlate() {
   }
 
   const handleConfirmCheckIn = async () => {
-    if (!licensePlate.trim() || !vehicleTypeId) return
+    if (!licensePlate.trim() || !gateId) return
+    if (checkInType !== 'reservation' && !vehicleTypeId) return
+    if (checkInType === 'reservation' && !reservationId && !qrPayload.trim()) {
+      setMessage('Vui lòng upload ảnh QR đặt chỗ hoặc nhập mã QR đặt chỗ')
+      return
+    }
     setLoading(true)
     setMessage('')
+    setCheckInTicket(null)
     try {
       const payload = {
+        customerType:
+          checkInType === 'resident'
+            ? 'Resident'
+            : checkInType === 'reservation'
+              ? 'Reservation'
+              : 'Guest',
         licensePlate: licensePlate.trim(),
-        vehicleTypeId,
-        gateName,
+        vehicleTypeId: checkInType === 'reservation' ? undefined : vehicleTypeId,
+        reservationId: reservationId || undefined,
+        qrPayload: qrPayload.trim() || undefined,
+        gateId,
         entryImageUrl: entryImageUrl || undefined,
-      }
-      const res =
-        checkInType === 'resident'
-          ? await parkingOperationApi.residentCheckIn(payload)
-          : await parkingOperationApi.guestCheckIn(payload)
+      } as const
+      const res = await parkingOperationApi.checkIn(payload)
 
       if (res.isSuccess) {
+        const ticket = toCheckInTicketView(res.result)
+        resetScan({ keepResult: true })
+        setCheckInTicket(ticket)
         setMessage(res.message || 'Check-in thành công')
-        resetScan()
         loadGateLists()
       } else {
         setMessage(res.message || 'Check-in thất bại')
       }
     } catch (err) {
       console.error(err)
-      setMessage('Lỗi kết nối API')
+      setMessage(err instanceof Error ? err.message : 'Lỗi kết nối API')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleQrUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setQrUploading(true)
+    setMessage('')
+    setCheckInTicket(null)
+    setQrDecode(null)
+    setReservationId('')
+    setQrPayload('')
+
+    try {
+      const res = await parkingOperationApi.uploadAndDecodeQr(file)
+      if (res.isSuccess && res.result) {
+        setQrDecode(res.result)
+        setQrPayload(res.result.qrPayload)
+        setReservationId(res.result.reservationId || '')
+        if (!res.result.reservationId) {
+          setMessage('QR đã đọc được nhưng không phải mã đặt chỗ. Vui lòng dùng QR reservation để check-in đặt trước.')
+        }
+      } else {
+        setMessage(res.message || 'Không đọc được mã QR.')
+      }
+    } catch (err) {
+      console.error(err)
+      setMessage(err instanceof Error ? err.message : 'Lỗi kết nối khi upload QR.')
+    } finally {
+      setQrUploading(false)
     }
   }
 
@@ -312,56 +432,131 @@ export default function ScanPlate() {
                       <select
                         className="input-standalone select"
                         value={checkInType}
-                        onChange={(event) => setCheckInType(event.target.value as 'guest' | 'resident')}
+                        onChange={(event) => {
+                          setCheckInType(event.target.value as 'guest' | 'resident' | 'reservation')
+                          setMessage('')
+                          setCheckInTicket(null)
+                        }}
                       >
                         <option value="guest">Khách vãng lai</option>
                         <option value="resident">Khách tháng (customer)</option>
+                        <option value="reservation">Xe đặt trước</option>
                       </select>
                     </div>
 
-                    <div className="form-field">
-                      <label htmlFor="vehicle-type">Loại phương tiện</label>
-                      <select
-                        id="vehicle-type"
-                        className="input-standalone select"
-                        value={vehicleTypeId}
-                        onChange={(event) => setVehicleTypeId(event.target.value)}
-                      >
-                        {vehicleTypes.map((vehicleType) => (
-                          <option key={vehicleType.vehicleTypeId} value={vehicleType.vehicleTypeId}>
-                            {vehicleType.typeName}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {checkInType !== 'reservation' && (
+                      <div className="form-field">
+                        <label htmlFor="vehicle-type">Loại phương tiện</label>
+                        <select
+                          id="vehicle-type"
+                          className="input-standalone select"
+                          value={vehicleTypeId}
+                          onChange={(event) => setVehicleTypeId(event.target.value)}
+                        >
+                          {vehicleTypes.map((vehicleType) => (
+                            <option key={vehicleType.vehicleTypeId} value={vehicleType.vehicleTypeId}>
+                              {vehicleType.typeName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {checkInType === 'reservation' && (
+                      <div className="form-field">
+                        <label>Mã QR đặt chỗ</label>
+                        <div className="input-readonly">
+                          {reservationId ? `ReservationId: ${reservationId}` : 'Upload QR hoặc nhập payload bên dưới'}
+                        </div>
+                        <input
+                          type="text"
+                          className="input-standalone"
+                          placeholder="Dán QR payload / ReservationId"
+                          value={qrPayload}
+                          onChange={(event) => {
+                            setQrPayload(event.target.value.trim())
+                            setReservationId('')
+                            setQrDecode(null)
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          disabled={qrUploading}
+                          onClick={() => qrInputRef.current?.click()}
+                        >
+                          <QrCode size={16} aria-hidden />
+                          {qrUploading ? 'Đang đọc QR...' : 'Tải ảnh QR'}
+                        </button>
+                        <input
+                          type="file"
+                          ref={qrInputRef}
+                          className="upload-input-hidden"
+                          accept="image/*"
+                          onChange={handleQrUpload}
+                        />
+                      </div>
+                    )}
 
                     <div className="form-field">
                       <label htmlFor="gate">Cổng vào</label>
                       <select
                         id="gate"
                         className="input-standalone select"
-                        value={gateName}
-                        onChange={(event) => setGateName(event.target.value)}
+                        value={gateId}
+                        onChange={(event) => setGateId(event.target.value)}
                       >
-                        <option value="Cổng A">Cổng A</option>
-                        <option value="Cổng B">Cổng B</option>
-                        <option value="Cổng C">Cổng C</option>
+                        {entryGates.length === 0 && <option value="">Chưa có cổng vào</option>}
+                        {entryGates.map((gate) => (
+                          <option key={gate.gateId} value={gate.gateId}>
+                            {gate.gateName}
+                            {gate.floorName ? ` · ${gate.floorName}` : ''}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
 
+                  {checkInType === 'reservation' && qrDecode && (
+                    <div className="scan-result">
+                      <h3>QR đặt chỗ</h3>
+                      <div className="scan-info">
+                        <p><strong>Loại mã:</strong> {qrDecode.codeType}</p>
+                        <p><strong>ReservationId:</strong> {qrDecode.reservationId || 'Không có'}</p>
+                        <p><strong>Payload:</strong> {qrDecode.qrPayload}</p>
+                      </div>
+                    </div>
+                  )}
+
                   {message && <p className="alert-inline">{message}</p>}
+
+                  {checkInTicket && (
+                    <div className="reservation-ticket-card staff-checkin-ticket">
+                      <img src={checkInTicket.qrCodeDataUrl} alt="Mã QR vé xe" className="reservation-ticket-qr" />
+                      <div>
+                        <span>Vé xe sau check-in</span>
+                        <code className="reservation-ticket-code">{checkInTicket.qrPayload}</code>
+                        <div className="staff-checkin-ticket-meta">
+                          <p><strong>SessionId:</strong> {checkInTicket.sessionId}</p>
+                          {checkInTicket.licensePlate && <p><strong>Biển số:</strong> {checkInTicket.licensePlate}</p>}
+                          {checkInTicket.vehicleTypeName && <p><strong>Loại xe:</strong> {checkInTicket.vehicleTypeName}</p>}
+                          {checkInTicket.slotCode && <p><strong>Ô:</strong> {checkInTicket.slotCode}</p>}
+                          {checkInTicket.entryTime && <p><strong>Giờ vào:</strong> {formatDateTime(checkInTicket.entryTime)}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="scan-entry-actions">
                     <button
                       type="button"
                       className="btn btn-success"
-                      disabled={loading || uploading || !licensePlate.trim()}
+                      disabled={loading || uploading || qrUploading || !licensePlate.trim() || !gateId}
                       onClick={handleConfirmCheckIn}
                     >
                       {loading ? 'Đang xử lý...' : 'Xác nhận vào bãi'}
                     </button>
-                    <button type="button" className="btn btn-ghost" onClick={resetScan}>
+                    <button type="button" className="btn btn-ghost" onClick={() => resetScan()}>
                       Làm lại
                     </button>
                   </div>
@@ -448,6 +643,16 @@ export default function ScanPlate() {
                                   <Clock size={15} aria-hidden />
                                   Giờ vào: {formatDateTime(session.entryTime)}
                                 </p>
+                                {session.ticket?.qrCodeDataUrl && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline btn-sm staff-ticket-button"
+                                    onClick={() => setTicketSession(session)}
+                                  >
+                                    <QrCode size={16} aria-hidden />
+                                    Xem mã vé
+                                  </button>
+                                )}
                               </div>
                             </article>
                           ))
@@ -457,6 +662,49 @@ export default function ScanPlate() {
                   )}
                 </div>
               </section>
+            )}
+
+            {ticketSession?.ticket && (
+              <div
+                className="modal-overlay"
+                role="presentation"
+                onClick={(event) => {
+                  if (event.target === event.currentTarget) setTicketSession(null)
+                }}
+              >
+                <div
+                  className="modal-panel staff-ticket-modal"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="staff-ticket-modal-title"
+                >
+                  <div className="staff-ticket-modal-header">
+                    <div>
+                      <h3 id="staff-ticket-modal-title" className="modal-title">Mã vé giữ xe</h3>
+                      <p>{ticketSession.licensePlateIn} · {ticketSession.vehicleTypeName || 'Chưa rõ loại xe'}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      aria-label="Đóng mã vé"
+                      onClick={() => setTicketSession(null)}
+                    >
+                      <X size={20} aria-hidden />
+                    </button>
+                  </div>
+                  <div className="staff-ticket-modal-content">
+                    <img
+                      src={ticketSession.ticket.qrCodeDataUrl}
+                      alt={`Mã QR vé giữ xe ${ticketSession.licensePlateIn}`}
+                      className="staff-ticket-modal-qr"
+                    />
+                    <span>Mã vé / SessionId</span>
+                    <code className="reservation-ticket-code">{ticketSession.ticket.qrPayload}</code>
+                    <p>Giờ vào: {formatDateTime(ticketSession.entryTime)}</p>
+                    <small>Dùng mã QR này để xác minh và làm thủ tục cho khách trong trường hợp mất vé.</small>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         </div>

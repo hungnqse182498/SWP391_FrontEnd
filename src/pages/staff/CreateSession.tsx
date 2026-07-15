@@ -3,7 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { AlertCircle, CalendarClock, Car, Smartphone } from 'lucide-react'
 import StaffLayout from '../../components/StaffLayout'
 import ProtectedRoute from '../../components/ProtectedRoute'
-import { parkingOperationApi, vehicleTypeApi, type VehicleTypeDto } from '../../utils/apiServices'
+import {
+  gateApi,
+  parkingOperationApi,
+  vehicleTypeApi,
+  type GateDto,
+  type VehicleTypeDto,
+} from '../../utils/apiServices'
 import { formatNowInVietnamTime } from '../../utils/dateTime'
 
 interface StaffMenuItem {
@@ -25,7 +31,8 @@ export default function CreateSession() {
   const [licensePlate, setLicensePlate] = useState('')
   const [vehicleTypeId, setVehicleTypeId] = useState('')
   const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeDto[]>([])
-  const [gateName, setGateName] = useState('Cổng A')
+  const [gateId, setGateId] = useState('')
+  const [entryGates, setEntryGates] = useState<GateDto[]>([])
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -39,6 +46,17 @@ export default function CreateSession() {
         }
       })
       .catch(console.error)
+
+    gateApi
+      .getAll()
+      .then((res) => {
+        if (res.isSuccess && res.result) {
+          const gates = res.result.filter((gate) => gate.gateType?.toLowerCase() === 'entry')
+          setEntryGates(gates)
+          if (gates[0]) setGateId(gates[0].gateId)
+        }
+      })
+      .catch(console.error)
   }, [])
 
   const handleCreateSession = async () => {
@@ -46,13 +64,18 @@ export default function CreateSession() {
       setMessage('Vui lòng nhập biển số')
       return
     }
+    if (!gateId) {
+      setMessage('Vui lòng chọn cổng vào')
+      return
+    }
     setLoading(true)
     setMessage('')
     try {
-      const res = await parkingOperationApi.guestCheckIn({
+      const res = await parkingOperationApi.checkIn({
+        customerType: 'Guest',
         licensePlate: licensePlate.trim(),
         vehicleTypeId,
-        gateName,
+        gateId,
       })
       setMessage(res.isSuccess ? res.message || 'Tạo lượt gửi xe thành công' : res.message || 'Thất bại')
       if (res.isSuccess) setLicensePlate('')
@@ -117,12 +140,16 @@ export default function CreateSession() {
                 <select
                   id="gate"
                   className="input-standalone select"
-                  value={gateName}
-                  onChange={(event) => setGateName(event.target.value)}
+                  value={gateId}
+                  onChange={(event) => setGateId(event.target.value)}
                 >
-                  <option value="Cổng A">Cổng A</option>
-                  <option value="Cổng B">Cổng B</option>
-                  <option value="Cổng C">Cổng C</option>
+                  {entryGates.length === 0 && <option value="">Chưa có cổng vào</option>}
+                  {entryGates.map((gate) => (
+                    <option key={gate.gateId} value={gate.gateId}>
+                      {gate.gateName}
+                      {gate.floorName ? ` · ${gate.floorName}` : ''}
+                    </option>
+                  ))}
                 </select>
               </div>
 

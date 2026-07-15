@@ -6,7 +6,7 @@ import ProtectedRoute from '../../components/ProtectedRoute'
 import { ConfirmDialog, ToastContainer, useToast } from '../../components/Toast'
 import { reservationApi, type ReservationDto } from '../../utils/apiServices'
 import { parseBackendUtcDate } from '../../utils/dateTime'
-import { formatCurrency, formatDateTime } from '../../utils/pricing'
+import { formatDateTime } from '../../utils/pricing'
 
 const statusLabel: Record<string, string> = {
   Pending: 'Chờ thanh toán',
@@ -200,7 +200,6 @@ function HistoryContent() {
       ) : (
         <ul className="history-list">
           {list.map((b, i) => {
-            const deposit = b.payments?.[0]?.amount ?? 0
             const paymentStatus = b.payments?.[0]?.paymentStatus
             const displayStatus = getHistoryStatus(b)
             const canChangeTime = b.status === 'Confirmed'
@@ -241,9 +240,10 @@ function HistoryContent() {
                     </div>
                   </div>
                 )}
-                <div className="history-footer" style={{ flexWrap: 'wrap', gap: '8px' }}>
-                  <strong>{formatCurrency(deposit)}</strong>
-
+                <div
+                  className="history-footer"
+                  style={{ flexWrap: 'wrap', gap: '8px', justifyContent: 'flex-end' }}
+                >
                   {/* Thanh toán lại cho đơn Pending */}
                   {b.status === 'Pending' && (
                     <button
