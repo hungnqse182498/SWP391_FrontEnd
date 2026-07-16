@@ -1400,7 +1400,7 @@ ul, ol { margin: 0; padding: 0; }
   transition: background 0.2s, color 0.2s;
 }
 .main-nav a:hover { color: var(--blue-800); background: var(--blue-50); }
-.main-nav a.active { color: var(--blue-800); background: #dbeafe; font-weight: 700; }
+.main-nav a.active { color: var(--blue-800); background: var(--blue-100); font-weight: 700; }
 
 .booking-steps {
   display: flex;

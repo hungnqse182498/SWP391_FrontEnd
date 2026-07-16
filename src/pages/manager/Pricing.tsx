@@ -180,7 +180,7 @@ export default function ManagerPricing() {
     <ManagerPageShell activeItem="pricing">
       <div className="staff-content-wrapper">
         <div className="staff-section">
-          <h2>Quản lý bảng giá &amp; chính sách tính phí</h2>
+          <h2>Bảng giá đỗ xe</h2>
           <p className="section-desc">
             Thiết lập đơn giá theo giờ, ngày, qua đêm và các quy định ưu đãi, phụ thu.
           </p>
@@ -264,37 +264,7 @@ export default function ManagerPricing() {
             </table>
           </div>
 
-          <form
-            className="config-form card-panel"
-            style={{ marginTop: '1.5rem' }}
-            onSubmit={(e) => e.preventDefault()}
-          >
-            <h3 className="panel-subtitle">Chính sách bổ sung</h3>
-            <div className="form-field checkbox-row">
-              <input id="free-first-15" type="checkbox" defaultChecked />
-              <label htmlFor="free-first-15">Miễn phí 15 phút đầu (ô tô)</label>
-            </div>
-            <div className="form-field checkbox-row">
-              <input id="peak-surcharge" type="checkbox" defaultChecked />
-              <label htmlFor="peak-surcharge">Phụ thu 20% khung 17:00–19:00</label>
-            </div>
-            <div className="form-field checkbox-row">
-              <input id="lost-ticket-fee" type="checkbox" defaultChecked />
-              <label htmlFor="lost-ticket-fee">Phí mất vé: 200.000đ + phí gửi thực tế</label>
-            </div>
-            <div className="form-field">
-              <label htmlFor="overtime-policy">Chính sách quá giờ đặt trước</label>
-              <select id="overtime-policy" defaultValue="hourly">
-                <option value="hourly">Tính thêm theo giờ</option>
-                <option value="daily">Chuyển sang gói ngày</option>
-              </select>
-            </div>
-            <div className="form-actions">
-              <button type="submit" className="btn btn-primary">
-                Lưu chính sách
-              </button>
-            </div>
-          </form>
+
         </div>
       </div>
 

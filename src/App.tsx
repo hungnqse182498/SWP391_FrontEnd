@@ -52,7 +52,6 @@ import ManagerGates from './pages/manager/Gates'
 
 import ManagerSubscriptionPackages from './pages/manager/SubscriptionPackages'
 
-import ManagerSubscriptionRenewals from './pages/manager/SubscriptionRenewals'
 import ManagerParkingSessions from './pages/manager/ParkingSessions'
 import ManagerVehicleChangeRequests from './pages/manager/VehicleChangeRequests'
 
@@ -154,8 +153,6 @@ export default function App() {
               <Route path="manager/gates" element={<ManagerGates />} />
 
               <Route path="manager/subscriptions" element={<ManagerSubscriptionPackages />} />
-
-              <Route path="manager/renewals" element={<ManagerSubscriptionRenewals />} />
 
               <Route path="manager/sessions" element={<ManagerParkingSessions />} />
 

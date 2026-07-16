@@ -138,7 +138,7 @@ export default function ManagerSubscriptionPackages() {
     <ManagerPageShell activeItem="subscriptions">
       <div className="staff-content-wrapper">
         <div className="staff-section">
-          <h2>Quản lý gói thuê bao</h2>
+          <h2>Quản lý gói</h2>
           <p className="section-desc">
             Thêm, sửa, xóa các gói đăng ký tháng cho khách hàng.
           </p>
