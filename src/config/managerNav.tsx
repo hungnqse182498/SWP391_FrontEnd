@@ -6,6 +6,7 @@ import {
   Clock,
   DollarSign,
   DoorOpen,
+  FileCheck,
   Layers,
   Package,
   ParkingSquare,
@@ -63,6 +64,13 @@ export const MANAGER_NAV: NavItem[] = [
     path: '/manager/renewals',
     icon: <RefreshCw size={18} />,
     desc: 'Duyệt yêu cầu gia hạn gói thuê bao',
+  },
+  {
+    id: 'vehicle-change-requests',
+    label: 'Phê duyệt biển số',
+    path: '/manager/vehicle-change-requests',
+    icon: <FileCheck size={18} />,
+    desc: 'Duyệt yêu cầu thay đổi biển số',
   },
   {
     id: 'slots',
