@@ -3,6 +3,7 @@ import {
   BarChart3,
   Building2,
   Car,
+  Clock,
   DollarSign,
   DoorOpen,
   Layers,
@@ -69,6 +70,13 @@ export const MANAGER_NAV: NavItem[] = [
     path: '/manager/slots',
     icon: <ParkingSquare size={18} />,
     desc: 'Trạng thái slot: trống, đang dùng, đặt trước...',
+  },
+  {
+    id: 'sessions',
+    label: 'Phiên ra vào',
+    path: '/manager/sessions',
+    icon: <Clock size={18} />,
+    desc: 'Theo dõi phiên gửi xe',
   },
   {
     id: 'pricing',

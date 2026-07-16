@@ -53,6 +53,7 @@ import ManagerGates from './pages/manager/Gates'
 import ManagerSubscriptionPackages from './pages/manager/SubscriptionPackages'
 
 import ManagerSubscriptionRenewals from './pages/manager/SubscriptionRenewals'
+import ManagerParkingSessions from './pages/manager/ParkingSessions'
 
 import UserBooking from './pages/user/Booking'
 
@@ -154,6 +155,8 @@ export default function App() {
               <Route path="manager/subscriptions" element={<ManagerSubscriptionPackages />} />
 
               <Route path="manager/renewals" element={<ManagerSubscriptionRenewals />} />
+
+              <Route path="manager/sessions" element={<ManagerParkingSessions />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
 
