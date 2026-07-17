@@ -1400,7 +1400,7 @@ ul, ol { margin: 0; padding: 0; }
   transition: background 0.2s, color 0.2s;
 }
 .main-nav a:hover { color: var(--blue-800); background: var(--blue-50); }
-.main-nav a.active { color: var(--blue-800); background: #dbeafe; font-weight: 700; }
+.main-nav a.active { color: var(--blue-800); background: var(--blue-100); font-weight: 700; }
 
 .booking-steps {
   display: flex;
@@ -3651,3 +3651,27 @@ ul, ol { margin: 0; padding: 0; }
   }
 }
 
+/* ── Spin animation ──────────────────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ── Responsive dashboard-grid for reports metrics ───────────── */
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 480px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}

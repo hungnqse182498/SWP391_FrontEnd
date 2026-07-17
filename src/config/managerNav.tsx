@@ -3,12 +3,13 @@ import {
   BarChart3,
   Building2,
   Car,
+  Clock,
   DollarSign,
   DoorOpen,
+  FileCheck,
   Layers,
   Package,
   ParkingSquare,
-  RefreshCw,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -51,17 +52,24 @@ export const MANAGER_NAV: NavItem[] = [
   },
   {
     id: 'subscriptions',
-    label: 'Gói thuê bao',
+    label: 'Quản lý gói',
     path: '/manager/subscriptions',
     icon: <Package size={18} />,
     desc: 'Quản lý gói đăng ký tháng',
   },
   {
-    id: 'renewals',
-    label: 'Gia hạn thuê bao',
-    path: '/manager/renewals',
-    icon: <RefreshCw size={18} />,
-    desc: 'Duyệt yêu cầu gia hạn gói thuê bao',
+    id: 'sessions',
+    label: 'Phiên ra vào',
+    path: '/manager/sessions',
+    icon: <Clock size={18} />,
+    desc: 'Theo dõi phiên gửi xe',
+  },
+  {
+    id: 'vehicle-change-requests',
+    label: 'Phê duyệt biển số',
+    path: '/manager/vehicle-change-requests',
+    icon: <FileCheck size={18} />,
+    desc: 'Duyệt yêu cầu thay đổi biển số',
   },
   {
     id: 'slots',
@@ -72,7 +80,7 @@ export const MANAGER_NAV: NavItem[] = [
   },
   {
     id: 'pricing',
-    label: 'Bảng giá & chính sách',
+    label: 'Bảng giá đỗ xe',
     path: '/manager/pricing',
     icon: <DollarSign size={18} />,
     desc: 'Quy định tính phí gửi xe',
