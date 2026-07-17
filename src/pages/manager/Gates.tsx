@@ -6,11 +6,14 @@ import { apiClient } from '../../config/api'
 interface Gate {
   gateId: string
   gateName: string
-  location: string
-  status: string
-  gateType?: string
-  floorId?: string
+  gateType: 'Entry' | 'Exit' | string
+  floorId: string
   floorName?: string
+}
+
+interface Floor {
+  floorId: string
+  floorName: string
 }
 
 interface ApiResponse<T> {
@@ -21,13 +24,13 @@ interface ApiResponse<T> {
 
 const EMPTY_FORM = {
   gateName: '',
-  location: '',
-  status: 'Active',
+  gateType: 'Entry',
+  floorId: '',
 }
 
 export default function ManagerGates() {
   const [gates, setGates] = useState<Gate[]>([])
-  const [floors, setFloors] = useState<any[]>([])
+  const [floors, setFloors] = useState<Floor[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -37,10 +40,10 @@ export default function ManagerGates() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
 
-  // Load supporting floors list to map floor names/locations to floorId
+  // Load supporting floors list for the FloorId selector.
   const fetchFloors = async () => {
     try {
-      const res = await apiClient.get<ApiResponse<any[]>>('/Floor')
+      const res = await apiClient.get<ApiResponse<Floor[]>>('/Floor')
       if (res.isSuccess && res.result) {
         setFloors(res.result)
       }
@@ -54,23 +57,14 @@ export default function ManagerGates() {
     setLoading(true)
     setError(null)
     try {
-      const res = await apiClient.get<ApiResponse<any[]>>('/Gate')
+      const res = await apiClient.get<ApiResponse<Gate[]>>('/Gate')
       if (res.isSuccess && res.result) {
-        const mapped = res.result.map((g: any) => ({
-          gateId: g.gateId,
-          gateName: g.gateName,
-          location: g.location || g.floorName || '—',
-          status: g.status || (g.gateType === 'Entry' ? 'Active' : 'Inactive'),
-          gateType: g.gateType,
-          floorId: g.floorId,
-          floorName: g.floorName,
-        }))
-        setGates(mapped)
+        setGates(res.result)
       } else {
         alert('Không thể tải danh sách cổng.')
         setError('Không thể tải danh sách cổng.')
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err)
       alert('Không thể tải danh sách cổng.')
       setError('Không thể tải danh sách cổng.')
@@ -80,8 +74,12 @@ export default function ManagerGates() {
   }
 
   useEffect(() => {
-    fetchFloors()
-    fetchGates()
+    const loadTimer = window.setTimeout(() => {
+      void fetchFloors()
+      void fetchGates()
+    }, 0)
+
+    return () => window.clearTimeout(loadTimer)
   }, [])
 
   const openCreate = () => {
@@ -94,8 +92,8 @@ export default function ManagerGates() {
     setEditTarget(g)
     setForm({
       gateName: g.gateName,
-      location: g.location,
-      status: g.status,
+      gateType: g.gateType,
+      floorId: g.floorId,
     })
     setShowModal(true)
   }
@@ -106,33 +104,14 @@ export default function ManagerGates() {
     setForm(EMPTY_FORM)
   }
 
-  // Helper to match input text location to floor ID
-  const resolveFloorId = (loc: string) => {
-    const norm = loc.toLowerCase().trim()
-    const match = floors.find((f) => f.floorName.toLowerCase().trim() === norm)
-    if (match) return match.floorId
-
-    const partial = floors.find(
-      (f) => f.floorName.toLowerCase().includes(norm) || norm.includes(f.floorName.toLowerCase())
-    )
-    if (partial) return partial.floorId
-
-    return floors[0]?.floorId || '00000000-0000-0000-0000-000000000000'
-  }
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     try {
-      const floorId = resolveFloorId(form.location)
-      const gateType = form.status === 'Active' ? 'Entry' : 'Exit'
-
       const payload = {
         gateName: form.gateName.trim(),
-        location: form.location.trim(),
-        status: form.status,
-        gateType,
-        floorId,
+        gateType: form.gateType,
+        floorId: form.floorId,
       }
 
       if (editTarget) {
@@ -140,27 +119,16 @@ export default function ManagerGates() {
           gateId: editTarget.gateId,
           ...payload,
         }
-        try {
-          // Attempt specified /Gate/{id} first for spec compliance
-          await apiClient.put<ApiResponse<unknown>>(`/Gate/${editTarget.gateId}`, body)
-        } catch (err: any) {
-          const errMsg = String(err?.message || err)
-          if (errMsg.includes('404') || errMsg.includes('405')) {
-            // Fall back to standard /Gate body-based endpoint
-            await apiClient.put<ApiResponse<unknown>>('/Gate', body)
-          } else {
-            throw err
-          }
-        }
+        await apiClient.put<ApiResponse<unknown>>('/Gate', body)
       } else {
         await apiClient.post<ApiResponse<unknown>>('/Gate', payload)
       }
 
       closeModal()
       await fetchGates()
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err)
-      alert(err?.message || 'Lưu thất bại. Vui lòng thử lại.')
+      alert(err instanceof Error ? err.message : 'Lưu thất bại. Vui lòng thử lại.')
     } finally {
       setSaving(false)
     }
@@ -208,8 +176,8 @@ export default function ManagerGates() {
                 <thead>
                   <tr>
                     <th>Tên cổng</th>
-                    <th>Vị trí</th>
-                    <th>Trạng thái</th>
+                    <th>Tầng</th>
+                    <th>Loại cổng</th>
                     <th style={{ width: '150px' }}>Thao tác</th>
                   </tr>
                 </thead>
@@ -224,21 +192,19 @@ export default function ManagerGates() {
                     gates.map((g) => (
                       <tr key={g.gateId}>
                         <td>{g.gateName}</td>
-                        <td>{g.location}</td>
+                        <td>{g.floorName || '—'}</td>
                         <td>
                           <span
-                            className={`badge ${
-                              g.status === 'Active' ? 'badge-paid' : 'badge-unpaid'
-                            }`}
+                            className="badge"
                             style={{
-                              backgroundColor: g.status === 'Active' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                              color: g.status === 'Active' ? '#10b981' : '#ef4444',
+                              backgroundColor: g.gateType === 'Entry' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                              color: g.gateType === 'Entry' ? '#047857' : '#1d4ed8',
                               padding: '0.25rem 0.5rem',
                               borderRadius: '4px',
                               fontWeight: '600',
                             }}
                           >
-                            {g.status === 'Active' ? 'Hoạt động' : 'Tạm dừng'}
+                            {g.gateType === 'Entry' ? 'Cổng vào' : g.gateType === 'Exit' ? 'Cổng ra' : g.gateType}
                           </span>
                         </td>
                         <td>
@@ -293,25 +259,29 @@ export default function ManagerGates() {
                 />
               </div>
               <div className="form-field">
-                <label htmlFor="gate-location">Vị trí *</label>
-                <input
-                  id="gate-location"
-                  type="text"
+                <label htmlFor="gate-floor">Tầng *</label>
+                <select
+                  id="gate-floor"
                   required
-                  value={form.location}
-                  onChange={(e) => setForm({ ...form, location: e.target.value })}
-                  placeholder="VD: Tầng B1"
-                />
+                  value={form.floorId}
+                  onChange={(e) => setForm({ ...form, floorId: e.target.value })}
+                >
+                  <option value="" disabled>-- Chọn tầng --</option>
+                  {floors.map((floor) => (
+                    <option key={floor.floorId} value={floor.floorId}>{floor.floorName}</option>
+                  ))}
+                </select>
               </div>
               <div className="form-field">
-                <label htmlFor="gate-status">Trạng thái</label>
+                <label htmlFor="gate-type">Loại cổng *</label>
                 <select
-                  id="gate-status"
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value })}
+                  id="gate-type"
+                  required
+                  value={form.gateType}
+                  onChange={(e) => setForm({ ...form, gateType: e.target.value })}
                 >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
+                  <option value="Entry">Cổng vào (Entry)</option>
+                  <option value="Exit">Cổng ra (Exit)</option>
                 </select>
               </div>
               <div className="form-actions">

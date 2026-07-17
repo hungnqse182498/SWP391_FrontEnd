@@ -6,7 +6,7 @@ import ProtectedRoute from '../../components/ProtectedRoute'
 import { ConfirmDialog, ToastContainer, useToast } from '../../components/Toast'
 import { reservationApi, type ReservationDto } from '../../utils/apiServices'
 import { parseBackendUtcDate } from '../../utils/dateTime'
-import { formatCurrency, formatDateTime } from '../../utils/pricing'
+import { formatDateTime } from '../../utils/pricing'
 
 const statusLabel: Record<string, string> = {
   Pending: 'Chờ thanh toán',
@@ -200,11 +200,17 @@ function HistoryContent() {
       ) : (
         <ul className="history-list">
           {list.map((b, i) => {
-            const deposit = b.payments?.[0]?.amount ?? 0
             const paymentStatus = b.payments?.[0]?.paymentStatus
             const displayStatus = getHistoryStatus(b)
             const canChangeTime = b.status === 'Confirmed'
             const alreadyChanged = b.status === 'Modified'
+            const ticket = b.ticket
+            const canShowTicket =
+              Boolean(ticket?.qrCodeDataUrl) &&
+              (
+                ['confirmed', 'modified', 'checkedin', 'completed'].includes(b.status?.toLowerCase()) ||
+                paymentStatus?.toLowerCase() === 'success'
+              )
 
             return (
               <motion.li
@@ -225,9 +231,19 @@ function HistoryContent() {
                   <span><Car size={14} /> {b.vehicleType?.typeName ?? 'Xe'}</span>
                   <span><Calendar size={14} /> {formatDateTime(b.expectedEntryTime)}</span>
                 </div>
-                <div className="history-footer" style={{ flexWrap: 'wrap', gap: '8px' }}>
-                  <strong>{formatCurrency(deposit)}</strong>
-
+                {canShowTicket && ticket && (
+                  <div className="reservation-ticket-card history-reservation-ticket">
+                    <img src={ticket.qrCodeDataUrl} alt="Mã QR đặt trước" className="reservation-ticket-qr" />
+                    <div>
+                      <span>Mã QR đặt trước để staff quét lúc check-in</span>
+                      <code className="reservation-ticket-code">{ticket.qrPayload || b.reservationId}</code>
+                    </div>
+                  </div>
+                )}
+                <div
+                  className="history-footer"
+                  style={{ flexWrap: 'wrap', gap: '8px', justifyContent: 'flex-end' }}
+                >
                   {/* Thanh toán lại cho đơn Pending */}
                   {b.status === 'Pending' && (
                     <button

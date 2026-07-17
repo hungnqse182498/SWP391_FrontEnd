@@ -2,11 +2,25 @@ import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { CheckCircle } from 'lucide-react'
+import { reservationApi, type ParkingSessionTicket } from '../utils/apiServices'
 
 export default function PaymentSuccess() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  const [ticket, setTicket] = useState<ParkingSessionTicket | null>(null)
+  const [reservationId, setReservationId] = useState('')
+  const [paymentContext] = useState<{ type?: string; subscriptionId?: string } | null>(() => {
+    const raw = sessionStorage.getItem('payment_return_context')
+    sessionStorage.removeItem('payment_return_context')
+    if (!raw) return null
+    try {
+      return JSON.parse(raw) as { type?: string; subscriptionId?: string }
+    } catch {
+      return null
+    }
+  })
+  const isSubscriptionRenewal = paymentContext?.type === 'subscription-renewal'
 
   // Lấy toàn bộ tham số từ URL của bạn
   const code = searchParams.get('code')
@@ -15,17 +29,54 @@ export default function PaymentSuccess() {
   const isCancel = searchParams.get('cancel') === 'true'
 
   useEffect(() => {
+    let ignore = false
+
     // Ép kiểu chữ thường để tránh lỗi lệch Ký tự hoa/thường (PAID vs paid)
     const currentStatus = status?.toUpperCase()
 
     // ĐIỀU KIỆN ĂN CHẮC: Nếu có code '00' HOẶC status là 'PAID' VÀ người dùng không bấm nút hủy
     if ((code === '00' || currentStatus === 'PAID') && !isCancel) {
-      setLoading(false) // Hợp lệ -> Hiển thị trang thành công luôn
+      if (isSubscriptionRenewal) {
+        const loadingTimer = window.setTimeout(() => setLoading(false), 0)
+        return () => window.clearTimeout(loadingTimer)
+      }
+
+      const loadTicket = async () => {
+        if (!orderCode) {
+          setLoading(false)
+          return
+        }
+
+        try {
+          const res = await reservationApi.checkPayment(orderCode)
+          const result = res.result as
+            | (typeof res.result & {
+                Ticket?: ParkingSessionTicket
+                ReservationId?: string
+              })
+            | undefined
+
+          if (!ignore && res.isSuccess && result) {
+            setTicket(result.ticket ?? result.Ticket ?? null)
+            setReservationId(result.reservationId ?? result.ReservationId ?? '')
+          }
+        } catch (err) {
+          console.error(err)
+        } finally {
+          if (!ignore) setLoading(false)
+        }
+      }
+
+      loadTicket()
     } else {
       // Nếu không thỏa mãn bất kỳ yếu tố thành công nào mới đá về cancel
       navigate(`/payment-cancel?orderCode=${orderCode || ''}`)
     }
-  }, [code, status, orderCode, isCancel, navigate])
+
+    return () => {
+      ignore = true
+    }
+  }, [code, status, orderCode, isCancel, navigate, isSubscriptionRenewal])
 
   if (loading) {
     return (
@@ -49,11 +100,21 @@ export default function PaymentSuccess() {
         
         <h1 style={{ fontSize: '24px', marginBottom: '12px', color: '#2ecc71' }}>Thanh Toán Thành Công!</h1>
         <p className="muted-text" style={{ marginBottom: '24px' }}>
-          Đơn hàng số <strong>#{orderCode}</strong> đã được thanh toán hoàn tất trên hệ thống.
+          {isSubscriptionRenewal
+            ? <>Giao dịch gia hạn <strong>#{orderCode}</strong> đã được ghi nhận. Thời hạn mới sẽ được cập nhật sau khi PayOS xác nhận.</>
+            : <>Đơn hàng số <strong>#{orderCode}</strong> đã được thanh toán hoàn tất trên hệ thống.</>}
         </p>
 
-        <button type="button" className="btn btn-primary btn-block" onClick={() => navigate('/lich-su')}>
-          Xem lịch sử đặt chỗ
+        {ticket?.qrCodeDataUrl && (
+          <div className="reservation-ticket-card success-reservation-ticket">
+            <span>Đưa mã này cho staff quét khi check-in</span>
+            <img src={ticket.qrCodeDataUrl} alt="Mã QR đặt trước" className="reservation-ticket-qr" />
+            <code className="reservation-ticket-code">{ticket.qrPayload || reservationId}</code>
+          </div>
+        )}
+
+        <button type="button" className="btn btn-primary btn-block" onClick={() => navigate(isSubscriptionRenewal ? '/my-subscriptions' : '/lich-su')}>
+          {isSubscriptionRenewal ? 'Xem gói đăng ký của tôi' : 'Xem lịch sử đặt chỗ'}
         </button>
       </motion.div>
     </section>

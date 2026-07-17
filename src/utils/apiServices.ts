@@ -24,6 +24,19 @@ export interface VehicleTypeDto {
   typeName: string
 }
 
+export interface GateDto {
+  gateId: string
+  gateName: string
+  gateType: 'Entry' | 'Exit' | string
+  floorId: string
+  floorName?: string
+}
+
+export interface ParkingSessionTicket {
+  qrPayload: string
+  qrCodeDataUrl: string
+}
+
 export interface CreateReservationResponse {
   reservationId: string
   paymentId: string
@@ -31,6 +44,14 @@ export interface CreateReservationResponse {
   paymentLinkId: string
   paymentUrl: string
   orderCode: string
+  ticket?: ParkingSessionTicket
+}
+
+export interface ReservationPaymentStatusResponse {
+  paymentStatus?: string
+  reservationStatus?: string
+  reservationId?: string
+  ticket?: ParkingSessionTicket
 }
 
 export interface ReservationDto {
@@ -49,6 +70,7 @@ export interface ReservationDto {
   vehicleType?: { typeName: string }
   payments?: Array<{ amount: number; paymentStatus: string }>
   parkingSessions?: ParkingSessionDto[]
+  ticket?: ParkingSessionTicket
 }
 
 export interface MonthlySubscriptionDto {
@@ -94,8 +116,18 @@ export interface ParkingFeePreview {
   amount: number
 }
 
+export interface SubscriptionRenewalDto {
+  renewalId: string
+  subscriptionId: string
+  oldEndDate: string
+  newEndDate: string
+  amount: number
+  renewalDate?: string
+}
+
 export interface ParkingSessionDto {
   sessionId: string
+  reservationId?: string
   cardId?: string
   cardCode?: string
   driverUserId?: string
@@ -117,6 +149,62 @@ export interface ParkingSessionDto {
   actualSlotId?: string
   actualSlotCode?: string
   status: string
+  ticket?: ParkingSessionTicket
+}
+
+export interface ParkingQrDecodeResult {
+  qrPayload: string
+  codeType: 'Session' | 'Reservation' | 'SessionAndReservation' | string
+  reservationId?: string
+  sessionId?: string
+  imageUrl?: string
+}
+
+export interface ParkingCheckInRequest {
+  customerType: 'Guest' | 'Resident' | 'Reservation'
+  qrPayload?: string
+  reservationId?: string
+  licensePlate?: string
+  vehicleTypeId?: string
+  gateId: string
+  entryImageUrl?: string
+}
+
+export interface ParkingCheckInResponse extends Partial<ParkingSessionDto> {
+  licensePlate?: string
+  gateName?: string
+  ticket?: ParkingSessionTicket
+}
+
+export interface ParkingCheckOutRequest {
+  customerType?: 'Guest' | 'Resident' | 'Reservation'
+  qrPayload?: string
+  sessionId?: string
+  licensePlate?: string
+  licensePlateOut?: string
+  gateId: string
+  paymentMethod?: 'Cash' | 'PayOS' | string
+  exitImageUrl?: string
+}
+
+export interface ParkingOnlinePayment {
+  paymentUrl?: string
+  paymentLinkId?: string
+  orderCode?: string
+  PaymentUrl?: string
+  PaymentLinkId?: string
+  OrderCode?: string
+}
+
+export interface ParkingCheckOutResponse {
+  session?: ParkingSessionDto
+  payment?: unknown
+  fee?: ParkingFeePreview
+  onlinePayment?: ParkingOnlinePayment
+  Session?: ParkingSessionDto
+  Payment?: unknown
+  Fee?: ParkingFeePreview
+  OnlinePayment?: ParkingOnlinePayment
 }
 
 export const profileApi = {
@@ -151,7 +239,7 @@ export const reservationApi = {
     apiClient.post<ApiResponse<CreateReservationResponse>>(`/reservations/${id}/recreate-payment`),
 
   checkPayment: (orderCode: string) =>
-    apiClient.get<ApiResponse>(`/reservations/check-payment-status/${orderCode}`),
+    apiClient.get<ApiResponse<ReservationPaymentStatusResponse>>(`/reservations/check-payment-status/${orderCode}`),
 }
 
 export const subscriptionApi = {
@@ -175,6 +263,23 @@ export const vehicleTypeApi = {
   getAll: () => apiClient.get<ApiResponse<VehicleTypeDto[]>>('/VehicleType'),
 }
 
+export const subscriptionRenewalApi = {
+  renew: (subscriptionId: string, packageId: string) =>
+    apiClient.post<ApiResponse<RegisterMonthlySubscriptionPaymentDto>>(
+      `/SubscriptionRenewal/${subscriptionId}/renew`,
+      { packageId },
+    ),
+
+  getHistory: (subscriptionId: string) =>
+    apiClient.get<ApiResponse<SubscriptionRenewalDto[]>>(
+      `/SubscriptionRenewal/${subscriptionId}/renewals`,
+    ),
+}
+
+export const gateApi = {
+  getAll: () => apiClient.get<ApiResponse<GateDto[]>>('/Gate'),
+}
+
 export const parkingOperationApi = {
   uploadAndRecognizePlate: (file: File) => {
     const formData = new FormData()
@@ -185,41 +290,20 @@ export const parkingOperationApi = {
     )
   },
 
-  guestCheckIn: (data: {
-    licensePlate: string
-    vehicleTypeId: string
-    gateName: string
-    cardCode?: string
-    entryImageUrl?: string
-  }) => apiClient.post<ApiResponse>('/ParkingOperation/guest/check-in', data),
+  uploadAndDecodeQr: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiClient.post<ApiResponse<ParkingQrDecodeResult>>(
+      '/ParkingOperation/upload-and-decode-qr',
+      formData,
+    )
+  },
 
-  guestCheckOutPreview: (data: { licensePlate?: string; cardCode?: string }) =>
-    apiClient.post<ApiResponse<ParkingFeePreview>>('/ParkingOperation/guest/check-out/preview', data),
+  checkIn: (data: ParkingCheckInRequest) =>
+    apiClient.post<ApiResponse<ParkingCheckInResponse>>('/ParkingOperation/check-in', data),
 
-  guestCheckOut: (data: {
-    licensePlate?: string
-    cardCode?: string
-    gateName: string
-    paymentMethod: string
-    licensePlateOut?: string
-    exitImageUrl?: string
-  }) => apiClient.post<ApiResponse>('/ParkingOperation/guest/check-out', data),
-
-  residentCheckIn: (data: {
-    licensePlate: string
-    vehicleTypeId: string
-    gateName: string
-    cardCode?: string
-    entryImageUrl?: string
-  }) => apiClient.post<ApiResponse>('/ParkingOperation/resident/check-in', data),
-
-  residentCheckOut: (data: {
-    licensePlate?: string
-    cardCode?: string
-    gateName: string
-    licensePlateOut?: string
-    exitImageUrl?: string
-  }) => apiClient.post<ApiResponse>('/ParkingOperation/resident/check-out', data),
+  checkOut: (data: ParkingCheckOutRequest) =>
+    apiClient.post<ApiResponse<ParkingCheckOutResponse>>('/ParkingOperation/check-out', data),
 
   getAvailability: (vehicleTypeId?: string, floorKeyword?: string) => {
     const params = new URLSearchParams()
@@ -232,4 +316,5 @@ export const parkingOperationApi = {
 
 export const parkingSessionApi = {
   getAll: () => apiClient.get<ApiResponse<ParkingSessionDto[]>>('/ParkingSession'),
+  getMy: () => apiClient.get<ApiResponse<ParkingSessionDto[]>>('/ParkingSession/my'),
 }

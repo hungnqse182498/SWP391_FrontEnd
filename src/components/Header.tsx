@@ -10,6 +10,7 @@ import {
   UserCircle,
   UserPlus,
   Package,
+  CircleParking,
 } from 'lucide-react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
@@ -103,6 +104,10 @@ export default function Header() {
                     <Package size={16} strokeWidth={2} aria-hidden />
                     Gói của tôi
                   </NavLink>
+                  <NavLink to="/phien-gui-xe">
+                    <CircleParking size={16} strokeWidth={2} aria-hidden />
+                    Phiên gửi xe
+                  </NavLink>
                 </>
               )}
             </>
@@ -162,6 +167,10 @@ export default function Header() {
                       <Link to="/lich-su" role="menuitem" onClick={closeMenu}>
                         <History size={16} strokeWidth={2} aria-hidden />
                         Lịch sử đặt chỗ
+                      </Link>
+                      <Link to="/phien-gui-xe" role="menuitem" onClick={closeMenu}>
+                        <CircleParking size={16} strokeWidth={2} aria-hidden />
+                        Phiên gửi xe
                       </Link>
                       <Link to="/dat-cho" role="menuitem" onClick={closeMenu}>
                         <Car size={16} strokeWidth={2} aria-hidden />

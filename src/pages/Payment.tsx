@@ -53,7 +53,7 @@ function PaymentContent() {
         })
 
         if (res.isSuccess && res.result) {
-          const { paymentUrl, orderCode, reservationId } = res.result
+          const { paymentUrl, orderCode, reservationId, ticket } = res.result
           setDraft({
             ...draft,
             reservationId,
@@ -67,7 +67,7 @@ function PaymentContent() {
           }
 
           const record = completePayment(method)
-          if (record) navigate('/dat-cho/thanh-cong', { state: { bookingId: record.id, reservationId } })
+          if (record) navigate('/dat-cho/thanh-cong', { state: { bookingId: record.id, reservationId, ticket } })
           return
         }
 
