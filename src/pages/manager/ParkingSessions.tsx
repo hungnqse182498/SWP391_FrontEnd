@@ -4,6 +4,12 @@ import { apiClient } from '../../config/api'
 import { formatUtcToVietnamDateTime, formatUtcToVietnamDate } from '../../utils/dateTime'
 import type { ApiResponse, ParkingSessionDto } from '../../utils/apiServices'
 
+const STATUS_MAP: Record<string, { text: string; className: string }> = {
+  active: { text: 'Đang hoạt động', className: 'badge-paid' },
+  completed: { text: 'Hoàn thành', className: '' },
+  pending: { text: 'Chờ xử lý', className: 'badge-cancelled' },
+}
+
 export default function ManagerParkingSessions() {
   const [sessions, setSessions] = useState<ParkingSessionDto[]>([])
   const [loading, setLoading] = useState(true)
@@ -193,20 +199,8 @@ export default function ManagerParkingSessions() {
 
                     const slotDisplay = session.actualSlotCode || session.assignedSlotCode || '—'
 
-                    let badgeClass = 'badge-history-neutral'
-                    let statusEmojiText = session.status || ''
                     const lowerStatus = (session.status || '').toLowerCase()
-
-                    if (lowerStatus === 'active') {
-                      badgeClass = 'badge-history-success'
-                      statusEmojiText = '🟢 Active'
-                    } else if (lowerStatus === 'completed') {
-                      badgeClass = 'badge-history-success'
-                      statusEmojiText = '✅ Completed'
-                    } else if (lowerStatus === 'pending') {
-                      badgeClass = 'badge-history-pending'
-                      statusEmojiText = '🟡 Pending'
-                    }
+                    const statusInfo = STATUS_MAP[lowerStatus] || { text: session.status || '—', className: '' }
 
                     return (
                       <tr key={session.sessionId}>
@@ -222,7 +216,9 @@ export default function ManagerParkingSessions() {
                         <td>{gatesDisplay}</td>
                         <td>{slotDisplay}</td>
                         <td>
-                          <span className={`badge ${badgeClass}`}>{statusEmojiText}</span>
+                          <span className={`badge ${statusInfo.className}`}>
+                            {statusInfo.text}
+                          </span>
                         </td>
                       </tr>
                     )
