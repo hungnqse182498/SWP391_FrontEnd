@@ -12,10 +12,8 @@ import {
   Package,
   ParkingSquare,
   RefreshCw,
+  Timer,
   TrendingUp,
-  ChevronDown,
-  ChevronUp,
-  AlertTriangle,
 } from 'lucide-react'
 import {
   BarChart,
@@ -30,87 +28,15 @@ import {
   Legend,
   CartesianGrid,
 } from 'recharts'
-import { motion, AnimatePresence } from 'framer-motion'
+import type { PieLabelRenderProps } from 'recharts'
 import ManagerPageShell from '../../components/ManagerPageShell'
 import { apiClient } from '../../config/api'
 import { formatCurrency } from '../../utils/pricing'
-import { formatUtcToVietnamDateTime, formatUtcToVietnamDate } from '../../utils/dateTime'
-import './Reports.css'
+import { formatUtcToVietnamDateTime } from '../../utils/dateTime'
+import type { ReactNode } from 'react'
 
-/* ── Color Palette ──────────────────────────────────────────── */
-const CHART_COLORS = ['#2563eb', '#7c3aed', '#f59e0b', '#10b981', '#ef4444', '#94a3b8']
-
-/* ── Vietnamese Translation Maps ────────────────────────────── */
-const METRIC_LABELS: Record<string, string> = {
-  totalRevenue: 'Tổng doanh thu',
-  successfulPayments: 'Số thanh toán thành công',
-  entries: 'Lượt xe vào',
-  exits: 'Lượt xe ra',
-  activeSessions: 'Phiên đang gửi',
-  completedSessions: 'Phiên hoàn tất',
-  averageParkingMinutes: 'Thời gian gửi trung bình',
-  reservations: 'Lượt đặt chỗ',
-  newSubscriptions: 'Gói tháng tạo mới',
-  activeSubscriptions: 'Gói tháng đang hoạt động',
-  expiredSubscriptions: 'Gói tháng hết hạn',
-  expiringSubscriptions: 'Gói tháng sắp hết hạn 7 ngày',
-  slotUtilizationRate: 'Tỷ lệ sử dụng chỗ đỗ',
-  openIncidents: 'Sự cố đang mở',
-  resolvedIncidents: 'Sự cố đã xử lý trong kỳ',
-}
-
-const PAYMENT_TYPE_LABELS: Record<string, string> = {
-  SubscriptionFee: 'Mua gói',
-  SubscriptionRenewal: 'Gia hạn',
-  Deposit: 'Đặt trước',
-  CheckoutFee: 'Check-out',
-  subscriptionfee: 'Mua gói',
-  subscriptionrenewal: 'Gia hạn',
-  deposit: 'Đặt trước',
-  checkoutfee: 'Check-out',
-}
-
-const VEHICLE_TYPE_LABELS: Record<string, string> = {
-  Car: 'Ô tô',
-  Motorbike: 'Xe máy',
-  SUV: 'SUV',
-  Bicycle: 'Xe đạp',
-  Truck: 'Xe tải',
-  car: 'Ô tô',
-  motorbike: 'Xe máy',
-  suv: 'SUV',
-  bicycle: 'Xe đạp',
-  truck: 'Xe tải',
-}
-
-const RESERVATION_STATUS_LABELS: Record<string, string> = {
-  Pending: 'Đang chờ',
-  Confirmed: 'Đã xác nhận',
-  CheckedIn: 'Đã nhận chỗ',
-  Completed: 'Hoàn thành',
-  Cancelled: 'Đã hủy',
-  NoShow: 'Không đến',
-  Active: 'Đang hoạt động',
-  pending: 'Đang chờ',
-  confirmed: 'Đã xác nhận',
-  checkedin: 'Đã nhận chỗ',
-  completed: 'Hoàn thành',
-  cancelled: 'Đã hủy',
-  noshow: 'Không đến',
-  active: 'Đang hoạt động',
-}
-
-function translatePaymentType(name: string): string {
-  return PAYMENT_TYPE_LABELS[name] ?? PAYMENT_TYPE_LABELS[name.toLowerCase()] ?? name
-}
-
-function translateVehicleType(name: string): string {
-  return VEHICLE_TYPE_LABELS[name] ?? VEHICLE_TYPE_LABELS[name.toLowerCase()] ?? name
-}
-
-function translateReservationStatus(name: string): string {
-  return RESERVATION_STATUS_LABELS[name] ?? RESERVATION_STATUS_LABELS[name.toLowerCase()] ?? name
-}
+/* ── colour palette ─────────────────────────────────────────── */
+const COLORS = ['#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899']
 
 /* ── Types matching backend DTOs ─────────────────────────────── */
 interface ApiRes<T = unknown> {
@@ -127,9 +53,9 @@ interface ReportMetric {
 }
 
 interface SeriesPoint {
-  period: string;
-  count: number;
-  amount: number;
+  period: string
+  count: number
+  amount: number
 }
 
 interface Breakdown {
@@ -179,10 +105,7 @@ interface OperationsDTO {
 
 /* ── Date helpers ────────────────────────────────────────────── */
 function toDateStr(d: Date) {
-  const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return d.toISOString().slice(0, 10)
 }
 
 function startOfMonth(d: Date) {
@@ -227,13 +150,39 @@ const PRESET_LABELS: { value: Preset; label: string }[] = [
   { value: 'custom', label: 'Tùy chỉnh' },
 ]
 
-/* ── Currency tick formatter for YAxis ───────────────────────── */
-function currencyTick(value: number) {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}Mđ`
-  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}Kđ`
-  return `${value}đ`
+/* ── Metric icon lookup ──────────────────────────────────────── */
+const METRIC_ICONS: Record<string, ReactNode> = {
+  totalRevenue: <Banknote size={22} />,
+  successfulPayments: <CreditCard size={22} />,
+  entries: <DoorOpen size={22} />,
+  exits: <DoorOpen size={22} />,
+  activeSessions: <Activity size={22} />,
+  completedSessions: <CheckCircle2 size={22} />,
+  averageParkingMinutes: <Timer size={22} />,
+  reservations: <CalendarCheck2 size={22} />,
+  newSubscriptions: <Package size={22} />,
+  activeSubscriptions: <Package size={22} />,
+  expiredSubscriptions: <Package size={22} />,
+  expiringSubscriptions: <Clock3 size={22} />,
+  openIncidents: <Activity size={22} />,
+  resolvedIncidents: <CheckCircle2 size={22} />,
+  slotUtilizationRate: <ParkingSquare size={22} />,
 }
 
+function metricDisplayValue(m: ReportMetric) {
+  if (m.unit === 'VND') return formatCurrency(m.value)
+  if (m.unit === '%') return `${m.value}%`
+  return new Intl.NumberFormat('vi-VN').format(m.value)
+}
+
+/* ── Custom Recharts tooltip formatter ───────────────────────── */
+function currencyTick(value: number) {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}K`
+  return String(value)
+}
+
+/* ── Main Component ──────────────────────────────────────────── */
 export default function ManagerReports() {
   const defaults = presetDates('30d')
   const [preset, setPreset] = useState<Preset>('30d')
@@ -246,18 +195,6 @@ export default function ManagerReports() {
   const [summary, setSummary] = useState<SummaryDTO | null>(null)
   const [revenue, setRevenue] = useState<RevenueDTO | null>(null)
   const [operations, setOperations] = useState<OperationsDTO | null>(null)
-
-  // Expandable cards state (default to collapsed/false)
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({
-    revenue: false,
-    traffic: false,
-    subscriptions: false,
-    incidents: false,
-  })
-
-  const toggleCard = (cardKey: string) => {
-    setExpanded((prev) => ({ ...prev, [cardKey]: !prev[cardKey] }))
-  }
 
   const fetchReports = useCallback(async (from: string, to: string) => {
     setLoading(true)
@@ -301,608 +238,244 @@ export default function ManagerReports() {
     fetchReports(fromDate, toDate)
   }
 
-  /* ── Data Mapping Helpers ──────────────────────────────────── */
-  const metricsMap = useMemo(() => {
-    if (!summary || !summary.metrics) return {} as Record<string, ReportMetric>
-    return summary.metrics.reduce((acc, m) => {
-      acc[m.key] = m
-      return acc
-    }, {} as Record<string, ReportMetric>)
-  }, [summary])
+  /* charts data */
+  const revenueSeries = useMemo(
+    () => summary?.revenueSeries ?? revenue?.revenueSeries ?? [],
+    [summary, revenue],
+  )
 
-  const getMetricValue = (key: string, defaultValue: number = 0): number => {
-    return metricsMap[key]?.value ?? defaultValue
-  }
-
-  // Raw breakdown data
   const paymentTypePie = useMemo(
     () => summary?.revenueByPaymentType ?? revenue?.byPaymentType ?? [],
     [summary, revenue],
   )
-
-  const paymentTypeMap = useMemo(() => {
-    const map: Record<string, number> = {}
-    paymentTypePie.forEach((item) => {
-      map[item.name.toLowerCase()] = item.amount
-    })
-    return map
-  }, [paymentTypePie])
-
-  const getPaymentTypeAmount = (nameKey: string): number => {
-    return paymentTypeMap[nameKey.toLowerCase()] ?? 0
-  }
-
-  /* ── Charts Data Prep with Translations ────────────────────── */
-  const formattedRevenueSeries = useMemo(() => {
-    const raw = summary?.revenueSeries ?? revenue?.revenueSeries ?? []
-    return raw.map((item) => ({
-      ...item,
-      formattedDate: formatUtcToVietnamDate(item.period),
-    }))
-  }, [summary, revenue])
-
-  // Translate labels and values completely inside the data object for reliability
-  const translatedPaymentTypePie = useMemo(() => {
-    return paymentTypePie.map((item) => {
-      const translatedName = translatePaymentType(item.name)
-      return {
-        ...item,
-        name: translatedName,
-        displayName: translatedName,
-      }
-    })
-  }, [paymentTypePie])
 
   const vehicleTypeBars = useMemo(
     () => operations?.sessionsByVehicleType ?? [],
     [operations],
   )
 
-  const translatedVehicleTypeBars = useMemo(() => {
-    return vehicleTypeBars.map((item) => {
-      const translatedName = translateVehicleType(item.name)
-      return {
-        ...item,
-        name: translatedName,
-        displayName: translatedName,
-      }
-    })
-  }, [vehicleTypeBars])
-
   const reservationPie = useMemo(
     () => operations?.reservationsByStatus ?? [],
     [operations],
   )
 
-  const translatedReservationPie = useMemo(() => {
-    return reservationPie.map((item) => {
-      const translatedName = translateReservationStatus(item.name)
-      return {
-        ...item,
-        name: translatedName,
-        displayName: translatedName,
-      }
-    })
-  }, [reservationPie])
-
   return (
     <ManagerPageShell activeItem="reports">
-      <div className="reports-dashboard">
-        
-        {/* ── Title Header ────────────────────────────────────── */}
+      <div className="staff-content-wrapper">
         <div className="staff-section">
           <h2>Báo cáo vận hành</h2>
           <p className="section-desc">
-            Phân tích chuyên sâu doanh thu, phiên đỗ xe và hiệu suất hoạt động hệ thống.
+            Tổng hợp doanh thu, lượt xe, đặt chỗ và các chỉ số vận hành bãi đỗ xe.
           </p>
-        </div>
 
-        {/* ── Filter Toolbar ──────────────────────────────────── */}
-        <section className="reports-toolbar">
-          <div className="reports-form-field">
-            <label htmlFor="report-from">Từ ngày</label>
-            <input
-              id="report-from"
-              type="date"
-              className="reports-input"
-              value={fromDate}
-              onChange={(e) => {
-                setFromDate(e.target.value)
-                setPreset('custom')
-              }}
-            />
-          </div>
-          <div className="reports-form-field">
-            <label htmlFor="report-to">Đến ngày</label>
-            <input
-              id="report-to"
-              type="date"
-              className="reports-input"
-              value={toDate}
-              onChange={(e) => {
-                setToDate(e.target.value)
-                setPreset('custom')
-              }}
-            />
-          </div>
-          <div className="reports-form-field">
-            <label htmlFor="report-preset">Khoảng thời gian</label>
-            <select
-              id="report-preset"
-              className="reports-select"
-              value={preset}
-              onChange={(e) => handlePresetChange(e.target.value as Preset)}
-            >
-              {PRESET_LABELS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="reports-actions-group">
+          {/* ── Toolbar ─────────────────────────────────────── */}
+          <div className="toolbar-row card-panel" style={{ flexWrap: 'wrap' }}>
+            <div className="form-field" style={{ margin: 0, flex: '1 1 140px', maxWidth: 180 }}>
+              <label htmlFor="report-from">Từ ngày</label>
+              <input
+                id="report-from"
+                type="date"
+                value={fromDate}
+                onChange={(e) => { setFromDate(e.target.value); setPreset('custom') }}
+              />
+            </div>
+            <div className="form-field" style={{ margin: 0, flex: '1 1 140px', maxWidth: 180 }}>
+              <label htmlFor="report-to">Đến ngày</label>
+              <input
+                id="report-to"
+                type="date"
+                value={toDate}
+                onChange={(e) => { setToDate(e.target.value); setPreset('custom') }}
+              />
+            </div>
+            <div className="form-field" style={{ margin: 0, flex: '1 1 140px', maxWidth: 180 }}>
+              <label htmlFor="report-preset">Khoảng thời gian</label>
+              <select
+                id="report-preset"
+                value={preset}
+                onChange={(e) => handlePresetChange(e.target.value as Preset)}
+              >
+                {PRESET_LABELS.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </div>
             <button
               type="button"
-              className="reports-btn reports-btn-primary"
+              className="btn btn-primary"
+              style={{ alignSelf: 'flex-end', height: 'fit-content' }}
               onClick={handleApply}
               disabled={loading}
             >
-              {loading ? (
-                <>
-                  <Loader2 size={16} className="reports-loader-spin" /> Đang tải...
-                </>
-              ) : (
-                <>
-                  <TrendingUp size={16} /> Xem báo cáo
-                </>
-              )}
+              {loading ? <><Loader2 size={16} className="spin" /> Đang tải...</> : <><TrendingUp size={16} /> Xem báo cáo</>}
             </button>
             <button
               type="button"
-              className="reports-btn reports-btn-ghost"
-              onClick={() => handlePresetChange('30d')}
+              className="btn btn-ghost"
+              style={{ alignSelf: 'flex-end', height: 'fit-content' }}
+              onClick={() => { handlePresetChange('30d') }}
               disabled={loading}
             >
               <RefreshCw size={16} /> Làm mới
             </button>
           </div>
-        </section>
 
-        {/* ── Error Notification ──────────────────────────────── */}
-        {error && (
-          <div className="state-container" style={{ borderColor: '#fca5a5', color: '#b91c1c' }}>
-            <p className="state-title">Đã xảy ra lỗi</p>
-            <p>{error}</p>
-          </div>
-        )}
+          {/* ── Error ────────────────────────────────────────── */}
+          {error && (
+            <div className="card-panel" style={{ color: 'var(--danger, #ef4444)', marginTop: '1rem' }}>
+              {error}
+            </div>
+          )}
 
-        {/* ── Loading Overlay ─────────────────────────────────── */}
-        {loading && !summary && (
-          <div className="state-container">
-            <Loader2 size={32} className="reports-loader-spin" style={{ color: '#2563eb' }} />
-            <p className="state-title">Đang tổng hợp dữ liệu báo cáo...</p>
-          </div>
-        )}
+          {/* ── Loading ─────────────────────────────────────── */}
+          {loading && !summary && (
+            <div className="card-panel" style={{ textAlign: 'center', padding: '3rem 1rem', marginTop: '1.5rem' }}>
+              <Loader2 size={32} className="spin" style={{ margin: '0 auto 1rem' }} />
+              <p style={{ color: 'var(--text-muted)' }}>Đang tải dữ liệu báo cáo...</p>
+            </div>
+          )}
 
-        {/* ── CRM style Expandable Cards Grid ─────────────────── */}
-        {summary && (
-          <section className="crm-cards-grid">
-            
-            {/* Card A: Tổng doanh thu */}
-            <article className="crm-card">
-              <div className="crm-card-header" onClick={() => toggleCard('revenue')}>
-                <div className="crm-header-left">
-                  <div className="crm-icon-wrapper accent-revenue">
-                    <Banknote size={18} />
+          {/* ── Metrics Grid ────────────────────────────────── */}
+          {summary && summary.metrics.length > 0 && (
+            <div className="dashboard-grid" style={{ marginTop: '1.5rem' }}>
+              {summary.metrics.map((m) => (
+                <article key={m.key} className="stat-card card-panel">
+                  <div style={{ color: 'var(--blue-600)', marginBottom: '0.25rem' }}>
+                    {METRIC_ICONS[m.key] ?? <Activity size={22} />}
                   </div>
-                  <div className="crm-header-info">
-                    <span className="crm-card-label">Tổng doanh thu</span>
-                    <strong className="crm-card-value">
-                      {formatCurrency(getMetricValue('totalRevenue'))}
-                    </strong>
-                  </div>
-                </div>
-                <div className="crm-header-right">
-                  {expanded.revenue ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </div>
-              </div>
-              <AnimatePresence initial={false}>
-                {expanded.revenue && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    style={{ overflow: 'hidden' }}
-                  >
-                    <div className="crm-card-details">
-                      <div className="crm-detail-item">
-                        <span className="crm-detail-label">Doanh thu mua gói</span>
-                        <span className="crm-detail-value">
-                          {formatCurrency(getPaymentTypeAmount('SubscriptionFee'))}
-                        </span>
-                      </div>
-                      <div className="crm-detail-item">
-                        <span className="crm-detail-label">Doanh thu gia hạn gói</span>
-                        <span className="crm-detail-value">
-                          {formatCurrency(getPaymentTypeAmount('SubscriptionRenewal'))}
-                        </span>
-                      </div>
-                      <div className="crm-detail-item">
-                        <span className="crm-detail-label">Doanh thu đặt trước</span>
-                        <span className="crm-detail-value">
-                          {formatCurrency(getPaymentTypeAmount('Deposit'))}
-                        </span>
-                      </div>
-                      <div className="crm-detail-item">
-                        <span className="crm-detail-label">Doanh thu check-out</span>
-                        <span className="crm-detail-value">
-                          {formatCurrency(getPaymentTypeAmount('CheckoutFee'))}
-                        </span>
-                      </div>
-                      <div className="crm-detail-item">
-                        <span className="crm-detail-label">Số thanh toán thành công</span>
-                        <span className="crm-detail-value">
-                          {new Intl.NumberFormat('vi-VN').format(getMetricValue('successfulPayments'))} lượt
-                        </span>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </article>
+                  <strong style={{ fontSize: '1.35rem' }}>{metricDisplayValue(m)}</strong>
+                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                    {m.label}
+                  </span>
+                </article>
+              ))}
+            </div>
+          )}
 
-            {/* Card B: Tổng lượt ra vào */}
-            <article className="crm-card">
-              <div className="crm-card-header" onClick={() => toggleCard('traffic')}>
-                <div className="crm-header-left">
-                  <div className="crm-icon-wrapper accent-traffic">
-                    <DoorOpen size={18} />
-                  </div>
-                  <div className="crm-header-info">
-                    <span className="crm-card-label">Tổng lượt ra vào</span>
-                    <strong className="crm-card-value">
-                      {new Intl.NumberFormat('vi-VN').format(getMetricValue('entries') + getMetricValue('exits'))} lượt
-                    </strong>
-                  </div>
-                </div>
-                <div className="crm-header-right">
-                  {expanded.traffic ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </div>
-              </div>
-              <AnimatePresence initial={false}>
-                {expanded.traffic && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    style={{ overflow: 'hidden' }}
-                  >
-                    <div className="crm-card-details">
-                      <div className="crm-detail-item">
-                        <span className="crm-detail-label">Lượt xe vào</span>
-                        <span className="crm-detail-value">
-                          {new Intl.NumberFormat('vi-VN').format(getMetricValue('entries'))} lượt
-                        </span>
-                      </div>
-                      <div className="crm-detail-item">
-                        <span className="crm-detail-label">Lượt xe ra</span>
-                        <span className="crm-detail-value">
-                          {new Intl.NumberFormat('vi-VN').format(getMetricValue('exits'))} lượt
-                        </span>
-                      </div>
-                      <div className="crm-detail-item">
-                        <span className="crm-detail-label">Phiên đang gửi</span>
-                        <span className="crm-detail-value">
-                          {new Intl.NumberFormat('vi-VN').format(getMetricValue('activeSessions'))} phiên
-                        </span>
-                      </div>
-                      <div className="crm-detail-item">
-                        <span className="crm-detail-label">Phiên hoàn tất</span>
-                        <span className="crm-detail-value">
-                          {new Intl.NumberFormat('vi-VN').format(getMetricValue('completedSessions'))} phiên
-                        </span>
-                      </div>
-                      <div className="crm-detail-item">
-                        <span className="crm-detail-label">Thời gian gửi trung bình</span>
-                        <span className="crm-detail-value">
-                          {Math.round(getMetricValue('averageParkingMinutes'))} phút
-                        </span>
-                      </div>
-                      <div className="crm-detail-item">
-                        <span className="crm-detail-label">Lượt đặt chỗ</span>
-                        <span className="crm-detail-value">
-                          {new Intl.NumberFormat('vi-VN').format(getMetricValue('reservations'))} lượt
-                        </span>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </article>
-
-            {/* Card C: Các gói đang hoạt động */}
-            <article className="crm-card">
-              <div className="crm-card-header" onClick={() => toggleCard('subscriptions')}>
-                <div className="crm-header-left">
-                  <div className="crm-icon-wrapper accent-subscriptions">
-                    <Package size={18} />
-                  </div>
-                  <div className="crm-header-info">
-                    <span className="crm-card-label">Gói đang hoạt động</span>
-                    <strong className="crm-card-value">
-                      {new Intl.NumberFormat('vi-VN').format(getMetricValue('activeSubscriptions'))} gói
-                    </strong>
-                  </div>
-                </div>
-                <div className="crm-header-right">
-                  {expanded.subscriptions ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </div>
-              </div>
-              <AnimatePresence initial={false}>
-                {expanded.subscriptions && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    style={{ overflow: 'hidden' }}
-                  >
-                    <div className="crm-card-details">
-                      <div className="crm-detail-item">
-                        <span className="crm-detail-label">Gói tháng tạo mới</span>
-                        <span className="crm-detail-value">
-                          {new Intl.NumberFormat('vi-VN').format(getMetricValue('newSubscriptions'))} gói
-                        </span>
-                      </div>
-                      <div className="crm-detail-item">
-                        <span className="crm-detail-label">Gói tháng đang hoạt động</span>
-                        <span className="crm-detail-value">
-                          {new Intl.NumberFormat('vi-VN').format(getMetricValue('activeSubscriptions'))} gói
-                        </span>
-                      </div>
-                      <div className="crm-detail-item">
-                        <span className="crm-detail-label">Gói tháng hết hạn</span>
-                        <span className="crm-detail-value">
-                          {new Intl.NumberFormat('vi-VN').format(getMetricValue('expiredSubscriptions'))} gói
-                        </span>
-                      </div>
-                      <div className="crm-detail-item">
-                        <span className="crm-detail-label">Gói tháng sắp hết hạn</span>
-                        <span className="crm-detail-value">
-                          {new Intl.NumberFormat('vi-VN').format(getMetricValue('expiringSubscriptions'))} gói
-                        </span>
-                      </div>
-                      <div className="crm-detail-item">
-                        <span className="crm-detail-label">Tỷ lệ sử dụng chỗ đỗ</span>
-                        <span className="crm-detail-value">
-                          {getMetricValue('slotUtilizationRate')}%
-                        </span>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </article>
-
-            {/* Card D: Sự cố đang mở */}
-            <article className="crm-card">
-              <div className="crm-card-header" onClick={() => toggleCard('incidents')}>
-                <div className="crm-header-left">
-                  <div className="crm-icon-wrapper accent-incidents">
-                    <Activity size={18} />
-                  </div>
-                  <div className="crm-header-info">
-                    <span className="crm-card-label">Sự cố đang mở</span>
-                    <strong className="crm-card-value">
-                      {new Intl.NumberFormat('vi-VN').format(getMetricValue('openIncidents'))} sự cố
-                    </strong>
-                  </div>
-                </div>
-                <div className="crm-header-right">
-                  {expanded.incidents ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </div>
-              </div>
-              <AnimatePresence initial={false}>
-                {expanded.incidents && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    style={{ overflow: 'hidden' }}
-                  >
-                    <div className="crm-card-details">
-                      {getMetricValue('openIncidents') === 0 && getMetricValue('resolvedIncidents') === 0 ? (
-                        <div className="crm-empty-incidents">Không có sự cố trong kỳ này.</div>
-                      ) : (
-                        <>
-                          <div className="crm-detail-item">
-                            <span className="crm-detail-label">Sự cố đang mở</span>
-                            <span className="crm-detail-value" style={{ color: '#e11d48' }}>
-                              {getMetricValue('openIncidents')} sự cố
-                            </span>
-                          </div>
-                          <div className="crm-detail-item">
-                            <span className="crm-detail-label">Sự cố đã xử lý trong kỳ</span>
-                            <span className="crm-detail-value" style={{ color: '#10b981' }}>
-                              {getMetricValue('resolvedIncidents')} sự cố
-                            </span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </article>
-
-          </section>
-        )}
-
-        {/* ── Charts Grid Section ────────────────────────────── */}
-        {!loading && (
-          <section className="charts-grid">
-            
-            {/* Chart 1: Doanh thu theo ngày (Bar Chart) */}
-            <div className="chart-card">
-              <h3 className="chart-title">Doanh thu theo ngày</h3>
-              {formattedRevenueSeries.length === 0 ? (
-                <div className="state-container" style={{ minHeight: 260, border: 'none', padding: 0 }}>
-                  <TrendingUp size={24} style={{ color: '#94a3b8' }} />
-                  <p className="state-title" style={{ fontSize: '12px' }}>Không có dữ liệu doanh thu</p>
-                </div>
-              ) : (
-                <div style={{ width: '100%', height: 260 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={formattedRevenueSeries} margin={{ top: 10, right: 10, left: -10, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                      <XAxis
-                        dataKey="formattedDate"
-                        tick={{ fontSize: 12, fill: '#64748b', angle: -20, textAnchor: 'end' }}
-                        axisLine={false}
-                        tickLine={false}
-                        height={50}
-                        minTickGap={25}
-                      />
-                      <YAxis
-                        tickFormatter={currencyTick}
-                        tick={{ fontSize: 12, fill: '#64748b' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
+          {/* ── Charts Row ──────────────────────────────────── */}
+          {!loading && (revenueSeries.length > 0 || paymentTypePie.length > 0) && (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+                gap: '1.5rem',
+                marginTop: '1.5rem',
+              }}
+            >
+              {/* Bar Chart – Revenue Over Time */}
+              {revenueSeries.length > 0 && (
+                <div className="card-panel" style={{ padding: '1.25rem' }}>
+                  <h3 className="panel-subtitle">Doanh thu theo ngày</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={revenueSeries}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border, #e2e8f0)" />
+                      <XAxis dataKey="period" tick={{ fontSize: 12 }} />
+                      <YAxis tickFormatter={currencyTick} tick={{ fontSize: 12 }} />
                       <Tooltip
                         formatter={(value: unknown) => [formatCurrency(Number(value)), 'Doanh thu']}
                         labelFormatter={(label: unknown) => `Ngày: ${label}`}
-                        contentStyle={{ background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
                       />
-                      <Bar dataKey="amount" fill="#2563eb" radius={[4, 4, 0, 0]} maxBarSize={28} name="Doanh thu" />
+                      <Bar dataKey="amount" fill="#2563eb" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               )}
-            </div>
 
-            {/* Chart 2: Phân bổ doanh thu theo loại thanh toán (Pie Donut) */}
-            <div className="chart-card">
-              <h3 className="chart-title">Phân bổ doanh thu theo loại thanh toán</h3>
-              {translatedPaymentTypePie.length === 0 ? (
-                <div className="state-container" style={{ minHeight: 260, border: 'none', padding: 0 }}>
-                  <CreditCard size={24} style={{ color: '#94a3b8' }} />
-                  <p className="state-title" style={{ fontSize: '12px' }}>Không có dữ liệu phân bổ thanh toán</p>
-                </div>
-              ) : (
-                <div style={{ width: '100%', height: 260 }}>
-                  <ResponsiveContainer width="100%" height="100%">
+              {/* Pie Chart – Revenue by Payment Type */}
+              {paymentTypePie.length > 0 && (
+                <div className="card-panel" style={{ padding: '1.25rem' }}>
+                  <h3 className="panel-subtitle">Phân bổ doanh thu theo loại thanh toán</h3>
+                  <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie
-                        data={translatedPaymentTypePie}
+                        data={paymentTypePie}
                         dataKey="amount"
                         nameKey="name"
                         cx="50%"
-                        cy="45%"
-                        innerRadius={50}
-                        outerRadius={70}
-                        paddingAngle={2}
+                        cy="50%"
+                        outerRadius={100}
+                        label={(props: PieLabelRenderProps) =>
+                          `${props.name ?? ''}: ${((Number(props.percent) || 0) * 100).toFixed(1)}%`
+                        }
                       >
-                        {translatedPaymentTypePie.map((_, i) => (
-                          <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                        {paymentTypePie.map((_, i) => (
+                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip
-                        formatter={(value: unknown) => [formatCurrency(Number(value)), 'Tổng tiền']}
-                        contentStyle={{ background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
-                      />
-                      <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                      <Tooltip formatter={(value: unknown) => formatCurrency(Number(value))} />
+                      <Legend />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
               )}
             </div>
+          )}
 
-            {/* Chart 3: Lượt xe theo loại phương tiện (Bar Chart) */}
-            <div className="chart-card">
-              <h3 className="chart-title chart-title-purple">Lượt xe theo loại phương tiện</h3>
-              {translatedVehicleTypeBars.length === 0 ? (
-                <div className="state-container" style={{ minHeight: 260, border: 'none', padding: 0 }}>
-                  <Car size={24} style={{ color: '#94a3b8' }} />
-                  <p className="state-title" style={{ fontSize: '12px' }}>Không có dữ liệu lượt xe</p>
-                </div>
-              ) : (
-                <div style={{ width: '100%', height: 260 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={translatedVehicleTypeBars} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                      <XAxis
-                        dataKey="displayName"
-                        tick={{ fontSize: 12, fill: '#64748b', angle: -20, textAnchor: 'end' }}
-                        axisLine={false}
-                        tickLine={false}
-                        height={50}
-                      />
-                      <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <Tooltip
-                        formatter={(value: unknown) => [value, 'Lượt xe']}
-                        contentStyle={{ background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
-                      />
-                      <Bar dataKey="count" fill="#7c3aed" radius={[4, 4, 0, 0]} maxBarSize={28} name="Lượt xe">
-                        {translatedVehicleTypeBars.map((_, i) => (
-                          <Cell key={i} fill={CHART_COLORS[(i + 1) % CHART_COLORS.length]} />
+          {/* ── Charts Row 2 – Operations ────────────────────── */}
+          {!loading && (vehicleTypeBars.length > 0 || reservationPie.length > 0) && (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+                gap: '1.5rem',
+                marginTop: '1.5rem',
+              }}
+            >
+              {/* Bar Chart – Sessions by Vehicle Type */}
+              {vehicleTypeBars.length > 0 && (
+                <div className="card-panel" style={{ padding: '1.25rem' }}>
+                  <h3 className="panel-subtitle">Lượt xe theo loại phương tiện</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={vehicleTypeBars}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border, #e2e8f0)" />
+                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#16a34a" radius={[4, 4, 0, 0]}>
+                        {vehicleTypeBars.map((_, i) => (
+                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
                         ))}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               )}
-            </div>
 
-            {/* Chart 4: Trạng thái đặt chỗ (Pie Chart) */}
-            <div className="chart-card">
-              <h3 className="chart-title chart-title-purple">Trạng thái đặt chỗ</h3>
-              {translatedReservationPie.length === 0 ? (
-                <div className="state-container" style={{ minHeight: 260, border: 'none', padding: 0 }}>
-                  <CalendarCheck2 size={24} style={{ color: '#94a3b8' }} />
-                  <p className="state-title" style={{ fontSize: '12px' }}>Không có dữ liệu đặt chỗ</p>
-                </div>
-              ) : (
-                <div style={{ width: '100%', height: 260 }}>
-                  <ResponsiveContainer width="100%" height="100%">
+              {/* Pie Chart – Reservation Status */}
+              {reservationPie.length > 0 && (
+                <div className="card-panel" style={{ padding: '1.25rem' }}>
+                  <h3 className="panel-subtitle">Trạng thái đặt chỗ</h3>
+                  <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie
-                        data={translatedReservationPie}
+                        data={reservationPie}
                         dataKey="count"
                         nameKey="name"
                         cx="50%"
-                        cy="45%"
-                        innerRadius={50}
-                        outerRadius={70}
-                        paddingAngle={2}
+                        cy="50%"
+                        outerRadius={100}
+                        label={(props: PieLabelRenderProps) =>
+                          `${props.name ?? ''}: ${((Number(props.percent) || 0) * 100).toFixed(1)}%`
+                        }
                       >
-                        {translatedReservationPie.map((_, i) => (
-                          <Cell key={i} fill={CHART_COLORS[(i + 2) % CHART_COLORS.length]} />
+                        {reservationPie.map((_, i) => (
+                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip
-                        formatter={(value: unknown) => [value, 'Số lượng']}
-                        contentStyle={{ background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
-                      />
-                      <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                      <Tooltip />
+                      <Legend />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
               )}
             </div>
+          )}
 
-          </section>
-        )}
-
-        {/* ── Latest Payments Table ──────────────────────────── */}
-        {revenue && revenue.latestPayments && revenue.latestPayments.length > 0 && (
-          <section className="full-width-section">
-            <h3 className="section-title">Thanh toán gần đây</h3>
-            <div className="table-responsive">
-              <table className="custom-table">
+          {/* ── Latest Payments Table ────────────────────────── */}
+          {revenue && revenue.latestPayments && revenue.latestPayments.length > 0 && (
+            <div className="card-panel table-wrap" style={{ marginTop: '1.5rem' }}>
+              <h3 className="panel-subtitle">Thanh toán gần đây</h3>
+              <table className="ui-table">
                 <thead>
                   <tr>
                     <th>Mã thanh toán</th>
@@ -916,17 +489,13 @@ export default function ManagerReports() {
                 <tbody>
                   {revenue.latestPayments.map((p) => (
                     <tr key={p.paymentId}>
-                      <td>
-                        <code style={{ fontSize: '0.75rem', color: '#64748b' }}>{p.paymentId.slice(0, 8)}…</code>
-                      </td>
+                      <td><code style={{ fontSize: '0.8rem' }}>{p.paymentId.slice(0, 8)}…</code></td>
                       <td>{formatUtcToVietnamDateTime(p.paymentTime)}</td>
-                      <td>{translatePaymentType(p.paymentType)}</td>
+                      <td>{p.paymentType}</td>
                       <td>{p.paymentMethod}</td>
+                      <td><strong>{formatCurrency(p.amount)}</strong></td>
                       <td>
-                        <strong style={{ color: '#0f172a' }}>{formatCurrency(p.amount)}</strong>
-                      </td>
-                      <td>
-                        <span className={`badge-pill ${paymentStatusBadge(p.paymentStatus)}`}>
+                        <span className={`badge ${paymentStatusBadge(p.paymentStatus)}`}>
                           {p.paymentStatus}
                         </span>
                       </td>
@@ -935,15 +504,13 @@ export default function ManagerReports() {
                 </tbody>
               </table>
             </div>
-          </section>
-        )}
+          )}
 
-        {/* ── Latest Sessions Table ──────────────────────────── */}
-        {operations && operations.latestSessions && operations.latestSessions.length > 0 && (
-          <section className="full-width-section">
-            <h3 className="section-title">Phiên gửi xe gần đây</h3>
-            <div className="table-responsive">
-              <table className="custom-table">
+          {/* ── Latest Sessions Table ────────────────────────── */}
+          {operations && operations.latestSessions && operations.latestSessions.length > 0 && (
+            <div className="card-panel table-wrap" style={{ marginTop: '1.5rem' }}>
+              <h3 className="panel-subtitle">Phiên gửi xe gần đây</h3>
+              <table className="ui-table">
                 <thead>
                   <tr>
                     <th>Biển số</th>
@@ -956,14 +523,12 @@ export default function ManagerReports() {
                 <tbody>
                   {operations.latestSessions.map((s) => (
                     <tr key={s.sessionId}>
-                      <td>
-                        <strong style={{ color: '#0f172a' }}>{s.licensePlate}</strong>
-                      </td>
-                      <td>{translateVehicleType(s.vehicleTypeName) || '—'}</td>
+                      <td><strong>{s.licensePlate}</strong></td>
+                      <td>{s.vehicleTypeName || '—'}</td>
                       <td>{formatUtcToVietnamDateTime(s.entryTime)}</td>
                       <td>{s.exitTime ? formatUtcToVietnamDateTime(s.exitTime) : '—'}</td>
                       <td>
-                        <span className={`badge-pill ${sessionStatusBadge(s.status)}`}>
+                        <span className={`badge ${sessionStatusBadge(s.status)}`}>
                           {sessionStatusLabel(s.status)}
                         </span>
                       </td>
@@ -972,17 +537,16 @@ export default function ManagerReports() {
                 </tbody>
               </table>
             </div>
-          </section>
-        )}
+          )}
 
-        {/* ── Empty State ────────────────────────────────────── */}
-        {!loading && !error && !summary && !revenue && !operations && (
-          <section className="state-container">
-            <AlertTriangle size={36} style={{ color: '#e11d48' }} />
-            <p className="state-title">Không tìm thấy dữ liệu</p>
-            <p>Vui lòng thử chọn một khoảng thời gian khác.</p>
-          </section>
-        )}
+          {/* ── Empty state ──────────────────────────────────── */}
+          {!loading && !error && !summary && !revenue && !operations && (
+            <div className="card-panel" style={{ textAlign: 'center', padding: '3rem 1rem', marginTop: '1.5rem' }}>
+              <Car size={40} style={{ color: 'var(--text-muted)', marginBottom: '0.75rem' }} />
+              <p style={{ color: 'var(--text-muted)' }}>Không có dữ liệu trong khoảng thời gian này.</p>
+            </div>
+          )}
+        </div>
       </div>
     </ManagerPageShell>
   )
@@ -993,22 +557,22 @@ function paymentStatusBadge(status: string) {
   const s = (status || '').toLowerCase()
   if (s === 'success' || s === 'completed' || s === 'paid') return 'badge-paid'
   if (s === 'failed' || s === 'cancelled') return 'badge-cancelled'
-  return 'badge-pending'
+  return 'badge-history-pending'
 }
 
 function sessionStatusBadge(status: string) {
   const s = (status || '').toLowerCase()
-  if (s === 'active') return 'badge-active'
-  if (s === 'completed') return 'badge-completed'
-  if (s === 'cancelled') return 'badge-cancelled'
-  return 'badge-pending'
+  if (s === 'active') return 'badge-history-success'
+  if (s === 'completed') return 'badge-history-neutral'
+  if (s === 'cancelled') return 'badge-history-cancelled'
+  return 'badge-history-pending'
 }
 
 function sessionStatusLabel(status: string) {
   const s = (status || '').toLowerCase()
-  if (s === 'active') return 'Đang gửi'
-  if (s === 'completed') return 'Hoàn tất'
+  if (s === 'active') return '🟢 Đang gửi'
+  if (s === 'completed') return '✅ Hoàn tất'
   if (s === 'cancelled') return 'Đã hủy'
-  if (s === 'pending') return 'Chờ xử lý'
+  if (s === 'pending') return '🟡 Chờ xử lý'
   return status
 }

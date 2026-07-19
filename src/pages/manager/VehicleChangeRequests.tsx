@@ -167,17 +167,17 @@ export default function ManagerVehicleChangeRequests() {
 
   const getStatusBadgeClass = (status?: string) => {
     const s = (status || '').toLowerCase()
-    if (s === 'pending') return 'badge-pending'
-    if (s === 'approved') return 'badge-paid'
-    if (s === 'rejected') return 'badge-cancelled'
+    if (s === 'pending') return 'badge-history-pending'
+    if (s === 'approved') return 'badge-history-success'
+    if (s === 'rejected') return 'badge-history-cancelled'
     return 'badge-history-neutral'
   }
 
   const getStatusText = (status?: string) => {
     const s = (status || '').toLowerCase()
-    if (s === 'pending') return 'Chờ xử lý'
-    if (s === 'approved') return 'Đã duyệt'
-    if (s === 'rejected') return 'Từ chối'
+    if (s === 'pending') return '🟡 Chờ xử lý'
+    if (s === 'approved') return '🟢 Đã duyệt'
+    if (s === 'rejected') return '🔴 Từ chối'
     return status || '—'
   }
 
@@ -279,26 +279,27 @@ export default function ManagerVehicleChangeRequests() {
                       </td>
                       <td>
                         {(req.status || '').toLowerCase() === 'pending' ? (
-                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button
                               type="button"
                               className="btn btn-primary btn-sm"
                               title="Duyệt"
                               onClick={() => openApproveModal(req)}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', padding: '0.25rem 0.5rem' }}
                             >
                               <Check size={14} /> Duyệt
                             </button>
                             <button
                               type="button"
-                              className="btn btn-outline btn-sm"
+                              className="btn btn-ghost btn-sm"
                               title="Từ chối"
                               onClick={() => openRejectModal(req)}
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '4px',
-                                borderColor: 'var(--danger, #ef4444)',
+                                gap: '2px',
+                                padding: '0.25rem 0.5rem',
+                                border: '1px solid var(--border)',
                                 color: 'var(--danger, #ef4444)',
                               }}
                             >
@@ -306,7 +307,7 @@ export default function ManagerVehicleChangeRequests() {
                             </button>
                           </div>
                         ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', height: '28px', color: 'var(--text-muted)', paddingLeft: '0.5rem' }}>—</div>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>—</span>
                         )}
                       </td>
                     </tr>
