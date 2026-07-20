@@ -20,7 +20,7 @@ export default function ManagerPageShell({ activeItem, children }: ManagerPageSh
         activeItem={activeItem}
         onSelectItem={(id) => navigateManagerNav(id, navigate)}
       >
-        {children}
+        <div className="manager-page-canvas">{children}</div>
       </StaffLayout>
     </ProtectedRoute>
   )

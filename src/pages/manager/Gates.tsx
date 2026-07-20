@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { DoorOpen, Layers3, LogIn, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import ManagerConfirmActionModal from '../../components/ManagerConfirmActionModal'
 import ManagerPageShell from '../../components/ManagerPageShell'
 import { apiClient } from '../../config/api'
 
@@ -39,6 +40,10 @@ export default function ManagerGates() {
   const [editTarget, setEditTarget] = useState<Gate | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [query, setQuery] = useState('')
+  const [gateTypeFilter, setGateTypeFilter] = useState('all')
+  const [floorFilter, setFloorFilter] = useState('all')
+  const [deleteTarget, setDeleteTarget] = useState<Gate | null>(null)
 
   // Load supporting floors list for the FloorId selector.
   const fetchFloors = async () => {
@@ -61,12 +66,10 @@ export default function ManagerGates() {
       if (res.isSuccess && res.result) {
         setGates(res.result)
       } else {
-        alert('Không thể tải danh sách cổng.')
         setError('Không thể tải danh sách cổng.')
       }
     } catch (err: unknown) {
       console.error(err)
-      alert('Không thể tải danh sách cổng.')
       setError('Không thể tải danh sách cổng.')
     } finally {
       setLoading(false)
@@ -134,106 +137,91 @@ export default function ManagerGates() {
     }
   }
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Xóa cổng "${name}"?`)) return
-    try {
-      await apiClient.delete<ApiResponse<unknown>>(`/Gate/${id}`)
-      await fetchGates()
-    } catch (err) {
-      console.error(err)
-      alert('Xóa thất bại. Vui lòng thử lại.')
-    }
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    const response = await apiClient.delete<ApiResponse<unknown>>(`/Gate/${deleteTarget.gateId}`)
+    if (!response.isSuccess) throw new Error(response.message ?? 'Không thể xóa cổng.')
+    setDeleteTarget(null)
+    await fetchGates()
   }
+
+  const normalizedQuery = query.trim().toLowerCase()
+  const filteredGates = gates.filter((gate) => {
+    const matchesQuery = !normalizedQuery ||
+      gate.gateName.toLowerCase().includes(normalizedQuery) ||
+      (gate.floorName ?? '').toLowerCase().includes(normalizedQuery)
+    const matchesType = gateTypeFilter === 'all' || gate.gateType.toLowerCase() === gateTypeFilter
+    const matchesFloor = floorFilter === 'all' || gate.floorId === floorFilter
+    return matchesQuery && matchesType && matchesFloor
+  })
+  const hasSelectFilters = gateTypeFilter !== 'all' || floorFilter !== 'all'
+  const entryCount = gates.filter((gate) => gate.gateType.toLowerCase() === 'entry').length
+  const exitCount = gates.filter((gate) => gate.gateType.toLowerCase() === 'exit').length
+  const assignedFloorCount = new Set(gates.map((gate) => gate.floorId).filter(Boolean)).size
 
   return (
     <ManagerPageShell activeItem="gates">
-      <div className="staff-content-wrapper">
-        <div className="staff-section">
-          <h2>Quản lý cổng ra vào</h2>
-          <p className="section-desc">Thêm, sửa, xóa cổng ra vào bãi xe.</p>
+      <div className="staff-content-wrapper manager-resource-page">
+        <header className="manager-resource-header">
+          <div className="manager-resource-title">
+            <span className="manager-resource-icon manager-resource-icon--green"><DoorOpen size={24} aria-hidden /></span>
+            <div><h2>Quản lý cổng ra vào</h2><p>Thiết lập cổng vào, cổng ra và vị trí tầng phục vụ vận hành bãi xe.</p></div>
+          </div>
+          <div className="manager-header-actions"><button type="button" className="btn btn-outline" onClick={fetchGates} disabled={loading}><RefreshCw size={17} className={loading ? 'spin' : ''} aria-hidden /> Làm mới</button><button type="button" className="btn btn-primary manager-add-button" onClick={openCreate}><Plus size={18} aria-hidden /> Thêm cổng</button></div>
+        </header>
 
-          <div className="toolbar-row card-panel">
-            <p style={{ margin: 0, color: 'var(--text-muted)' }}>
-              {loading ? 'Đang tải...' : `${gates.length} cổng ra vào`}
-            </p>
-            <button type="button" className="btn btn-primary" onClick={openCreate}>
-              <Plus size={18} aria-hidden />
-              Thêm cổng
-            </button>
+        <section className="manager-summary-grid manager-summary-grid--three" aria-label="Tổng quan cổng ra vào">
+          <article className="manager-summary-card"><span>Tổng số cổng</span><strong>{gates.length}</strong><small>Đang cấu hình trong hệ thống</small></article>
+          <article className="manager-summary-card manager-summary-card--green"><span>Cổng vào / Cổng ra</span><strong>{entryCount} / {exitCount}</strong><small>Phân bổ theo hướng di chuyển</small></article>
+          <article className="manager-summary-card manager-summary-card--purple"><span>Tầng đã bố trí cổng</span><strong>{assignedFloorCount}</strong><small>Trên tổng số {floors.length} tầng</small></article>
+        </section>
+
+        <section className="card-panel manager-resource-panel">
+          <div className="manager-resource-toolbar manager-resource-toolbar--wrap">
+            <label className="manager-search-field" htmlFor="gate-search"><Search size={18} aria-hidden /><input id="gate-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm theo tên cổng hoặc tầng..." />{query && <button type="button" aria-label="Xóa tìm kiếm" onClick={() => setQuery('')}><X size={16} aria-hidden /></button>}</label>
+            <div className="manager-filter-controls"><select aria-label="Lọc loại cổng" value={gateTypeFilter} onChange={(event) => setGateTypeFilter(event.target.value)}><option value="all">Tất cả loại cổng</option><option value="entry">Cổng vào</option><option value="exit">Cổng ra</option></select><select aria-label="Lọc tầng phục vụ" value={floorFilter} onChange={(event) => setFloorFilter(event.target.value)}><option value="all">Tất cả tầng</option>{floors.map((floor) => <option key={floor.floorId} value={floor.floorId}>{floor.floorName}</option>)}</select></div>
+            <div className="manager-filter-actions"><span>{filteredGates.length}/{gates.length} cổng</span>{hasSelectFilters && <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setGateTypeFilter('all'); setFloorFilter('all') }}><X size={15} aria-hidden /> Xóa lọc</button>}</div>
           </div>
 
-          {error && (
-            <div className="card-panel" style={{ color: 'var(--danger, #ef4444)', marginBottom: '1rem' }}>
-              {error}
-            </div>
-          )}
+          {error && <div className="manager-inline-error" role="alert">{error}</div>}
 
-          <div className="card-panel" style={{ marginTop: '1rem' }}>
-            {loading && gates.length === 0 ? (
-              <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Đang tải...</p>
-            ) : (
-              <table className="ui-table">
+          <div className="table-wrap manager-table-wrap">
+              <table className="ui-table manager-resource-table manager-gate-table">
                 <thead>
                   <tr>
                     <th>Tên cổng</th>
                     <th>Tầng</th>
                     <th>Loại cổng</th>
-                    <th style={{ width: '150px' }}>Thao tác</th>
+                    <th>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {gates.length === 0 ? (
+                  {loading && gates.length === 0 ? (
+                    <tr><td colSpan={4}><div className="manager-empty-state">Đang tải danh sách cổng...</div></td></tr>
+                  ) : filteredGates.length === 0 ? (
                     <tr>
-                      <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-                        Chưa có cổng ra vào nào.
-                      </td>
+                      <td colSpan={4}><div className="manager-empty-state"><DoorOpen size={32} aria-hidden /><strong>{query ? 'Không tìm thấy cổng phù hợp' : 'Chưa có cổng ra vào'}</strong><span>{query ? 'Hãy thử từ khóa khác.' : 'Hãy thêm cổng đầu tiên để bắt đầu vận hành.'}</span></div></td>
                     </tr>
                   ) : (
-                    gates.map((g) => (
+                    filteredGates.map((g) => (
                       <tr key={g.gateId}>
-                        <td>{g.gateName}</td>
-                        <td>{g.floorName || '—'}</td>
+                        <td><div className="manager-name-cell"><span>{g.gateType === 'Entry' ? <LogIn size={18} aria-hidden /> : <LogOut size={18} aria-hidden />}</span><strong>{g.gateName}</strong></div></td>
+                        <td><span className="manager-gate-floor"><Layers3 size={15} aria-hidden />{g.floorName || 'Chưa xác định'}</span></td>
                         <td>
-                          <span
-                            className="badge"
-                            style={{
-                              backgroundColor: g.gateType === 'Entry' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-                              color: g.gateType === 'Entry' ? '#047857' : '#1d4ed8',
-                              padding: '0.25rem 0.5rem',
-                              borderRadius: '4px',
-                              fontWeight: '600',
-                            }}
-                          >
+                          <span className={`manager-gate-badge ${g.gateType === 'Entry' ? 'entry' : 'exit'}`}>
                             {g.gateType === 'Entry' ? 'Cổng vào' : g.gateType === 'Exit' ? 'Cổng ra' : g.gateType}
                           </span>
                         </td>
                         <td>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button
-                              type="button"
-                              className="btn btn-outline btn-sm"
-                              onClick={() => openEdit(g)}
-                            >
-                              Sửa
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-outline btn-sm"
-                              style={{ borderColor: 'var(--danger, #ef4444)', color: 'var(--danger, #ef4444)' }}
-                              onClick={() => handleDelete(g.gateId, g.gateName)}
-                            >
-                              Xóa
-                            </button>
-                          </div>
+                          <div className="manager-row-actions"><button type="button" className="btn btn-outline btn-sm manager-edit-button" onClick={() => openEdit(g)}><Pencil size={15} aria-hidden /> Sửa</button><button type="button" className="btn btn-ghost btn-sm manager-danger-action" onClick={() => setDeleteTarget(g)}><Trash2 size={15} aria-hidden /> Xóa</button></div>
                         </td>
                       </tr>
                     ))
                   )}
                 </tbody>
               </table>
-            )}
           </div>
-        </div>
+        </section>
       </div>
 
       {/* Create / Edit Modal */}
@@ -244,8 +232,8 @@ export default function ManagerGates() {
             if (e.target === e.currentTarget) closeModal()
           }}
         >
-          <div className="modal-panel">
-            <h3 className="modal-title">{editTarget ? 'Sửa cổng' : 'Thêm cổng'}</h3>
+          <div className="modal-panel manager-form-modal" role="dialog" aria-modal="true" aria-labelledby="gate-modal-title">
+            <div className="manager-modal-header"><div><h3 id="gate-modal-title" className="modal-title">{editTarget ? 'Cập nhật cổng' : 'Thêm cổng mới'}</h3><p>Chọn đúng tầng và hướng di chuyển của cổng.</p></div><button type="button" className="btn btn-ghost btn-sm" aria-label="Đóng" onClick={closeModal} disabled={saving}><X size={20} aria-hidden /></button></div>
             <form onSubmit={handleSave}>
               <div className="form-field">
                 <label htmlFor="gate-name">Tên cổng *</label>
@@ -280,22 +268,23 @@ export default function ManagerGates() {
                   value={form.gateType}
                   onChange={(e) => setForm({ ...form, gateType: e.target.value })}
                 >
-                  <option value="Entry">Cổng vào (Entry)</option>
-                  <option value="Exit">Cổng ra (Exit)</option>
+                  <option value="Entry">Cổng vào</option>
+                  <option value="Exit">Cổng ra</option>
                 </select>
               </div>
               <div className="form-actions">
                 <button type="button" className="btn btn-ghost" onClick={closeModal}>
-                  Huỷ
+                  Hủy
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                  {saving ? 'Đang lưu...' : 'Lưu'}
+                  {saving ? 'Đang lưu...' : editTarget ? 'Lưu thay đổi' : 'Thêm cổng'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+      <ManagerConfirmActionModal open={Boolean(deleteTarget)} title="Xóa cổng?" description={<>Bạn có chắc muốn xóa cổng <strong>{deleteTarget?.gateName}</strong>? Hành động này không thể hoàn tác.</>} targetLabel={deleteTarget?.gateName} targetMeta={deleteTarget ? `${deleteTarget.gateType === 'Entry' ? 'Cổng vào' : 'Cổng ra'} · ${deleteTarget.floorName || 'Chưa rõ tầng'}` : undefined} targetIcon={<DoorOpen size={18} aria-hidden />} note="Cổng đang được sử dụng trong phiên ra vào có thể không xóa được." errorFallback="Không thể xóa cổng." onCancel={() => setDeleteTarget(null)} onConfirm={handleDelete} />
     </ManagerPageShell>
   )
 }

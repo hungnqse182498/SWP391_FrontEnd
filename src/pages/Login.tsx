@@ -1,16 +1,16 @@
-import { AlertCircle, ArrowLeft, Lock, LogIn, Mail } from 'lucide-react'
+import { AlertCircle, ArrowLeft, LogIn, Eye, EyeOff } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
-import FormField from '../components/FormField'
-import { DEMO_USER, useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/AuthContext'
 
 const LOGO_SRC = '/image/logo.png'
 
 export default function Login() {
   const { login, isAuthenticated, user, isLoading } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState(DEMO_USER.email)
-  const [password, setPassword] = useState('123456')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
 
   if (isAuthenticated) {
@@ -56,8 +56,52 @@ export default function Login() {
           <p>Đăng nhập để đặt chỗ đỗ xe.</p>
         </div>
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
-          <FormField label="Email" name="email" id="email" type="email" icon={Mail} autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@easyparking.vn" disabled={isLoading} />
-          <FormField label="Mật khẩu" name="password" id="password" type="password" icon={Lock} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••" disabled={isLoading} />
+          <div className="form-field">
+            <label htmlFor="email">Email</label>
+            <input
+              id="email"
+              type="email"
+              placeholder="Nhập email của bạn"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="input-standalone"
+              autoComplete="email"
+              disabled={isLoading}
+            />
+          </div>
+          <div className="form-field">
+            <label htmlFor="password">Mật khẩu</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Nhập mật khẩu của bạn"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="input-standalone"
+                autoComplete="current-password"
+                disabled={isLoading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
           {error && <p className="form-error form-error--row"><AlertCircle size={16} strokeWidth={2} aria-hidden />{error}</p>}
           <button type="submit" className="btn btn-primary btn-block" disabled={isLoading}><LogIn size={18} strokeWidth={2} aria-hidden />{isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}</button>
         </form>

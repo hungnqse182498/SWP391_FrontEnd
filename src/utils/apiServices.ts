@@ -24,6 +24,17 @@ export interface VehicleTypeDto {
   typeName: string
 }
 
+export interface ParkingSlotDto {
+  slotId: string
+  floorId: string
+  floorName?: string
+  slotCode: string
+  vehicleTypeId: string
+  vehicleTypeName?: string
+  status: string
+  isResident: boolean
+}
+
 export interface GateDto {
   gateId: string
   gateName: string
@@ -57,7 +68,9 @@ export interface ReservationPaymentStatusResponse {
 export interface ReservationDto {
   reservationId: string
   userId: string
+  userFullName?: string
   vehicleTypeId: string
+  vehicleTypeName?: string
   expectedEntryTime: string
   status: string
   createdAt?: string
@@ -75,6 +88,7 @@ export interface ReservationDto {
 
 export interface MonthlySubscriptionDto {
   subscriptionId: string
+  userId: string
   fullName?: string
   licensePlate: string
   vehicleType?: string
@@ -128,8 +142,6 @@ export interface SubscriptionRenewalDto {
 export interface ParkingSessionDto {
   sessionId: string
   reservationId?: string
-  cardId?: string
-  cardCode?: string
   driverUserId?: string
   driverFullName?: string
   licensePlateIn: string
@@ -245,7 +257,7 @@ export const reservationApi = {
 export const subscriptionApi = {
   getPackages: () => apiClient.get<ApiResponse<SubscriptionPackageDto[]>>('/SubscriptionPackage'),
 
-  register: (data: { packageId: string; licensePlate: string; startDateUtc: string }) =>
+  register: (data: { packageId: string; licensePlate: string; fixedSlotId?: string }) =>
     apiClient.post<ApiResponse<RegisterMonthlySubscriptionPaymentDto>>('/MonthlySubscription/register', data),
 
   createPayment: (subscriptionId: string) =>
@@ -261,6 +273,10 @@ export const subscriptionApi = {
 
 export const vehicleTypeApi = {
   getAll: () => apiClient.get<ApiResponse<VehicleTypeDto[]>>('/VehicleType'),
+}
+
+export const parkingSlotApi = {
+  getAll: () => apiClient.get<ApiResponse<ParkingSlotDto[]>>('/ParkingSlot'),
 }
 
 export const subscriptionRenewalApi = {

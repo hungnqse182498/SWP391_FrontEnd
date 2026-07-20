@@ -174,7 +174,7 @@ export default function Header() {
                       </Link>
                       <Link to="/dat-cho" role="menuitem" onClick={closeMenu}>
                         <Car size={16} strokeWidth={2} aria-hidden />
-                        {user?.role === 'customer' ? 'Đặt chỗ khách tháng' : 'Đặt chỗ theo giờ'}
+                        Đặt chỗ theo giờ
                       </Link>
                       {user?.role === 'user' && (
                         <Link to="/dang-ky-thang" role="menuitem" onClick={closeMenu}>

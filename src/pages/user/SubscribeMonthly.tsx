@@ -2,8 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { Bike, CalendarDays, Car, CreditCard } from 'lucide-react'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { useAuth } from '../../context/AuthContext'
-import { subscriptionApi, type SubscriptionPackageDto } from '../../utils/apiServices'
-import { toUtcIsoString } from '../../utils/dateTime'
+import {
+  parkingSlotApi,
+  subscriptionApi,
+  type ParkingSlotDto,
+  type SubscriptionPackageDto,
+} from '../../utils/apiServices'
 import { formatCurrency } from '../../utils/pricing'
 
 type VehicleFilter = 'all' | 'car' | 'bike'
@@ -50,6 +54,9 @@ function SubscribeContent() {
   const [packages, setPackages] = useState<SubscriptionPackageDto[]>([])
   const [selectedPackageId, setSelectedPackageId] = useState('')
   const [licensePlate, setLicensePlate] = useState(profile?.vehiclePlate ?? '')
+  const [availableFixedSlots, setAvailableFixedSlots] = useState<ParkingSlotDto[]>([])
+  const [selectedFixedSlotId, setSelectedFixedSlotId] = useState('')
+  const [loadingSlots, setLoadingSlots] = useState(false)
   const [loadingPackages, setLoadingPackages] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -74,8 +81,14 @@ function SubscribeContent() {
     visiblePackages[0] ??
     null
 
+  const requiresFixedSlot = Boolean(
+    selectedPackage?.requireFixedSlot && getVehicleFilter(selectedPackage) !== 'bike',
+  )
+
   useEffect(() => {
-    if (profile?.vehiclePlate) setLicensePlate(profile.vehiclePlate)
+    if (!profile?.vehiclePlate) return undefined
+    const timer = window.setTimeout(() => setLicensePlate(profile.vehiclePlate), 0)
+    return () => window.clearTimeout(timer)
   }, [profile])
 
   useEffect(() => {
@@ -109,14 +122,55 @@ function SubscribeContent() {
   }, [])
 
   useEffect(() => {
-    if (!selectedPackage) {
-      setSelectedPackageId('')
-      return
-    }
-    if (selectedPackage.packageId !== selectedPackageId) {
-      setSelectedPackageId(selectedPackage.packageId)
-    }
+    const nextPackageId = selectedPackage?.packageId ?? ''
+    if (nextPackageId === selectedPackageId) return undefined
+
+    const timer = window.setTimeout(() => setSelectedPackageId(nextPackageId), 0)
+    return () => window.clearTimeout(timer)
   }, [selectedPackage, selectedPackageId])
+
+  useEffect(() => {
+    let ignore = false
+
+    if (!selectedPackage || !requiresFixedSlot) return undefined
+
+    const loadAvailableSlots = async () => {
+      setLoadingSlots(true)
+      try {
+        const res = await parkingSlotApi.getAll()
+        if (ignore) return
+
+        if (res.isSuccess && Array.isArray(res.result)) {
+          const matchingSlots = res.result.filter(
+            (slot) =>
+              slot.isResident &&
+              slot.vehicleTypeId === selectedPackage.vehicleTypeId &&
+              slot.status.toLowerCase() === 'available',
+          )
+          setAvailableFixedSlots(matchingSlots)
+          setSelectedFixedSlotId(matchingSlots[0]?.slotId ?? '')
+        } else {
+          setAvailableFixedSlots([])
+          setSelectedFixedSlotId('')
+          setError(res.message || 'Không thể tải danh sách vị trí đỗ cư dân.')
+        }
+      } catch (err) {
+        console.error(err)
+        if (!ignore) {
+          setAvailableFixedSlots([])
+          setSelectedFixedSlotId('')
+          setError(getApiErrorMessage(err) || 'Không thể tải danh sách vị trí đỗ cư dân.')
+        }
+      } finally {
+        if (!ignore) setLoadingSlots(false)
+      }
+    }
+
+    void loadAvailableSlots()
+    return () => {
+      ignore = true
+    }
+  }, [requiresFixedSlot, selectedPackage])
 
   const handleSubscribe = async () => {
     if (!selectedPackage) {
@@ -127,6 +181,10 @@ function SubscribeContent() {
       setError('Vui lòng nhập biển số xe.')
       return
     }
+    if (requiresFixedSlot && !selectedFixedSlotId) {
+      setError('Gói này yêu cầu chọn vị trí đỗ cố định nhưng hiện chưa có vị trí phù hợp.')
+      return
+    }
 
     setSubmitting(true)
     setError('')
@@ -134,7 +192,7 @@ function SubscribeContent() {
       const res = await subscriptionApi.register({
         packageId: selectedPackage.packageId,
         licensePlate: licensePlate.trim(),
-        startDateUtc: toUtcIsoString(new Date()),
+        fixedSlotId: requiresFixedSlot ? selectedFixedSlotId : undefined,
       })
 
       if (res.isSuccess && res.result?.paymentUrl) {
@@ -210,10 +268,42 @@ function SubscribeContent() {
                   <small>
                     <CalendarDays size={14} /> Thời hạn: {pkg.durationMonths} tháng
                   </small>
-                  {pkg.requireFixedSlot && <small>Yêu cầu ô đỗ cố định</small>}
+                  {getVehicleFilter(pkg) === 'car' && (
+                    <small>
+                      {pkg.requireFixedSlot
+                        ? 'Bạn được chọn vị trí ô tô cố định'
+                        : 'Hệ thống phân vị trí ô tô ngẫu nhiên'}
+                    </small>
+                  )}
                 </button>
               ))}
             </div>
+          )}
+
+          {requiresFixedSlot && (
+            <label className="hero-field" style={{ marginTop: '1rem' }}>
+              <span>Vị trí đỗ cố định tại tầng cư dân</span>
+              <div>
+                <Car size={18} />
+                <select
+                  value={selectedFixedSlotId}
+                  disabled={loadingSlots || availableFixedSlots.length === 0}
+                  onChange={(event) => setSelectedFixedSlotId(event.target.value)}
+                >
+                  {loadingSlots ? (
+                    <option value="">Đang tải vị trí...</option>
+                  ) : availableFixedSlots.length === 0 ? (
+                    <option value="">Không còn vị trí phù hợp</option>
+                  ) : (
+                    availableFixedSlots.map((slot) => (
+                      <option key={slot.slotId} value={slot.slotId}>
+                        {slot.slotCode} - {slot.floorName || 'Tầng cư dân'}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+            </label>
           )}
         </div>
       </div>
@@ -228,7 +318,13 @@ function SubscribeContent() {
         <button
           type="button"
           className="btn btn-primary"
-          disabled={loadingPackages || submitting || !selectedPackage}
+          disabled={
+            loadingPackages ||
+            loadingSlots ||
+            submitting ||
+            !selectedPackage ||
+            (requiresFixedSlot && !selectedFixedSlotId)
+          }
           onClick={handleSubscribe}
         >
           <CreditCard size={18} />

@@ -73,12 +73,12 @@ export class AuthService {
 
       if (response.isSuccess && response.result?.accessToken) {
         this.api.setToken(response.result.accessToken)
-        localStorage.setItem('refresh_token', response.result.refreshToken)
-        localStorage.setItem('user_email', response.result.user.email)
-        localStorage.setItem('user_name', response.result.user.fullName)
-        localStorage.setItem('user_role', response.result.user.roleName)
-        localStorage.setItem('user_id', response.result.user.userId)
-        localStorage.setItem('user_phone', response.result.user.phoneNumber ?? '')
+        sessionStorage.setItem('refresh_token', response.result.refreshToken)
+        sessionStorage.setItem('user_email', response.result.user.email)
+        sessionStorage.setItem('user_name', response.result.user.fullName)
+        sessionStorage.setItem('user_role', response.result.user.roleName)
+        sessionStorage.setItem('user_id', response.result.user.userId)
+        sessionStorage.setItem('user_phone', response.result.user.phoneNumber ?? '')
         return response
       }
 
@@ -136,13 +136,25 @@ export class AuthService {
   }
 
   async logout() {
-    this.api.clearToken()
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('user_email')
-    localStorage.removeItem('user_name')
-    localStorage.removeItem('user_role')
-    localStorage.removeItem('user_id')
-    localStorage.removeItem('user_phone')
+    const refreshTokenKey = sessionStorage.getItem('refresh_token')
+
+    try {
+      if (refreshTokenKey) {
+        await this.api.post(API_ENDPOINTS.AUTH_LOGOUT, { refreshTokenKey })
+      }
+    } catch (error) {
+      // A failed revoke request must not prevent the user from ending the
+      // current browser session.
+      console.error('Logout API error:', error)
+    } finally {
+      this.api.clearToken()
+      sessionStorage.removeItem('refresh_token')
+      sessionStorage.removeItem('user_email')
+      sessionStorage.removeItem('user_name')
+      sessionStorage.removeItem('user_role')
+      sessionStorage.removeItem('user_id')
+      sessionStorage.removeItem('user_phone')
+    }
   }
 
   async refreshToken(): Promise<RefreshTokenResponse> {
@@ -163,13 +175,13 @@ export class AuthService {
 
   // Get stored user info
   getStoredUser() {
-    if (!localStorage.getItem('auth_token')) return null
+    if (!sessionStorage.getItem('auth_token')) return null
 
-    const email = localStorage.getItem('user_email')
-    const name = localStorage.getItem('user_name')
-    const role = localStorage.getItem('user_role')
-    const userId = localStorage.getItem('user_id')
-    const phone = localStorage.getItem('user_phone')
+    const email = sessionStorage.getItem('user_email')
+    const name = sessionStorage.getItem('user_name')
+    const role = sessionStorage.getItem('user_role')
+    const userId = sessionStorage.getItem('user_id')
+    const phone = sessionStorage.getItem('user_phone')
 
     if (!email) return null
 
@@ -184,7 +196,7 @@ export class AuthService {
 
   // Check if user is authenticated
   isAuthenticated(): boolean {
-    return !!localStorage.getItem('auth_token')
+    return !!sessionStorage.getItem('auth_token')
   }
 }
 

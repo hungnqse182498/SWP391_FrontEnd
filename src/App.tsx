@@ -34,8 +34,6 @@ import AdminSystemConfig from './pages/admin/SystemConfig'
 
 import ManagerDashboard from './pages/manager/Dashboard'
 
-import ManagerBuildingInfo from './pages/manager/BuildingInfo'
-
 import ManagerVehicleTypes from './pages/manager/VehicleTypes'
 
 import ManagerFloorAssignment from './pages/manager/FloorAssignment'
@@ -46,13 +44,14 @@ import ManagerPricing from './pages/manager/Pricing'
 
 import ManagerReports from './pages/manager/Reports'
 
-import ManagerAdvanced from './pages/manager/Advanced'
-
 import ManagerGates from './pages/manager/Gates'
 
 import ManagerSubscriptionPackages from './pages/manager/SubscriptionPackages'
+import ManagerMonthlySubscriptions from './pages/manager/MonthlySubscriptions'
 
-import ManagerSubscriptionRenewals from './pages/manager/SubscriptionRenewals'
+import ManagerParkingSessions from './pages/manager/ParkingSessions'
+import ManagerPayments from './pages/manager/Payments'
+import ManagerVehicleChangeRequests from './pages/manager/VehicleChangeRequests'
 
 import UserBooking from './pages/user/Booking'
 
@@ -135,8 +134,6 @@ export default function App() {
 
               <Route path="manager/dashboard" element={<ManagerDashboard />} />
 
-              <Route path="manager/building" element={<ManagerBuildingInfo />} />
-
               <Route path="manager/vehicle-types" element={<ManagerVehicleTypes />} />
 
               <Route path="manager/floor-assignment" element={<ManagerFloorAssignment />} />
@@ -147,13 +144,16 @@ export default function App() {
 
               <Route path="manager/reports" element={<ManagerReports />} />
 
-              <Route path="manager/advanced" element={<ManagerAdvanced />} />
-
               <Route path="manager/gates" element={<ManagerGates />} />
 
               <Route path="manager/subscriptions" element={<ManagerSubscriptionPackages />} />
+              <Route path="manager/monthly-subscriptions" element={<ManagerMonthlySubscriptions />} />
 
-              <Route path="manager/renewals" element={<ManagerSubscriptionRenewals />} />
+              <Route path="manager/sessions" element={<ManagerParkingSessions />} />
+
+              <Route path="manager/payments" element={<ManagerPayments />} />
+
+              <Route path="manager/vehicle-change-requests" element={<ManagerVehicleChangeRequests />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
 

@@ -1,17 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { AlertTriangle, Bike, CalendarDays, Car, MapPin } from 'lucide-react'
+import { AlertTriangle, CalendarDays, Car, MapPin } from 'lucide-react'
 import BookingSteps from '../../components/BookingSteps'
-import ParkingMap from '../../components/ParkingMap'
 import ProtectedRoute from '../../components/ProtectedRoute'
-import { useAuth } from '../../context/AuthContext'
 import { useBooking } from '../../context/BookingContext'
-import { parkingFloors } from '../../data/parkingFloors'
-import type { ParkingFloor } from '../../types/parking'
-import {
-  filterCustomerFloors,
-  vehicleTypeLabel,
-} from '../../utils/bookingPricing'
+import { vehicleTypeLabel } from '../../utils/bookingPricing'
 
 function CancellationPolicy() {
   return (
@@ -64,17 +57,11 @@ function PriceTable() {
 function BookingContent() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user } = useAuth()
   const { setDraft, getPolicy } = useBooking()
 
-  const isCustomer = user?.role === 'customer'
-  const locationState = location.state as { vehicle?: 'car' | 'bike'; startTime?: string } | null
-  const initialVehicle = isCustomer
-    ? (locationState?.vehicle ?? 'car')
-    : 'car'
+  const locationState = location.state as { startTime?: string } | null
   const initialStartTime = locationState?.startTime ?? ''
 
-  const [vehicle, setVehicle] = useState<'car' | 'bike'>(initialVehicle)
   const [startTime, setStartTime] = useState<string>(() => {
     if (initialStartTime) return initialStartTime
     const now = new Date()
@@ -83,11 +70,6 @@ function BookingContent() {
     const tzoffset = now.getTimezoneOffset() * 60000
     return new Date(now.getTime() - tzoffset).toISOString().slice(0, 16)
   })
-
-  const customerFloors = useMemo(
-    () => filterCustomerFloors(vehicle, parkingFloors) as ParkingFloor[],
-    [vehicle],
-  )
 
   const handlePreRegisterSubmit = () => {
     if (!startTime) {
@@ -162,53 +144,15 @@ function BookingContent() {
             </div>
 
             <h1>
-              {isCustomer ? 'Chọn chỗ đỗ tháng' : 'Đăng ký giữ chỗ trước'}
-              <span>{isCustomer ? 'chọn tầng & vị trí' : 'chọn giờ vào bãi'}</span>
+              Đăng ký giữ chỗ trước
+              <span>chọn giờ vào bãi</span>
             </h1>
 
             <p className="home-hero-lead">
-              {isCustomer
-                ? 'Khách hàng tháng: chọn tầng và ô đỗ cố định theo loại xe của bạn.'
-                : 'Đặt trước chỉ dành cho ô tô. Chọn giờ vào bãi và thanh toán tiền cọc 1 giờ.'}
+              Đặt trước chỉ dành cho ô tô. Chọn giờ vào bãi và thanh toán tiền cọc 1 giờ.
             </p>
 
-
-            {isCustomer ? (
-              <div className="booking-customer-layout">
-                <section className="booking-section-card booking-customer-form">
-                  <div className="booking-section-heading">
-                    <span>Thông tin xe</span>
-                    <strong>Chọn loại xe</strong>
-                  </div>
-
-                  <div className="availability-head">
-                    <div className="vehicle-toggle" aria-label="Chọn loại xe">
-                      <button
-                        type="button"
-                        onClick={() => setVehicle('car')}
-                        className={vehicle === 'car' ? 'active' : ''}
-                      >
-                        <Car size={18} strokeWidth={2.2} aria-hidden />
-                        Ô tô (B2, B3)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setVehicle('bike')}
-                        className={vehicle === 'bike' ? 'active' : ''}
-                      >
-                        <Bike size={18} strokeWidth={2.2} aria-hidden />
-                        Xe máy (B1)
-                      </button>
-                    </div>
-                  </div>
-                </section>
-
-                <div className="booking-map-panel">
-                  <ParkingMap floors={customerFloors} />
-                </div>
-              </div>
-            ) : (
-              <div className="booking-split-layout">
+            <div className="booking-split-layout">
                 {/* Bên trái: Thông tin đặt chỗ + Bảng giá */}
                 <section className="booking-section-card booking-info-card">
                   <div className="booking-section-heading">
@@ -270,8 +214,7 @@ function BookingContent() {
                     Tiếp tục thanh toán
                   </button>
                 </aside>
-              </div>
-            )}
+            </div>
 
           </div>
         </div>

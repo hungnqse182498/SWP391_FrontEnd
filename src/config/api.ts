@@ -85,32 +85,33 @@ export class ApiClient {
     this.loadToken()
   }
 
-  // Load token from localStorage
+  // Authentication is tab-scoped so signing in from another tab does not
+  // replace the identity used by requests in this tab.
   private loadToken() {
-    this.token = localStorage.getItem('auth_token')
+    this.token = sessionStorage.getItem('auth_token')
   }
 
   // Set token
   setToken(token: string) {
     this.token = token
     this.redirectingToLogin = false
-    localStorage.setItem('auth_token', token)
+    sessionStorage.setItem('auth_token', token)
   }
 
   // Clear token
   clearToken() {
     this.token = null
-    localStorage.removeItem('auth_token')
+    sessionStorage.removeItem('auth_token')
   }
 
   private clearSessionTokens() {
     this.clearToken()
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('user_email')
-    localStorage.removeItem('user_name')
-    localStorage.removeItem('user_role')
-    localStorage.removeItem('user_id')
-    localStorage.removeItem('user_phone')
+    sessionStorage.removeItem('refresh_token')
+    sessionStorage.removeItem('user_email')
+    sessionStorage.removeItem('user_name')
+    sessionStorage.removeItem('user_role')
+    sessionStorage.removeItem('user_id')
+    sessionStorage.removeItem('user_phone')
   }
 
   private redirectToLogin() {
@@ -130,7 +131,7 @@ export class ApiClient {
   async refreshAccessToken(): Promise<string | null> {
     if (this.refreshPromise) return this.refreshPromise
 
-    const refreshToken = localStorage.getItem('refresh_token')
+    const refreshToken = sessionStorage.getItem('refresh_token')
     if (!refreshToken || refreshToken === 'undefined' || refreshToken === 'null') {
       return null
     }
@@ -161,7 +162,7 @@ export class ApiClient {
         // Current backend keeps the old refresh token. Only rotate it if a
         // future backend response explicitly supplies a replacement.
         if (body.result?.refreshToken) {
-          localStorage.setItem('refresh_token', body.result.refreshToken)
+          sessionStorage.setItem('refresh_token', body.result.refreshToken)
         }
         return accessToken
       } catch (error) {
@@ -177,7 +178,7 @@ export class ApiClient {
 
   // Get headers with authorization
   private getHeaders(): Record<string, string> {
-    const storedToken = localStorage.getItem('auth_token')
+    const storedToken = sessionStorage.getItem('auth_token')
     if (storedToken !== this.token) this.token = storedToken
 
     const headers: Record<string, string> = {
@@ -285,6 +286,27 @@ export class ApiClient {
 
   async patch<T>(endpoint: string, data?: unknown): Promise<T> {
     return this.request<T>('PATCH', endpoint, data)
+  }
+
+  async download(endpoint: string, _isRetry = false): Promise<{ blob: Blob; fileName: string }> {
+    const response = await fetch(`${this.baseUrl}${endpoint}`, { method: 'GET', headers: this.getHeaders() })
+    if (response.status === 401 && !_isRetry) {
+      const token = await this.refreshAccessToken()
+      if (token) return this.download(endpoint, true)
+    }
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type')
+      const body = contentType?.includes('application/json') ? await response.json() : await response.text()
+      const message = typeof body?.message === 'string' ? body.message : `HTTP ${response.status}`
+      throw new ApiRequestError(response.status, message, body)
+    }
+    const disposition = response.headers.get('content-disposition') ?? ''
+    const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+    const plainName = disposition.match(/filename="?([^";]+)"?/i)?.[1]
+    return {
+      blob: await response.blob(),
+      fileName: encodedName ? decodeURIComponent(encodedName) : plainName ?? 'report',
+    }
   }
 }
 
