@@ -1,6 +1,20 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { AlertCircle, CalendarClock, Car, Clock, QrCode, Smartphone, UserRound, X } from 'lucide-react'
+import {
+  AlertCircle,
+  CalendarClock,
+  Car,
+  CheckCircle2,
+  Clock,
+  QrCode,
+  RotateCcw,
+  Smartphone,
+  Upload,
+  UserCheck,
+  UserRound,
+  UsersRound,
+  X,
+} from 'lucide-react'
 import StaffLayout from '../../components/StaffLayout'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import {
@@ -217,7 +231,9 @@ export default function ScanPlate() {
       })
       .catch(console.error)
 
-    loadGateLists()
+    queueMicrotask(() => {
+      void loadGateLists()
+    })
   }, [])
 
   const setPlateForConfirm = (plate: string) => {
@@ -354,6 +370,36 @@ export default function ScanPlate() {
     else if (id === 'exception') navigate('/staff/exception')
   }
 
+  const selectCheckInType = (type: 'guest' | 'resident' | 'reservation') => {
+    setCheckInType(type)
+    setMessage('')
+    setCheckInTicket(null)
+    if (type !== 'reservation') {
+      setReservationId('')
+      setQrPayload('')
+      setQrDecode(null)
+    }
+  }
+
+  const handleUseReservation = (reservation: ReservationDto) => {
+    resetScan()
+    setCheckInType('reservation')
+    setReservationId(reservation.reservationId)
+    const plate = getReservationPlate(reservation)
+    if (plate !== 'Chưa ghi nhận') setPlateForConfirm(plate)
+    setActivePanel('scan')
+  }
+
+  const hasReservationCode = Boolean(reservationId || qrPayload.trim())
+  const canConfirm = Boolean(
+    !loading &&
+      !uploading &&
+      !qrUploading &&
+      licensePlate.trim() &&
+      gateId &&
+      (checkInType === 'reservation' ? hasReservationCode : vehicleTypeId),
+  )
+
   return (
     <ProtectedRoute allowedRoles={['staff']}>
       <StaffLayout items={menuItems} activeItem={activePanel} onSelectItem={handleSelectSidebar}>
@@ -373,7 +419,14 @@ export default function ScanPlate() {
 
             {activePanel === 'scan' && (
               <div className="scan-entry-layout">
-                <div className="camera-preview scan-entry-camera">
+                <div className="camera-preview scan-entry-camera card-panel">
+                  <div className="scan-card-heading">
+                    <span className="scan-step-badge">1</span>
+                    <div>
+                      <h3>Nhận diện biển số</h3>
+                      <p>Chụp rõ toàn bộ biển số hoặc nhập thủ công ở bước bên cạnh.</p>
+                    </div>
+                  </div>
                   <div className="camera-frame clickable camera-frame--compact" onClick={() => fileInputRef.current?.click()}>
                     {imagePreviewUrl ? (
                       <img src={imagePreviewUrl} className="camera-preview-img" alt="Ảnh biển số xe" />
@@ -383,7 +436,8 @@ export default function ScanPlate() {
                           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                           <circle cx="12" cy="13" r="4" />
                         </svg>
-                        <p>Tải ảnh xe lên</p>
+                        <p>Nhấn để chọn ảnh biển số</p>
+                        <small>Hỗ trợ JPG, PNG từ camera hoặc thiết bị</small>
                       </div>
                     )}
 
@@ -404,11 +458,19 @@ export default function ScanPlate() {
                     onChange={handleImageUpload}
                   />
                   <button type="button" className="btn btn-outline btn-block" onClick={() => fileInputRef.current?.click()}>
-                    Tải ảnh
+                    <Upload size={17} aria-hidden />
+                    {imagePreviewUrl ? 'Đổi ảnh khác' : 'Chọn ảnh biển số'}
                   </button>
                 </div>
 
                 <div className="scan-entry-form card-panel">
+                  <div className="scan-card-heading">
+                    <span className="scan-step-badge">2</span>
+                    <div>
+                      <h3>Xác nhận thông tin xe</h3>
+                      <p>Kiểm tra biển số, loại khách và cổng trước khi cho xe vào.</p>
+                    </div>
+                  </div>
                   <div className="scan-entry-grid">
                     <div className="form-field">
                       <label htmlFor="license-plate">Biển số xe</label>
@@ -427,21 +489,37 @@ export default function ScanPlate() {
                       <div className="input-readonly">{entryTimePreview || formatNowInVietnamTime()}</div>
                     </div>
 
-                    <div className="form-field">
-                      <label>Loại check-in</label>
-                      <select
-                        className="input-standalone select"
-                        value={checkInType}
-                        onChange={(event) => {
-                          setCheckInType(event.target.value as 'guest' | 'resident' | 'reservation')
-                          setMessage('')
-                          setCheckInTicket(null)
-                        }}
-                      >
-                        <option value="guest">Khách vãng lai</option>
-                        <option value="resident">Khách tháng (customer)</option>
-                        <option value="reservation">Xe đặt trước</option>
-                      </select>
+                    <div className="form-field form-field--full">
+                      <label>Loại khách</label>
+                      <div className="checkin-type-selector" role="group" aria-label="Chọn loại khách check-in">
+                        <button
+                          type="button"
+                          className={checkInType === 'guest' ? 'active' : ''}
+                          aria-pressed={checkInType === 'guest'}
+                          onClick={() => selectCheckInType('guest')}
+                        >
+                          <UsersRound size={19} aria-hidden />
+                          <span><strong>Vãng lai</strong><small>Khách gửi xe thông thường</small></span>
+                        </button>
+                        <button
+                          type="button"
+                          className={checkInType === 'resident' ? 'active' : ''}
+                          aria-pressed={checkInType === 'resident'}
+                          onClick={() => selectCheckInType('resident')}
+                        >
+                          <UserCheck size={19} aria-hidden />
+                          <span><strong>Khách tháng</strong><small>Đã có gói gửi xe</small></span>
+                        </button>
+                        <button
+                          type="button"
+                          className={checkInType === 'reservation' ? 'active' : ''}
+                          aria-pressed={checkInType === 'reservation'}
+                          onClick={() => selectCheckInType('reservation')}
+                        >
+                          <CalendarClock size={19} aria-hidden />
+                          <span><strong>Đặt trước</strong><small>Có mã QR hoặc mã đơn</small></span>
+                        </button>
+                      </div>
                     </div>
 
                     {checkInType !== 'reservation' && (
@@ -463,9 +541,9 @@ export default function ScanPlate() {
                     )}
 
                     {checkInType === 'reservation' && (
-                      <div className="form-field">
+                      <div className="form-field form-field--full reservation-code-field">
                         <label>Mã QR đặt chỗ</label>
-                        <div className="input-readonly">
+                        <div className={`input-readonly${reservationId ? ' input-readonly--success' : ''}`}>
                           {reservationId ? `ReservationId: ${reservationId}` : 'Upload QR hoặc nhập payload bên dưới'}
                         </div>
                         <input
@@ -479,15 +557,20 @@ export default function ScanPlate() {
                             setQrDecode(null)
                           }}
                         />
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          disabled={qrUploading}
-                          onClick={() => qrInputRef.current?.click()}
-                        >
-                          <QrCode size={16} aria-hidden />
-                          {qrUploading ? 'Đang đọc QR...' : 'Tải ảnh QR'}
-                        </button>
+                        <div className="reservation-code-actions">
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            disabled={qrUploading}
+                            onClick={() => qrInputRef.current?.click()}
+                          >
+                            <QrCode size={16} aria-hidden />
+                            {qrUploading ? 'Đang đọc QR...' : 'Quét QR từ ảnh'}
+                          </button>
+                          {hasReservationCode && (
+                            <span className="scan-ready-label"><CheckCircle2 size={16} aria-hidden /> Đã nhận mã đặt chỗ</span>
+                          )}
+                        </div>
                         <input
                           type="file"
                           ref={qrInputRef}
@@ -528,7 +611,12 @@ export default function ScanPlate() {
                     </div>
                   )}
 
-                  {message && <p className="alert-inline">{message}</p>}
+                  {message && (
+                    <p className={`alert-inline ${checkInTicket ? 'alert-success' : 'alert-error'}`} role="status">
+                      {checkInTicket ? <CheckCircle2 size={18} aria-hidden /> : <AlertCircle size={18} aria-hidden />}
+                      {message}
+                    </p>
+                  )}
 
                   {checkInTicket && (
                     <div className="reservation-ticket-card staff-checkin-ticket">
@@ -548,15 +636,24 @@ export default function ScanPlate() {
                   )}
 
                   <div className="scan-entry-actions">
+                    <div className={`scan-submit-status${canConfirm ? ' ready' : ''}`}>
+                      {canConfirm ? (
+                        <><CheckCircle2 size={17} aria-hidden /> Thông tin đã sẵn sàng</>
+                      ) : (
+                        <><AlertCircle size={17} aria-hidden /> Vui lòng nhập đủ thông tin bắt buộc</>
+                      )}
+                    </div>
                     <button
                       type="button"
                       className="btn btn-success"
-                      disabled={loading || uploading || qrUploading || !licensePlate.trim() || !gateId}
+                      disabled={!canConfirm}
                       onClick={handleConfirmCheckIn}
                     >
+                      <CheckCircle2 size={18} aria-hidden />
                       {loading ? 'Đang xử lý...' : 'Xác nhận vào bãi'}
                     </button>
                     <button type="button" className="btn btn-ghost" onClick={() => resetScan()}>
+                      <RotateCcw size={17} aria-hidden />
                       Làm lại
                     </button>
                   </div>
@@ -603,6 +700,14 @@ export default function ScanPlate() {
                                     <Clock size={15} aria-hidden />
                                     Giờ dự kiến vào: {formatDateTime(reservation.expectedEntryTime)}
                                   </p>
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary btn-sm staff-reservation-checkin-btn"
+                                    onClick={() => handleUseReservation(reservation)}
+                                  >
+                                    <CheckCircle2 size={16} aria-hidden />
+                                    Check-in đơn này
+                                  </button>
                                 </div>
                               </article>
                             )

@@ -251,10 +251,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               }
             : prev,
         )
-        localStorage.setItem('user_name', u.fullName)
-        localStorage.setItem('user_role', u.roleName)
-        localStorage.setItem('user_phone', u.phoneNumber ?? '')
-        if (u.userId) localStorage.setItem('user_id', u.userId)
+        sessionStorage.setItem('user_name', u.fullName)
+        sessionStorage.setItem('user_role', u.roleName)
+        sessionStorage.setItem('user_phone', u.phoneNumber ?? '')
+        if (u.userId) sessionStorage.setItem('user_id', u.userId)
       }
     } catch (error) {
       console.error('Refresh profile error:', error)
@@ -283,8 +283,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             prev ? { ...prev, name: u.fullName, phone: u.phoneNumber } : prev,
           )
           localStorage.setItem(profileKey(nextProfile.email), JSON.stringify(nextProfile))
-          localStorage.setItem('user_name', u.fullName)
-          localStorage.setItem('user_phone', u.phoneNumber ?? '')
+          sessionStorage.setItem('user_name', u.fullName)
+          sessionStorage.setItem('user_phone', u.phoneNumber ?? '')
           return true
         }
         return false
@@ -300,7 +300,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser((prev) => {
       if (!prev) return prev
       const nextUser = { ...prev, role: 'customer' as UserRole }
-      localStorage.setItem('user_role', 'customer')
+      sessionStorage.setItem('user_role', 'customer')
       return nextUser
     })
   }, [])

@@ -48,6 +48,11 @@ interface ApiResponse<T> {
   message?: string
 }
 
+const isMotorbike = (typeName?: string) => {
+  const normalized = (typeName ?? '').toLowerCase()
+  return normalized.includes('motor') || normalized.includes('bike') || normalized.includes('xe máy') || normalized.includes('xe may')
+}
+
 export default function AdminSystemConfig() {
   const [activeTab, setActiveTab] = useState(1)
 
@@ -90,7 +95,13 @@ export default function AdminSystemConfig() {
     durationMonths: '',
     description: '',
     vehicleTypeId: '',
+    requireFixedSlot: false,
+    status: 'Active',
   })
+  const selectedPackageVehicleType = vehicleTypes.find(
+    (item) => item.vehicleTypeId === packageForm.vehicleTypeId,
+  )
+  const selectedPackageIsMotorbike = isMotorbike(selectedPackageVehicleType?.typeName)
 
   // Fetch logic
   const fetchFloors = async () => {
@@ -407,6 +418,8 @@ export default function AdminSystemConfig() {
       durationMonths: '',
       description: '',
       vehicleTypeId: vehicleTypes[0]?.vehicleTypeId || '',
+      requireFixedSlot: false,
+      status: 'Active',
     })
     setShowModal('package')
   }
@@ -419,6 +432,8 @@ export default function AdminSystemConfig() {
       durationMonths: String(p.durationMonths !== undefined ? p.durationMonths : p.duration || 0),
       description: p.description || '',
       vehicleTypeId: p.vehicleTypeId,
+      requireFixedSlot: p.requireFixedSlot ?? false,
+      status: p.status || 'Active',
     })
     setShowModal('package')
   }
@@ -437,8 +452,8 @@ export default function AdminSystemConfig() {
         durationMonths: Number(packageForm.durationMonths),
         description: packageForm.description.trim(),
         vehicleTypeId: packageForm.vehicleTypeId,
-        requireFixedSlot: editPackage?.requireFixedSlot ?? false,
-        status: editPackage?.status ?? 'Active',
+        requireFixedSlot: packageForm.requireFixedSlot,
+        status: packageForm.status,
       }
       if (editPackage) {
         const res = await apiClient.put<ApiResponse<unknown>>(
@@ -466,7 +481,7 @@ export default function AdminSystemConfig() {
   }
 
   const handleDeletePackage = async (id: string, name: string) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa gói thuê bao "${name}"?`)) return
+    if (!window.confirm(`Bạn có chắc chắn muốn ngừng bán gói thuê bao "${name}"?`)) return
     try {
       await apiClient.delete<ApiResponse<unknown>>(`/SubscriptionPackage/${id}`)
       fetchPackages()
@@ -1065,7 +1080,14 @@ export default function AdminSystemConfig() {
                   id="pkg-vtype"
                   required
                   value={packageForm.vehicleTypeId}
-                  onChange={(e) => setPackageForm({ ...packageForm, vehicleTypeId: e.target.value })}
+                  onChange={(e) => {
+                    const nextType = vehicleTypes.find((item) => item.vehicleTypeId === e.target.value)
+                    setPackageForm({
+                      ...packageForm,
+                      vehicleTypeId: e.target.value,
+                      requireFixedSlot: isMotorbike(nextType?.typeName) ? false : packageForm.requireFixedSlot,
+                    })
+                  }}
                 >
                   <option value="" disabled>-- Chọn loại xe --</option>
                   {vehicleTypes.map((vt) => (
@@ -1111,6 +1133,32 @@ export default function AdminSystemConfig() {
                   onChange={(e) => setPackageForm({ ...packageForm, description: e.target.value })}
                   placeholder="Nhập mô tả chi tiết về gói thuê bao..."
                 />
+              </div>
+
+              <div className="form-field">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={packageForm.requireFixedSlot}
+                    disabled={selectedPackageIsMotorbike}
+                    onChange={(e) => setPackageForm({ ...packageForm, requireFixedSlot: e.target.checked })}
+                  />
+                  Cho phép user chọn vị trí ô tô cố định
+                </label>
+                {selectedPackageIsMotorbike && <small>Xe máy không sử dụng vị trí cố định.</small>}
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="pkg-status">Trạng thái *</label>
+                <select
+                  id="pkg-status"
+                  value={packageForm.status}
+                  onChange={(e) => setPackageForm({ ...packageForm, status: e.target.value })}
+                >
+                  <option value="Active">Đang bán</option>
+                  <option value="Inactive">Ngừng bán</option>
+                  <option value="Suspended">Tạm ngưng</option>
+                </select>
               </div>
 
               <div className="form-actions">

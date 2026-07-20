@@ -15,10 +15,3 @@ export function vehicleTypeLabel(vehicle: 'car' | 'bike') {
 export function depositAmount(vehicle: 'car' | 'bike') {
   return DEPOSIT_RATES[vehicle]
 }
-
-export function filterCustomerFloors(vehicle: 'car' | 'bike', floors: { id: number; name: string }[]) {
-  if (vehicle === 'car') {
-    return floors.filter((f) => /B2|B3/i.test(f.name))
-  }
-  return floors.filter((f) => /B1/i.test(f.name))
-}

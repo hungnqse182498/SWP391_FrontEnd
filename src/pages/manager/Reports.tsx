@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Activity,
   Banknote,
+  BarChart3,
   CalendarCheck2,
   Car,
   CheckCircle2,
   Clock3,
   CreditCard,
   DoorOpen,
+  Download,
   Loader2,
   Package,
   ParkingSquare,
@@ -32,11 +34,38 @@ import type { PieLabelRenderProps } from 'recharts'
 import ManagerPageShell from '../../components/ManagerPageShell'
 import { apiClient } from '../../config/api'
 import { formatCurrency } from '../../utils/pricing'
-import { formatUtcToVietnamDateTime } from '../../utils/dateTime'
 import type { ReactNode } from 'react'
 
 /* ── colour palette ─────────────────────────────────────────── */
 const COLORS = ['#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899']
+
+const REPORT_LABELS: Record<string, string> = {
+  deposit: 'Tiền đặt cọc',
+  checkoutfee: 'Phí gửi xe',
+  subscriptionfee: 'Phí đăng ký gói tháng',
+  subscriptionrenewal: 'Phí gia hạn gói tháng',
+  payos: 'Chuyển khoản PayOS',
+  cash: 'Tiền mặt',
+  pending: 'Chờ xử lý',
+  success: 'Thành công',
+  successful: 'Thành công',
+  paid: 'Đã thanh toán',
+  failed: 'Thất bại',
+  confirmed: 'Đã xác nhận',
+  modified: 'Đã điều chỉnh',
+  checkedin: 'Đã vào bãi',
+  completed: 'Hoàn tất',
+  cancelled: 'Đã hủy',
+  canceled: 'Đã hủy',
+  noshow: 'Không đến',
+  active: 'Đang hoạt động',
+  exception: 'Có sự cố',
+  unknown: 'Chưa xác định',
+}
+function localizeReportLabel(value: string) {
+  const key = (value || '').replace(/[\s_-]/g, '').toLowerCase()
+  return REPORT_LABELS[key] ?? (value || 'Chưa xác định')
+}
 
 /* ── Types matching backend DTOs ─────────────────────────────── */
 interface ApiRes<T = unknown> {
@@ -71,36 +100,23 @@ interface SummaryDTO {
   revenueByPaymentType: Breakdown[]
 }
 
-interface PaymentRow {
-  paymentId: string
-  paymentTime: string
-  paymentType: string
-  paymentMethod: string
-  amount: number
-  paymentStatus: string
-}
-
 interface RevenueDTO {
   totalRevenue: number
   successfulPaymentCount: number
   revenueSeries: SeriesPoint[]
   byPaymentType: Breakdown[]
-  latestPayments: PaymentRow[]
 }
 
-interface SessionRow {
-  sessionId: string
-  licensePlate: string
-  vehicleTypeName: string
-  entryTime: string
-  exitTime?: string
-  status: string
+interface ReportTypeDTO {
+  key: string
+  name: string
+  description: string
+  supportedFormats: string[]
 }
 
 interface OperationsDTO {
   sessionsByVehicleType: Breakdown[]
   reservationsByStatus: Breakdown[]
-  latestSessions: SessionRow[]
 }
 
 /* ── Date helpers ────────────────────────────────────────────── */
@@ -195,6 +211,10 @@ export default function ManagerReports() {
   const [summary, setSummary] = useState<SummaryDTO | null>(null)
   const [revenue, setRevenue] = useState<RevenueDTO | null>(null)
   const [operations, setOperations] = useState<OperationsDTO | null>(null)
+  const [reportTypes, setReportTypes] = useState<ReportTypeDTO[]>([])
+  const [exportType, setExportType] = useState('summary')
+  const [exportFormat, setExportFormat] = useState('excel')
+  const [exporting, setExporting] = useState(false)
 
   const fetchReports = useCallback(async (from: string, to: string) => {
     setLoading(true)
@@ -221,7 +241,14 @@ export default function ManagerReports() {
   }, [])
 
   useEffect(() => {
+    // Tải dữ liệu máy chủ khi mở trang báo cáo lần đầu.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchReports(fromDate, toDate)
+    apiClient.get<ApiRes<ReportTypeDTO[]>>('/reports/types')
+      .then((response) => {
+        if (response.isSuccess) setReportTypes(response.result ?? [])
+      })
+      .catch(() => setError('Không thể tải danh sách loại báo cáo.'))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePresetChange = (p: Preset) => {
@@ -238,6 +265,27 @@ export default function ManagerReports() {
     fetchReports(fromDate, toDate)
   }
 
+  const handleExport = async () => {
+    setExporting(true)
+    setError(null)
+    try {
+      const params = new URLSearchParams({ from: fromDate, to: toDate, reportType: exportType, format: exportFormat })
+      const file = await apiClient.download(`/reports/export?${params}`)
+      const url = URL.createObjectURL(file.blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = file.fileName
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Không thể xuất báo cáo.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   /* charts data */
   const revenueSeries = useMemo(
     () => summary?.revenueSeries ?? revenue?.revenueSeries ?? [],
@@ -245,7 +293,11 @@ export default function ManagerReports() {
   )
 
   const paymentTypePie = useMemo(
-    () => summary?.revenueByPaymentType ?? revenue?.byPaymentType ?? [],
+    () => (summary?.revenueByPaymentType ?? revenue?.byPaymentType ?? []).map((item) => ({
+      name: localizeReportLabel(item.name),
+      count: item.count,
+      amount: item.amount,
+    })),
     [summary, revenue],
   )
 
@@ -255,22 +307,35 @@ export default function ManagerReports() {
   )
 
   const reservationPie = useMemo(
-    () => operations?.reservationsByStatus ?? [],
+    () => (operations?.reservationsByStatus ?? []).map((item) => ({
+      name: localizeReportLabel(item.name),
+      count: item.count,
+      amount: item.amount,
+    })),
     [operations],
   )
 
   return (
     <ManagerPageShell activeItem="reports">
-      <div className="staff-content-wrapper">
+      <div className="staff-content-wrapper manager-resource-page manager-report-page">
+        <header className="manager-resource-header">
+          <div className="manager-resource-title">
+            <span className="manager-resource-icon manager-resource-icon--purple">
+              <BarChart3 size={24} />
+            </span>
+            <div>
+              <h2>Báo cáo vận hành</h2>
+              <p>Tổng hợp doanh thu, lượt xe, đặt chỗ và các chỉ số vận hành bãi đỗ xe.</p>
+            </div>
+          </div>
+          <div className="manager-header-actions"><button type="button" className="btn btn-outline" onClick={handleApply} disabled={loading}><RefreshCw size={17} className={loading ? 'spin' : ''} /> Làm mới</button></div>
+        </header>
+
         <div className="staff-section">
-          <h2>Báo cáo vận hành</h2>
-          <p className="section-desc">
-            Tổng hợp doanh thu, lượt xe, đặt chỗ và các chỉ số vận hành bãi đỗ xe.
-          </p>
 
           {/* ── Toolbar ─────────────────────────────────────── */}
-          <div className="toolbar-row card-panel" style={{ flexWrap: 'wrap' }}>
-            <div className="form-field" style={{ margin: 0, flex: '1 1 140px', maxWidth: 180 }}>
+          <div className="manager-report-toolbar card-panel">
+            <div className="form-field">
               <label htmlFor="report-from">Từ ngày</label>
               <input
                 id="report-from"
@@ -279,7 +344,7 @@ export default function ManagerReports() {
                 onChange={(e) => { setFromDate(e.target.value); setPreset('custom') }}
               />
             </div>
-            <div className="form-field" style={{ margin: 0, flex: '1 1 140px', maxWidth: 180 }}>
+            <div className="form-field">
               <label htmlFor="report-to">Đến ngày</label>
               <input
                 id="report-to"
@@ -288,7 +353,7 @@ export default function ManagerReports() {
                 onChange={(e) => { setToDate(e.target.value); setPreset('custom') }}
               />
             </div>
-            <div className="form-field" style={{ margin: 0, flex: '1 1 140px', maxWidth: 180 }}>
+            <div className="form-field">
               <label htmlFor="report-preset">Khoảng thời gian</label>
               <select
                 id="report-preset"
@@ -303,50 +368,48 @@ export default function ManagerReports() {
             <button
               type="button"
               className="btn btn-primary"
-              style={{ alignSelf: 'flex-end', height: 'fit-content' }}
               onClick={handleApply}
               disabled={loading}
             >
               {loading ? <><Loader2 size={16} className="spin" /> Đang tải...</> : <><TrendingUp size={16} /> Xem báo cáo</>}
             </button>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              style={{ alignSelf: 'flex-end', height: 'fit-content' }}
-              onClick={() => { handlePresetChange('30d') }}
-              disabled={loading}
-            >
-              <RefreshCw size={16} /> Làm mới
+            <div className="form-field">
+              <label htmlFor="report-export-type">Loại xuất</label>
+              <select id="report-export-type" value={exportType} onChange={(e) => setExportType(e.target.value)}>
+                {(reportTypes.length ? reportTypes : [{ key: 'summary', name: 'Báo cáo tổng quan', description: '', supportedFormats: ['excel', 'pdf'] }]).map((type) => <option key={type.key} value={type.key}>{type.name}</option>)}
+              </select>
+            </div>
+            <div className="form-field">
+              <label htmlFor="report-export-format">Định dạng</label>
+              <select id="report-export-format" value={exportFormat} onChange={(e) => setExportFormat(e.target.value)}>
+                {(reportTypes.find((type) => type.key === exportType)?.supportedFormats ?? ['excel', 'pdf']).map((format) => <option key={format} value={format}>{format === 'pdf' ? 'PDF' : 'Excel/CSV'}</option>)}
+              </select>
+            </div>
+            <button type="button" className="btn btn-outline" onClick={() => void handleExport()} disabled={exporting || loading}>
+              {exporting ? <><Loader2 size={16} className="spin" /> Đang xuất...</> : <><Download size={16} /> Xuất báo cáo</>}
             </button>
           </div>
 
           {/* ── Error ────────────────────────────────────────── */}
           {error && (
-            <div className="card-panel" style={{ color: 'var(--danger, #ef4444)', marginTop: '1rem' }}>
-              {error}
-            </div>
+            <div className="manager-inline-error manager-report-message" role="alert">{error}</div>
           )}
 
           {/* ── Loading ─────────────────────────────────────── */}
           {loading && !summary && (
-            <div className="card-panel" style={{ textAlign: 'center', padding: '3rem 1rem', marginTop: '1.5rem' }}>
-              <Loader2 size={32} className="spin" style={{ margin: '0 auto 1rem' }} />
-              <p style={{ color: 'var(--text-muted)' }}>Đang tải dữ liệu báo cáo...</p>
-            </div>
+            <div className="card-panel manager-empty-state manager-report-message"><Loader2 size={32} className="spin" /><strong>Đang tải dữ liệu báo cáo...</strong></div>
           )}
 
           {/* ── Metrics Grid ────────────────────────────────── */}
           {summary && summary.metrics.length > 0 && (
-            <div className="dashboard-grid" style={{ marginTop: '1.5rem' }}>
+            <div className="manager-report-metrics">
               {summary.metrics.map((m) => (
-                <article key={m.key} className="stat-card card-panel">
-                  <div style={{ color: 'var(--blue-600)', marginBottom: '0.25rem' }}>
+                <article key={m.key} className="manager-summary-card manager-report-metric">
+                  <div className="manager-report-metric-icon">
                     {METRIC_ICONS[m.key] ?? <Activity size={22} />}
                   </div>
-                  <strong style={{ fontSize: '1.35rem' }}>{metricDisplayValue(m)}</strong>
-                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                    {m.label}
-                  </span>
+                  <strong>{metricDisplayValue(m)}</strong>
+                  <span>{localizeReportLabel(m.label)}</span>
                 </article>
               ))}
             </div>
@@ -354,17 +417,10 @@ export default function ManagerReports() {
 
           {/* ── Charts Row ──────────────────────────────────── */}
           {!loading && (revenueSeries.length > 0 || paymentTypePie.length > 0) && (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
-                gap: '1.5rem',
-                marginTop: '1.5rem',
-              }}
-            >
+            <div className="manager-report-chart-grid">
               {/* Bar Chart – Revenue Over Time */}
               {revenueSeries.length > 0 && (
-                <div className="card-panel" style={{ padding: '1.25rem' }}>
+                <div className="card-panel manager-report-chart-card">
                   <h3 className="panel-subtitle">Doanh thu theo ngày</h3>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={revenueSeries}>
@@ -383,7 +439,7 @@ export default function ManagerReports() {
 
               {/* Pie Chart – Revenue by Payment Type */}
               {paymentTypePie.length > 0 && (
-                <div className="card-panel" style={{ padding: '1.25rem' }}>
+                <div className="card-panel manager-report-chart-card">
                   <h3 className="panel-subtitle">Phân bổ doanh thu theo loại thanh toán</h3>
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
@@ -413,24 +469,17 @@ export default function ManagerReports() {
 
           {/* ── Charts Row 2 – Operations ────────────────────── */}
           {!loading && (vehicleTypeBars.length > 0 || reservationPie.length > 0) && (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
-                gap: '1.5rem',
-                marginTop: '1.5rem',
-              }}
-            >
+            <div className="manager-report-chart-grid">
               {/* Bar Chart – Sessions by Vehicle Type */}
               {vehicleTypeBars.length > 0 && (
-                <div className="card-panel" style={{ padding: '1.25rem' }}>
+                <div className="card-panel manager-report-chart-card">
                   <h3 className="panel-subtitle">Lượt xe theo loại phương tiện</h3>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={vehicleTypeBars}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border, #e2e8f0)" />
                       <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                       <YAxis tick={{ fontSize: 12 }} />
-                      <Tooltip />
+                      <Tooltip formatter={(value: unknown) => [new Intl.NumberFormat('vi-VN').format(Number(value)), 'Số lượt']} />
                       <Bar dataKey="count" fill="#16a34a" radius={[4, 4, 0, 0]}>
                         {vehicleTypeBars.map((_, i) => (
                           <Cell key={i} fill={COLORS[i % COLORS.length]} />
@@ -443,7 +492,7 @@ export default function ManagerReports() {
 
               {/* Pie Chart – Reservation Status */}
               {reservationPie.length > 0 && (
-                <div className="card-panel" style={{ padding: '1.25rem' }}>
+                <div className="card-panel manager-report-chart-card">
                   <h3 className="panel-subtitle">Trạng thái đặt chỗ</h3>
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
@@ -462,7 +511,7 @@ export default function ManagerReports() {
                           <Cell key={i} fill={COLORS[i % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip formatter={(value: unknown) => [new Intl.NumberFormat('vi-VN').format(Number(value)), 'Số lượt']} />
                       <Legend />
                     </PieChart>
                   </ResponsiveContainer>
@@ -471,108 +520,12 @@ export default function ManagerReports() {
             </div>
           )}
 
-          {/* ── Latest Payments Table ────────────────────────── */}
-          {revenue && revenue.latestPayments && revenue.latestPayments.length > 0 && (
-            <div className="card-panel table-wrap" style={{ marginTop: '1.5rem' }}>
-              <h3 className="panel-subtitle">Thanh toán gần đây</h3>
-              <table className="ui-table">
-                <thead>
-                  <tr>
-                    <th>Mã thanh toán</th>
-                    <th>Thời gian</th>
-                    <th>Loại thanh toán</th>
-                    <th>Phương thức</th>
-                    <th>Số tiền</th>
-                    <th>Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {revenue.latestPayments.map((p) => (
-                    <tr key={p.paymentId}>
-                      <td><code style={{ fontSize: '0.8rem' }}>{p.paymentId.slice(0, 8)}…</code></td>
-                      <td>{formatUtcToVietnamDateTime(p.paymentTime)}</td>
-                      <td>{p.paymentType}</td>
-                      <td>{p.paymentMethod}</td>
-                      <td><strong>{formatCurrency(p.amount)}</strong></td>
-                      <td>
-                        <span className={`badge ${paymentStatusBadge(p.paymentStatus)}`}>
-                          {p.paymentStatus}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* ── Latest Sessions Table ────────────────────────── */}
-          {operations && operations.latestSessions && operations.latestSessions.length > 0 && (
-            <div className="card-panel table-wrap" style={{ marginTop: '1.5rem' }}>
-              <h3 className="panel-subtitle">Phiên gửi xe gần đây</h3>
-              <table className="ui-table">
-                <thead>
-                  <tr>
-                    <th>Biển số</th>
-                    <th>Loại xe</th>
-                    <th>Thời gian vào</th>
-                    <th>Thời gian ra</th>
-                    <th>Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {operations.latestSessions.map((s) => (
-                    <tr key={s.sessionId}>
-                      <td><strong>{s.licensePlate}</strong></td>
-                      <td>{s.vehicleTypeName || '—'}</td>
-                      <td>{formatUtcToVietnamDateTime(s.entryTime)}</td>
-                      <td>{s.exitTime ? formatUtcToVietnamDateTime(s.exitTime) : '—'}</td>
-                      <td>
-                        <span className={`badge ${sessionStatusBadge(s.status)}`}>
-                          {sessionStatusLabel(s.status)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
           {/* ── Empty state ──────────────────────────────────── */}
           {!loading && !error && !summary && !revenue && !operations && (
-            <div className="card-panel" style={{ textAlign: 'center', padding: '3rem 1rem', marginTop: '1.5rem' }}>
-              <Car size={40} style={{ color: 'var(--text-muted)', marginBottom: '0.75rem' }} />
-              <p style={{ color: 'var(--text-muted)' }}>Không có dữ liệu trong khoảng thời gian này.</p>
-            </div>
+            <div className="card-panel manager-empty-state manager-report-message"><Car size={40} aria-hidden /><strong>Không có dữ liệu</strong><span>Không có dữ liệu trong khoảng thời gian này.</span></div>
           )}
         </div>
       </div>
     </ManagerPageShell>
   )
-}
-
-/* ── Badge helpers ──────────────────────────────────────────── */
-function paymentStatusBadge(status: string) {
-  const s = (status || '').toLowerCase()
-  if (s === 'success' || s === 'completed' || s === 'paid') return 'badge-paid'
-  if (s === 'failed' || s === 'cancelled') return 'badge-cancelled'
-  return 'badge-history-pending'
-}
-
-function sessionStatusBadge(status: string) {
-  const s = (status || '').toLowerCase()
-  if (s === 'active') return 'badge-history-success'
-  if (s === 'completed') return 'badge-history-neutral'
-  if (s === 'cancelled') return 'badge-history-cancelled'
-  return 'badge-history-pending'
-}
-
-function sessionStatusLabel(status: string) {
-  const s = (status || '').toLowerCase()
-  if (s === 'active') return '🟢 Đang gửi'
-  if (s === 'completed') return '✅ Hoàn tất'
-  if (s === 'cancelled') return 'Đã hủy'
-  if (s === 'pending') return '🟡 Chờ xử lý'
-  return status
 }

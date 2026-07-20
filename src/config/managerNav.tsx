@@ -1,14 +1,14 @@
 import {
-  AlertTriangle,
   BarChart3,
-  Building2,
   Car,
   Clock,
+  CreditCard,
   DollarSign,
   DoorOpen,
   FileCheck,
   Layers,
   Package,
+  CalendarRange,
   ParkingSquare,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -22,13 +22,6 @@ export interface NavItem {
 }
 
 export const MANAGER_NAV: NavItem[] = [
-  {
-    id: 'building',
-    label: 'Thông tin tòa nhà',
-    path: '/manager/building',
-    icon: <Building2 size={18} />,
-    desc: 'Tòa nhà gửi xe, địa chỉ, giờ mở cửa',
-  },
   {
     id: 'vehicles',
     label: 'Loại phương tiện',
@@ -65,6 +58,20 @@ export const MANAGER_NAV: NavItem[] = [
     desc: 'Theo dõi phiên gửi xe',
   },
   {
+    id: 'monthly-subscriptions',
+    label: 'Đăng ký gửi xe tháng',
+    path: '/manager/monthly-subscriptions',
+    icon: <CalendarRange size={18} />,
+    desc: 'Quản lý các gói tháng khách hàng đã đăng ký',
+  },
+  {
+    id: 'payments',
+    label: 'Quản lý thanh toán',
+    path: '/manager/payments',
+    icon: <CreditCard size={18} />,
+    desc: 'Tra cứu giao dịch và trạng thái thanh toán',
+  },
+  {
     id: 'vehicle-change-requests',
     label: 'Phê duyệt biển số',
     path: '/manager/vehicle-change-requests',
@@ -91,13 +98,6 @@ export const MANAGER_NAV: NavItem[] = [
     path: '/manager/reports',
     icon: <BarChart3 size={18} />,
     desc: 'Lượt xe, doanh thu, lấp đầy, giờ cao điểm',
-  },
-  {
-    id: 'advanced',
-    label: 'Quản lý nâng cao',
-    path: '/manager/advanced',
-    icon: <AlertTriangle size={18} />,
-    desc: 'Mất vé, sai biển, quá giờ, chưa thanh toán...',
   },
 ]
 
