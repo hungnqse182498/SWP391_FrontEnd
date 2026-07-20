@@ -617,8 +617,8 @@ ul, ol { margin: 0; padding: 0; }
 
 .search-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.9rem;
+  grid-template-columns: 1fr 2.5fr;
+  gap: 0.5rem;
 }
 
 .hero-field {
@@ -633,9 +633,9 @@ ul, ol { margin: 0; padding: 0; }
 .hero-field > div {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.4rem;
   min-height: 48px;
-  padding: 0 0.85rem;
+  padding: 0 0.6rem;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: #fff;
@@ -4876,16 +4876,16 @@ ul, ol { margin: 0; padding: 0; }
 }
 .booking-datetime-picker {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(88px, 0.8fr) minmax(72px, 0.6fr);
-  gap: 0.55rem;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.3rem;
   align-items: stretch;
 }
 .booking-datetime-part {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.25rem;
   min-height: 48px;
-  padding: 0 0.75rem;
+  padding: 0 0.5rem;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: #fff;
