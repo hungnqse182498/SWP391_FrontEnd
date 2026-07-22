@@ -1,4 +1,4 @@
-import { formatUtcToVietnamDateTime } from './dateTime'
+import { formatUtcToVietnamDateTime, parseBackendUtcDate } from './dateTime'
 
 export const PRICE_PER_HOUR = 15_000
 
@@ -11,8 +11,8 @@ export function calcTotal(spotCount: number, hours: number): number {
 }
 
 export function addHours(isoStart: string, hours: number): string {
-  const d = new Date(isoStart)
-  d.setHours(d.getHours() + hours)
+  const d = parseBackendUtcDate(isoStart)
+  d.setTime(d.getTime() + hours * 60 * 60 * 1000)
   return d.toISOString()
 }
 

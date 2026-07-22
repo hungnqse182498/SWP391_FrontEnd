@@ -8,6 +8,8 @@ import { useAuth } from '../context/AuthContext'
 import { useBooking } from '../context/BookingContext'
 import { parkingFloors } from '../data/parkingFloors'
 import { formatCurrency } from '../utils/pricing'
+import { defaultBookingDatetimeLocal } from '../utils/bookingTime'
+import { vietnamDatetimeLocalToUtcIso } from '../utils/dateTime'
 
 function BookingContent() {
   const navigate = useNavigate()
@@ -25,14 +27,7 @@ function BookingContent() {
   )
   const [startTime, setStartTime] = useState<string>(() => {
     if (initialStartTime) return initialStartTime
-    // Default to tomorrow or 1 hour from now formatted for datetime-local
-    const now = new Date()
-    now.setHours(now.getHours() + 1)
-    now.setMinutes(0, 0, 0)
-    // format as YYYY-MM-DDTHH:mm
-    const tzoffset = now.getTimezoneOffset() * 60000;
-    const localISOTime = (new Date(now.getTime() - tzoffset)).toISOString().slice(0, 16);
-    return localISOTime
+    return defaultBookingDatetimeLocal()
   })
   const [vehiclePlate, setVehiclePlate] = useState(profile?.vehiclePlate ?? '')
 
@@ -66,7 +61,7 @@ function BookingContent() {
           type: 'standard',
         },
       ],
-      startTime: new Date(startTime).toISOString(),
+      startTime: vietnamDatetimeLocalToUtcIso(startTime),
       hours: 1, // Fixed 1 hour deposit
       vehiclePlate: vehiclePlate.trim(),
       isPreRegistered: true,

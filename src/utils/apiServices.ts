@@ -139,6 +139,22 @@ export interface SubscriptionRenewalDto {
   renewalDate?: string
 }
 
+export interface VehicleChangeRequestDto {
+  requestId: string
+  subscriptionId: string
+  oldLicensePlate?: string
+  newLicensePlate?: string
+  reason?: string
+  rejectionReason?: string
+  status?: string
+  createdAt?: string
+  processedAt?: string
+  userFullName?: string
+  packageName?: string
+  handledByStaffId?: string
+  handledByFullName?: string
+}
+
 export interface ParkingSessionDto {
   sessionId: string
   reservationId?: string
@@ -161,6 +177,10 @@ export interface ParkingSessionDto {
   actualSlotId?: string
   actualSlotCode?: string
   status: string
+  paymentAmount?: number
+  paymentStatus?: string
+  paymentMethod?: string
+  paymentTime?: string
   ticket?: ParkingSessionTicket
 }
 
@@ -242,6 +262,11 @@ export const reservationApi = {
     return apiClient.get<ApiResponse<ReservationDto[]>>(`/reservations${q ? `?${q}` : ''}`)
   },
 
+  getById: (id: string) => apiClient.get<ApiResponse<ReservationDto>>(`/reservations/${id}`),
+
+  updateStatus: (id: string, status: string) =>
+    apiClient.put<ApiResponse>(`/reservations/${id}/status`, { status }),
+
   cancel: (id: string) => apiClient.put<ApiResponse>(`/reservations/${id}/cancel`),
 
   changeTime: (id: string, newExpectedTime: string) =>
@@ -290,6 +315,23 @@ export const subscriptionRenewalApi = {
     apiClient.get<ApiResponse<SubscriptionRenewalDto[]>>(
       `/SubscriptionRenewal/${subscriptionId}/renewals`,
     ),
+}
+
+export const vehicleChangeRequestApi = {
+  getMy: () =>
+    apiClient.get<ApiResponse<VehicleChangeRequestDto[]>>('/VehicleChangeRequest/my-requests'),
+
+  create: (data: { subscriptionId: string; newLicensePlate: string; reason: string }) =>
+    apiClient.post<ApiResponse<VehicleChangeRequestDto>>('/VehicleChangeRequest/change-vehicle', data),
+
+  update: (requestId: string, data: { newLicensePlate: string; reason: string }) =>
+    apiClient.put<ApiResponse<VehicleChangeRequestDto>>(
+      `/VehicleChangeRequest/change-vehicle/${requestId}`,
+      data,
+    ),
+
+  remove: (requestId: string) =>
+    apiClient.delete<ApiResponse>(`/VehicleChangeRequest/change-vehicle/${requestId}`),
 }
 
 export const gateApi = {

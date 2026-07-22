@@ -3,8 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { AlertTriangle, CalendarDays, Car, MapPin } from 'lucide-react'
 import BookingSteps from '../../components/BookingSteps'
 import ProtectedRoute from '../../components/ProtectedRoute'
+import { ToastContainer, useToast } from '../../components/Toast'
 import { useBooking } from '../../context/BookingContext'
 import { vehicleTypeLabel } from '../../utils/bookingPricing'
+import { bookingTimeBoundsLocal, defaultBookingDatetimeLocal, parseDatetimeLocal } from '../../utils/bookingTime'
+import { vietnamDatetimeLocalToUtcIso } from '../../utils/dateTime'
+import { formatCurrency } from '../../utils/pricing'
 
 function CancellationPolicy() {
   return (
@@ -21,7 +25,14 @@ function CancellationPolicy() {
   )
 }
 
-function PriceTable() {
+interface PriceTableProps {
+  basePrice: number
+  baseHours: number
+  extraHourPrice: number
+  nightSurcharge: number
+}
+
+function PriceTable({ basePrice, baseHours, extraHourPrice, nightSurcharge }: PriceTableProps) {
   return (
     <div className="booking-price-table">
       <h3>Bảng giá giữ xe ô tô</h3>
@@ -34,21 +45,22 @@ function PriceTable() {
         </thead>
         <tbody>
           <tr style={{ fontWeight: 'bold', background: '#eef6ff' }}>
-            <td>Giờ đầu</td>
-            <td>30.000 đ</td>
+            <td>Giá cơ bản ({baseHours} giờ đầu)</td>
+            <td>{formatCurrency(basePrice)}</td>
           </tr>
           <tr>
-            <td>Ban ngày (6h – 22h)</td>
-            <td>10.000 đ/giờ</td>
+            <td>Mỗi giờ tiếp theo</td>
+            <td>{formatCurrency(extraHourPrice)}/giờ</td>
           </tr>
           <tr>
-            <td>Ban đêm (22h – 6h)</td>
-            <td>20.000 đ/giờ</td>
+            <td>Phụ thu ban đêm (22h – 6h)</td>
+            <td>{formatCurrency(nightSurcharge)}/lượt</td>
           </tr>
         </tbody>
       </table>
       <p className="booking-price-note">
-        Giờ đầu: 30.000 đ — Các giờ tiếp theo: 10.000 đ/giờ (06:00–22:00), 20.000 đ/giờ (22:00–06:00).
+        Phụ thu ban đêm chỉ được cộng một lần nếu thời gian gửi xe có giao với khung 22:00–06:00,
+        không tính theo số giờ ban đêm.
       </p>
     </div>
   )
@@ -58,36 +70,39 @@ function BookingContent() {
   const navigate = useNavigate()
   const location = useLocation()
   const { setDraft, getPolicy } = useBooking()
+  const carPolicy = getPolicy('car')
+  const toast = useToast()
 
   const locationState = location.state as { startTime?: string } | null
   const initialStartTime = locationState?.startTime ?? ''
 
   const [startTime, setStartTime] = useState<string>(() => {
     if (initialStartTime) return initialStartTime
-    const now = new Date()
-    now.setHours(now.getHours() + 1)
-    now.setMinutes(0, 0, 0)
-    const tzoffset = now.getTimezoneOffset() * 60000
-    return new Date(now.getTime() - tzoffset).toISOString().slice(0, 16)
+    return defaultBookingDatetimeLocal()
   })
 
   const handlePreRegisterSubmit = () => {
     if (!startTime) {
-      alert('Vui lòng chọn thời gian vào')
+      toast.warning('Bạn chưa chọn thời gian dự kiến đến bãi.')
       return
     }
 
-    const selectedTime = new Date(startTime).getTime()
-    const nowTime = new Date().getTime()
+    const selectedTime = parseDatetimeLocal(startTime).getTime()
+    const nowTime = Date.now()
     const diffHours = (selectedTime - nowTime) / (1000 * 60 * 60)
 
-    if (diffHours < 0) {
-      alert('Thời gian vào phải lớn hơn thời gian hiện tại')
+    if (!Number.isFinite(selectedTime)) {
+      toast.error('Thời gian đã chọn không hợp lệ. Vui lòng chọn lại ngày và giờ đến bãi.')
+      return
+    }
+
+    if (diffHours <= 0) {
+      toast.warning('Thời gian dự kiến đến phải sau thời điểm hiện tại.')
       return
     }
 
     if (diffHours > 5) {
-      alert('Chỉ được phép đặt trước tối đa 5 tiếng')
+      toast.warning('Bạn chỉ có thể đặt chỗ trong vòng 5 giờ tính từ thời điểm hiện tại.')
       return
     }
 
@@ -106,7 +121,7 @@ function BookingContent() {
           type: 'standard',
         },
       ],
-      startTime: new Date(startTime).toISOString(),
+      startTime: vietnamDatetimeLocalToUtcIso(startTime),
       hours: 1,
       vehiclePlate: '',
       isPreRegistered: true,
@@ -118,14 +133,11 @@ function BookingContent() {
   }
 
   // Calculate min and max time for the input
-  const now = new Date()
-  const tzoffset = now.getTimezoneOffset() * 60000
-  const minTimeStr = new Date(now.getTime() - tzoffset).toISOString().slice(0, 16)
-  const maxTime = new Date(now.getTime() + 5 * 60 * 60 * 1000)
-  const maxTimeStr = new Date(maxTime.getTime() - tzoffset).toISOString().slice(0, 16)
+  const { min: minTimeStr, max: maxTimeStr } = bookingTimeBoundsLocal()
 
   return (
     <div className="home-landing booking-landing">
+      <ToastContainer toasts={toast.toasts} onClose={toast.close} />
       <section className="home-hero">
         <div className="home-hero-media" aria-hidden="true">
           <img src="/image/banner.jpg" alt="" className="home-hero-img" />
@@ -182,7 +194,7 @@ function BookingContent() {
                   </div>
 
                   {/* Bảng giá chuyển sang bên trái */}
-                  <PriceTable />
+                  <PriceTable {...carPolicy} />
                 </section>
 
                 {/* Bên phải: Chỉ thông tin thanh toán */}
@@ -200,7 +212,7 @@ function BookingContent() {
 
                     <div className="booking-payment-item booking-payment-item--total">
                       <span>Số tiền thanh toán</span>
-                      <strong>30.000 đ</strong>
+                      <strong>{formatCurrency(carPolicy.basePrice)}</strong>
                     </div>
                   </div>
 

@@ -11,6 +11,7 @@ import type { BookingDraft, BookingRecord, PaymentMethod } from '../types/bookin
 import { addHours } from '../utils/pricing'
 import { useAuth } from './AuthContext'
 import { apiClient } from '../config/api'
+import { parseBackendUtcDate } from '../utils/dateTime'
 
 interface PricingPolicyRaw {
   policyId: string
@@ -48,6 +49,7 @@ interface BookingContextValue {
   updateBookingStatus: (id: string, status: BookingRecord['status']) => void
   getPolicy: (vehicle: 'car' | 'bike') => {
     basePrice: number
+    baseHours: number
     nightSurcharge: number
     extraHourPrice: number
   }
@@ -81,12 +83,14 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       if (found) {
         return {
           basePrice: found.basePrice,
+          baseHours: found.baseHours,
           nightSurcharge: found.nightSurcharge,
           extraHourPrice: found.extraHourPrice,
         }
       }
       return {
         basePrice: vehicle === 'car' ? 25000 : 5000,
+        baseHours: 1,
         nightSurcharge: vehicle === 'car' ? 20000 : 5000,
         extraHourPrice: vehicle === 'car' ? 10000 : 2000,
       }
@@ -98,11 +102,11 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     if (!user) return []
     return bookings
       .filter((b) => b.userEmail === user.email)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort((a, b) => parseBackendUtcDate(b.createdAt).getTime() - parseBackendUtcDate(a.createdAt).getTime())
   }, [bookings, user])
 
   const getAllBookings = useCallback(() => {
-    return [...bookings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return [...bookings].sort((a, b) => parseBackendUtcDate(b.createdAt).getTime() - parseBackendUtcDate(a.createdAt).getTime())
   }, [bookings])
 
   const completePayment = useCallback(

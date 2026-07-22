@@ -1,34 +1,32 @@
+import {
+  toVietnamDateInput,
+  toVietnamDatetimeLocal,
+  vietnamDatetimeLocalToUtcIso,
+} from './dateTime'
+
 export const BOOKING_WINDOW_HOURS = 5
 export const QUARTER_MINUTES = [0, 15, 30, 45] as const
 
 export function toDatetimeLocalValue(date: Date): string {
-  const offsetMs = date.getTimezoneOffset() * 60_000
-  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16)
+  return toVietnamDatetimeLocal(date)
 }
 
 export function toDateInputValue(date: Date): string {
-  return toDatetimeLocalValue(date).slice(0, 10)
+  return toVietnamDateInput(date)
 }
 
 export function parseDatetimeLocal(value: string): Date {
-  return new Date(value)
+  return new Date(vietnamDatetimeLocalToUtcIso(value))
 }
 
 function ceilToQuarterHour(date: Date): Date {
-  const next = new Date(date)
-  next.setSeconds(0, 0)
-  const remainder = next.getMinutes() % 15
-  if (remainder !== 0) {
-    next.setMinutes(next.getMinutes() + (15 - remainder))
-  }
-  return next
+  const quarter = 15 * 60_000
+  return new Date(Math.ceil(date.getTime() / quarter) * quarter)
 }
 
 function floorToQuarterHour(date: Date): Date {
-  const floored = new Date(date)
-  floored.setSeconds(0, 0)
-  floored.setMinutes(floored.getMinutes() - (floored.getMinutes() % 15))
-  return floored
+  const quarter = 15 * 60_000
+  return new Date(Math.floor(date.getTime() / quarter) * quarter)
 }
 
 export function getBookingTimeBounds(now = new Date()) {
@@ -94,8 +92,7 @@ function isSlotInBounds(date: string, hour: number, minute: number, now = new Da
 export function getAvailableDates(now = new Date()): string[] {
   const { min, max } = getBookingTimeBounds(now)
   const dates: string[] = []
-  const cursor = new Date(min)
-  cursor.setHours(0, 0, 0, 0)
+  let cursor = parseDatetimeLocal(`${toDateInputValue(min)}T00:00`)
 
   while (cursor.getTime() <= max.getTime()) {
     const date = toDateInputValue(cursor)
@@ -105,7 +102,7 @@ export function getAvailableDates(now = new Date()): string[] {
       ),
     )
     if (hasSlot) dates.push(date)
-    cursor.setDate(cursor.getDate() + 1)
+    cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000)
   }
 
   return dates
@@ -142,6 +139,7 @@ export function combineBookingDatetimeLocal(date: string, hour: number, minute: 
 export function formatBookingWindowHint(now = new Date()): string {
   const { min, max } = getBookingTimeBounds(now)
   const formatter = new Intl.DateTimeFormat('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
     hour: '2-digit',
     minute: '2-digit',
     day: '2-digit',

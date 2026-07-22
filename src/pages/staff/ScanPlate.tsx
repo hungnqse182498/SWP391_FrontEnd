@@ -30,7 +30,7 @@ import {
   type ReservationDto,
   type VehicleTypeDto,
 } from '../../utils/apiServices'
-import { formatNowInVietnamTime, formatUtcToVietnamDateTime } from '../../utils/dateTime'
+import { formatNowInVietnamTime, formatUtcToVietnamDateTime, parseBackendUtcDate } from '../../utils/dateTime'
 
 type GatePanel = 'scan' | 'reservations' | 'active-vehicles'
 
@@ -185,8 +185,8 @@ export default function ScanPlate() {
             .filter((item) => !['cancelled', 'completed'].includes(item.status?.toLowerCase()))
             .sort(
               (left, right) =>
-                new Date(left.expectedEntryTime).getTime() -
-                new Date(right.expectedEntryTime).getTime(),
+                parseBackendUtcDate(left.expectedEntryTime).getTime() -
+                parseBackendUtcDate(right.expectedEntryTime).getTime(),
             ),
         )
       }
@@ -197,7 +197,7 @@ export default function ScanPlate() {
             .filter((item) => item.status?.toLowerCase() === 'active' && !item.exitTime)
             .sort(
               (left, right) =>
-                new Date(right.entryTime).getTime() - new Date(left.entryTime).getTime(),
+                parseBackendUtcDate(right.entryTime).getTime() - parseBackendUtcDate(left.entryTime).getTime(),
             ),
         )
       }

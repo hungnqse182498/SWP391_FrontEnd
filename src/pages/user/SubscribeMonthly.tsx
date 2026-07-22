@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Bike, CalendarDays, Car, CreditCard } from 'lucide-react'
+import { Bike, CalendarDays, Car, CreditCard, MapPin } from 'lucide-react'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { useAuth } from '../../context/AuthContext'
 import {
@@ -84,6 +84,7 @@ function SubscribeContent() {
   const requiresFixedSlot = Boolean(
     selectedPackage?.requireFixedSlot && getVehicleFilter(selectedPackage) !== 'bike',
   )
+  const selectedFixedSlot = availableFixedSlots.find((slot) => slot.slotId === selectedFixedSlotId)
 
   useEffect(() => {
     if (!profile?.vehiclePlate) return undefined
@@ -219,35 +220,41 @@ function SubscribeContent() {
       </header>
 
       <div className="subscribe-layout">
-        <div className="card-panel">
+        <div className="card-panel subscribe-vehicle-card">
           <h2>Thông tin xe</h2>
-          <div className="vehicle-toggle subscribe-vehicle-toggle">
-            <button type="button" className={vehicle === 'all' ? 'active' : ''} onClick={() => setVehicle('all')}>
-              Tất cả
-            </button>
-            <button type="button" className={vehicle === 'car' ? 'active' : ''} onClick={() => setVehicle('car')}>
-              <Car size={18} /> Ô tô
-            </button>
-            <button type="button" className={vehicle === 'bike' ? 'active' : ''} onClick={() => setVehicle('bike')}>
-              <Bike size={18} /> Xe máy
-            </button>
+          <div className="subscribe-vehicle-filter">
+            <span>Loại phương tiện</span>
+            <div className="vehicle-toggle subscribe-vehicle-toggle">
+              <button type="button" className={vehicle === 'all' ? 'active' : ''} onClick={() => setVehicle('all')}>
+                Tất cả
+              </button>
+              <button type="button" className={vehicle === 'car' ? 'active' : ''} onClick={() => setVehicle('car')}>
+                <Car size={18} /> Ô tô
+              </button>
+              <button type="button" className={vehicle === 'bike' ? 'active' : ''} onClick={() => setVehicle('bike')}>
+                <Bike size={18} /> Xe máy
+              </button>
+            </div>
+            <small>Chọn loại xe để lọc danh sách gói.</small>
           </div>
 
-          <label className="hero-field">
-            <span>Biển số xe</span>
+          <label className="hero-field subscribe-plate-field">
+            <span>Biển số xe đăng ký</span>
             <div>
               <Car size={18} />
               <input
                 type="text"
                 value={licensePlate}
                 onChange={(event) => setLicensePlate(event.target.value.toUpperCase())}
-                placeholder="VD: 51A-12345"
+                placeholder="Ví dụ: 51A-12345"
+                aria-describedby="subscribe-plate-hint"
               />
             </div>
+            <small id="subscribe-plate-hint">Nhập đúng biển số của xe sẽ sử dụng gói.</small>
           </label>
         </div>
 
-        <div className="card-panel">
+        <div className="card-panel subscribe-packages-card">
           <h2>Chọn gói dịch vụ</h2>
           {loadingPackages ? (
             <p className="section-desc">Đang tải danh sách gói...</p>
@@ -261,49 +268,81 @@ function SubscribeContent() {
                   type="button"
                   className={`subscribe-plan-btn${selectedPackage?.packageId === pkg.packageId ? ' active' : ''}`}
                   onClick={() => setSelectedPackageId(pkg.packageId)}
+                  aria-pressed={selectedPackage?.packageId === pkg.packageId}
                 >
                   <span className="plan-tag">{pkg.vehicleTypeName || 'Phương tiện'}</span>
-                  <strong>{pkg.packageName}</strong>
-                  <span>{formatCurrency(pkg.price)}</span>
-                  <small>
-                    <CalendarDays size={14} /> Thời hạn: {pkg.durationMonths} tháng
-                  </small>
-                  {getVehicleFilter(pkg) === 'car' && (
-                    <small>
-                      {pkg.requireFixedSlot
-                        ? 'Bạn được chọn vị trí ô tô cố định'
-                        : 'Hệ thống phân vị trí ô tô ngẫu nhiên'}
-                    </small>
-                  )}
+                  <strong className="plan-name">{pkg.packageName}</strong>
+                  <span className="plan-price-label">Giá gói</span>
+                  <span className="plan-price">{formatCurrency(pkg.price)}</span>
+                  <div className="plan-details">
+                    <div className="plan-detail-row">
+                      <CalendarDays size={16} />
+                      <span>
+                        <small>Thời hạn</small>
+                        <strong>{pkg.durationMonths} tháng</strong>
+                      </span>
+                    </div>
+                    <div className="plan-detail-row">
+                      <MapPin size={16} />
+                      <span>
+                        <small>Vị trí đỗ</small>
+                        <strong>
+                          {getVehicleFilter(pkg) === 'bike'
+                            ? 'Không cố định'
+                            : pkg.requireFixedSlot
+                              ? 'Được chọn cố định'
+                              : 'Hệ thống phân bổ'}
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
                 </button>
               ))}
             </div>
           )}
 
           {requiresFixedSlot && (
-            <label className="hero-field" style={{ marginTop: '1rem' }}>
-              <span>Vị trí đỗ cố định tại tầng cư dân</span>
-              <div>
-                <Car size={18} />
-                <select
-                  value={selectedFixedSlotId}
-                  disabled={loadingSlots || availableFixedSlots.length === 0}
-                  onChange={(event) => setSelectedFixedSlotId(event.target.value)}
-                >
-                  {loadingSlots ? (
-                    <option value="">Đang tải vị trí...</option>
-                  ) : availableFixedSlots.length === 0 ? (
-                    <option value="">Không còn vị trí phù hợp</option>
-                  ) : (
-                    availableFixedSlots.map((slot) => (
-                      <option key={slot.slotId} value={slot.slotId}>
-                        {slot.slotCode} - {slot.floorName || 'Tầng cư dân'}
-                      </option>
-                    ))
-                  )}
-                </select>
+            <div className="subscribe-slot-picker">
+              <div className="subscribe-slot-heading">
+                <span className="subscribe-slot-icon"><MapPin size={19} /></span>
+                <div>
+                  <strong>Chọn vị trí đỗ cố định</strong>
+                  <small>Vị trí đã chọn sẽ được dành riêng cho xe mang biển số trên.</small>
+                </div>
+                <span className="subscribe-required-badge">Bắt buộc</span>
               </div>
-            </label>
+
+              <label className="hero-field subscribe-slot-field">
+                <span>Vị trí còn trống tại tầng cư dân</span>
+                <div>
+                  <Car size={18} />
+                  <select
+                    value={selectedFixedSlotId}
+                    disabled={loadingSlots || availableFixedSlots.length === 0}
+                    onChange={(event) => setSelectedFixedSlotId(event.target.value)}
+                  >
+                    {loadingSlots ? (
+                      <option value="">Đang tải vị trí...</option>
+                    ) : availableFixedSlots.length === 0 ? (
+                      <option value="">Không còn vị trí phù hợp</option>
+                    ) : (
+                      availableFixedSlots.map((slot) => (
+                        <option key={slot.slotId} value={slot.slotId}>
+                          {slot.slotCode} — {slot.floorName || 'Tầng cư dân'}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+                <small className={selectedFixedSlot ? 'subscribe-slot-selected' : ''}>
+                  {loadingSlots
+                    ? 'Đang kiểm tra vị trí còn trống...'
+                    : selectedFixedSlot
+                      ? `Đang chọn: ${selectedFixedSlot.slotCode} tại ${selectedFixedSlot.floorName || 'tầng cư dân'}`
+                      : 'Vui lòng chọn một vị trí còn trống để tiếp tục thanh toán.'}
+                </small>
+              </label>
+            </div>
           )}
         </div>
       </div>

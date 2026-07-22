@@ -1,4 +1,4 @@
-import type { ParkingFloor, ParkingSpot, SpotStatus } from '../types/parking'
+import type { ParkingFloor, ParkingSpot } from '../types/parking'
 import { MOCK_FLOOR_LAYOUTS, rowLabels } from './parkingLayoutConfig'
 
 function buildFloorFromLayout(

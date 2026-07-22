@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 const LOGO_SRC = "/image/logo.png";
 
 export default function Footer() {
-  const year = new Date().getFullYear();
+  const year = Number(new Intl.DateTimeFormat('en', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric' }).format(new Date()));
 
   return (
     <footer className="site-footer" id="support">

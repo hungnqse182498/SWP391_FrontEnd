@@ -5,11 +5,26 @@ import ManagerPageShell from '../../components/ManagerPageShell'
 import { apiClient } from '../../config/api'
 
 interface ParkingSlot {
-  slotId: number
+  slotId: string
+  floorId: string
   slotCode: string
   floorName: string
+  vehicleTypeId: string
   vehicleTypeName: string
   status: string
+}
+
+interface FloorOption {
+  floorId: string
+  floorName: string
+  dedicatedVehicleTypeId?: string
+  dedicatedVehicleTypeName?: string
+  isResident: boolean
+}
+
+interface VehicleTypeOption {
+  vehicleTypeId: string
+  typeName: string
 }
 
 interface ApiResponse<T> {
@@ -43,7 +58,7 @@ const STATUS_TILE_MAP: Record<string, string> = {
   Locked: 'slot-tile--locked',
 }
 
-const EMPTY_FORM = { slotCode: '', floorName: '', vehicleTypeName: '', status: 'Available' }
+const EMPTY_FORM = { slotCode: '', floorId: '', vehicleTypeId: '', status: 'Available' }
 
 function getLabel(status: string) {
   return STATUS_LABEL_MAP[status] ?? status
@@ -51,7 +66,10 @@ function getLabel(status: string) {
 
 export default function ManagerSlots() {
   const [slots, setSlots] = useState<ParkingSlot[]>([])
+  const [floors, setFloors] = useState<FloorOption[]>([])
+  const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeOption[]>([])
   const [loading, setLoading] = useState(false)
+  const [optionsLoading, setOptionsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Filters
@@ -84,8 +102,26 @@ export default function ManagerSlots() {
     }
   }
 
+  const fetchOptions = async () => {
+    setOptionsLoading(true)
+    try {
+      const [floorResponse, vehicleTypeResponse] = await Promise.all([
+        apiClient.get<ApiResponse<FloorOption[]>>('/Floor'),
+        apiClient.get<ApiResponse<VehicleTypeOption[]>>('/VehicleType'),
+      ])
+      if (!floorResponse.isSuccess) throw new Error(floorResponse.message || 'Không thể tải danh sách tầng.')
+      if (!vehicleTypeResponse.isSuccess) throw new Error(vehicleTypeResponse.message || 'Không thể tải danh sách loại xe.')
+      setFloors(floorResponse.result ?? [])
+      setVehicleTypes(vehicleTypeResponse.result ?? [])
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Không thể tải dữ liệu lựa chọn.')
+    } finally {
+      setOptionsLoading(false)
+    }
+  }
+
   useEffect(() => {
-    const timer = window.setTimeout(() => { void fetchSlots() }, 0)
+    const timer = window.setTimeout(() => { void fetchSlots(); void fetchOptions() }, 0)
     return () => window.clearTimeout(timer)
   }, [])
 
@@ -117,8 +153,8 @@ export default function ManagerSlots() {
     setEditTarget(slot)
     setForm({
       slotCode: slot.slotCode,
-      floorName: slot.floorName,
-      vehicleTypeName: slot.vehicleTypeName,
+      floorId: slot.floorId,
+      vehicleTypeId: slot.vehicleTypeId,
       status: slot.status,
     })
     setShowModal(true)
@@ -251,24 +287,36 @@ export default function ManagerSlots() {
               </div>
               <div className="form-field">
                 <label htmlFor="slot-floor">Tầng *</label>
-                <input
+                <select
                   id="slot-floor"
-                  type="text"
                   required
-                  value={form.floorName}
-                  onChange={(e) => setForm({ ...form, floorName: e.target.value })}
-                  placeholder="VD: B1"
-                />
+                  value={form.floorId}
+                  disabled={optionsLoading}
+                  onChange={(e) => {
+                    const floor = floors.find((item) => item.floorId === e.target.value)
+                    setForm({
+                      ...form,
+                      floorId: e.target.value,
+                      vehicleTypeId: floor?.dedicatedVehicleTypeId || form.vehicleTypeId,
+                    })
+                  }}
+                >
+                  <option value="" disabled>{optionsLoading ? 'Đang tải tầng...' : '-- Chọn tầng --'}</option>
+                  {floors.map((floor) => <option key={floor.floorId} value={floor.floorId}>{floor.floorName}{floor.isResident ? ' · Tầng cư dân' : ''}</option>)}
+                </select>
               </div>
               <div className="form-field">
-                <label htmlFor="slot-vtype">Loại xe</label>
-                <input
+                <label htmlFor="slot-vtype">Loại xe *</label>
+                <select
                   id="slot-vtype"
-                  type="text"
-                  value={form.vehicleTypeName}
-                  onChange={(e) => setForm({ ...form, vehicleTypeName: e.target.value })}
-                  placeholder="VD: Xe máy"
-                />
+                  required
+                  value={form.vehicleTypeId}
+                  disabled={optionsLoading}
+                  onChange={(e) => setForm({ ...form, vehicleTypeId: e.target.value })}
+                >
+                  <option value="" disabled>{optionsLoading ? 'Đang tải loại xe...' : '-- Chọn loại xe --'}</option>
+                  {vehicleTypes.map((vehicleType) => <option key={vehicleType.vehicleTypeId} value={vehicleType.vehicleTypeId}>{vehicleType.typeName}</option>)}
+                </select>
               </div>
               <div className="form-field">
                 <label htmlFor="slot-status">Trạng thái</label>
@@ -288,7 +336,7 @@ export default function ManagerSlots() {
                 <button type="button" className="btn btn-ghost" onClick={closeModal}>
                   Hủy
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>
+                <button type="submit" className="btn btn-primary" disabled={saving || optionsLoading || !form.floorId || !form.vehicleTypeId}>
                   {saving ? 'Đang lưu...' : editTarget ? 'Lưu thay đổi' : 'Thêm slot'}
                 </button>
               </div>

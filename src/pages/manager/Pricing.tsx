@@ -14,7 +14,7 @@ import {
 import ManagerConfirmActionModal from '../../components/ManagerConfirmActionModal'
 import ManagerPageShell from '../../components/ManagerPageShell'
 import { ApiRequestError, apiClient } from '../../config/api'
-import { formatUtcToVietnamDate } from '../../utils/dateTime'
+import { formatUtcToVietnamDate, toVietnamDateInput } from '../../utils/dateTime'
 
 interface PricingPolicy {
   policyId: string
@@ -56,7 +56,7 @@ function createEmptyForm(): PricingForm {
     baseHours: '1',
     extraHourPrice: '',
     nightSurcharge: '0',
-    effectiveDate: new Date().toISOString().slice(0, 10),
+    effectiveDate: toVietnamDateInput(),
     status: 'Active',
   }
 }
@@ -145,7 +145,7 @@ export default function ManagerPricing() {
       baseHours: String(policy.baseHours),
       extraHourPrice: String(policy.extraHourPrice),
       nightSurcharge: String(policy.nightSurcharge ?? 0),
-      effectiveDate: policy.effectiveDate?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+      effectiveDate: policy.effectiveDate ? toVietnamDateInput(policy.effectiveDate) : toVietnamDateInput(),
       status: policy.status.toLowerCase() === 'inactive' ? 'Inactive' : 'Active',
     })
     setFormError('')
@@ -281,15 +281,14 @@ export default function ManagerPricing() {
             <form onSubmit={handleSave}>
               {formError && <div className="manager-inline-error" role="alert">{formError}</div>}
               <div className="form-grid-2">
-                <div className="form-field form-field--full"><label htmlFor="pp-vtype">Loại phương tiện *</label><select id="pp-vtype" autoFocus value={form.vehicleTypeId} onChange={(event) => setForm({ ...form, vehicleTypeId: event.target.value })}><option value="">Chọn loại phương tiện</option>{vehicleTypes.map((vehicleType) => <option key={vehicleType.vehicleTypeId} value={vehicleType.vehicleTypeId}>{vehicleType.typeName}</option>)}</select></div>
-                <div className="form-field"><label htmlFor="pp-base-price">Giá cơ bản *</label><div className="manager-money-field"><input id="pp-base-price" type="number" min={0} step={1000} value={form.basePrice} onChange={(event) => setForm({ ...form, basePrice: event.target.value })} placeholder="30000" /><span>₫</span></div></div>
-                <div className="form-field"><label htmlFor="pp-base-hours">Số giờ cơ bản *</label><div className="manager-money-field"><input id="pp-base-hours" type="number" min={1} step={1} value={form.baseHours} onChange={(event) => setForm({ ...form, baseHours: event.target.value })} /><span>giờ</span></div></div>
-                <div className="form-field"><label htmlFor="pp-extra-hour">Giá mỗi giờ phát sinh *</label><div className="manager-money-field"><input id="pp-extra-hour" type="number" min={0} step={1000} value={form.extraHourPrice} onChange={(event) => setForm({ ...form, extraHourPrice: event.target.value })} placeholder="10000" /><span>₫</span></div></div>
-                <div className="form-field"><label htmlFor="pp-night">Phụ thu qua đêm</label><div className="manager-money-field"><input id="pp-night" type="number" min={0} step={1000} value={form.nightSurcharge} onChange={(event) => setForm({ ...form, nightSurcharge: event.target.value })} /><span>₫</span></div></div>
-                <div className="form-field"><label htmlFor="pp-effective">Ngày hiệu lực *</label><input id="pp-effective" type="date" value={form.effectiveDate} onChange={(event) => setForm({ ...form, effectiveDate: event.target.value })} /></div>
+                <div className="form-field form-field--full"><label htmlFor="pp-vtype">Loại phương tiện *</label><select id="pp-vtype" autoFocus required value={form.vehicleTypeId} onChange={(event) => setForm({ ...form, vehicleTypeId: event.target.value })}><option value="">Chọn loại phương tiện</option>{vehicleTypes.map((vehicleType) => <option key={vehicleType.vehicleTypeId} value={vehicleType.vehicleTypeId}>{vehicleType.typeName}</option>)}</select></div>
+                <div className="form-field"><label htmlFor="pp-base-price">Giá cơ bản (VNĐ) *</label><input id="pp-base-price" type="number" min={0} step={1000} required value={form.basePrice} onChange={(event) => setForm({ ...form, basePrice: event.target.value })} placeholder="Ví dụ: 30000" /></div>
+                <div className="form-field"><label htmlFor="pp-base-hours">Số giờ cơ bản *</label><input id="pp-base-hours" type="number" min={1} step={1} required value={form.baseHours} onChange={(event) => setForm({ ...form, baseHours: event.target.value })} placeholder="Ví dụ: 2" /></div>
+                <div className="form-field"><label htmlFor="pp-extra-hour">Giá mỗi giờ phát sinh (VNĐ) *</label><input id="pp-extra-hour" type="number" min={0} step={1000} required value={form.extraHourPrice} onChange={(event) => setForm({ ...form, extraHourPrice: event.target.value })} placeholder="Ví dụ: 10000" /></div>
+                <div className="form-field"><label htmlFor="pp-night">Phụ thu qua đêm (VNĐ)</label><input id="pp-night" type="number" min={0} step={1000} value={form.nightSurcharge} onChange={(event) => setForm({ ...form, nightSurcharge: event.target.value })} placeholder="Ví dụ: 20000" /></div>
+                <div className="form-field"><label htmlFor="pp-effective">Ngày hiệu lực *</label><input id="pp-effective" type="date" required value={form.effectiveDate} onChange={(event) => setForm({ ...form, effectiveDate: event.target.value })} /></div>
                 <div className="form-field"><label htmlFor="pp-status">Trạng thái</label><select id="pp-status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as PricingForm['status'] })}><option value="Active">Đang áp dụng</option><option value="Inactive">Ngừng áp dụng</option></select></div>
               </div>
-              <div className="manager-pricing-preview"><BadgeDollarSign size={19} aria-hidden /><div><span>Xem trước công thức</span><strong>{form.basePrice ? formatVND(Number(form.basePrice)) : '0 ₫'} cho {form.baseHours || '0'} giờ đầu, sau đó {form.extraHourPrice ? formatVND(Number(form.extraHourPrice)) : '0 ₫'}/giờ.</strong></div></div>
               <div className="form-actions"><button type="button" className="btn btn-ghost" onClick={closeModal} disabled={saving}>Hủy</button><button type="submit" className="btn btn-primary" disabled={saving || !form.vehicleTypeId || !form.basePrice || !form.baseHours || !form.extraHourPrice}>{saving ? 'Đang lưu...' : editTarget ? 'Lưu thay đổi' : 'Thêm chính sách'}</button></div>
             </form>
           </div>

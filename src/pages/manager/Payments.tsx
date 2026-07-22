@@ -3,7 +3,7 @@ import { Banknote, Eye, Pencil, Plus, RefreshCw, Search, Trash2, WalletCards, X 
 import ManagerConfirmActionModal from '../../components/ManagerConfirmActionModal'
 import ManagerPageShell from '../../components/ManagerPageShell'
 import { apiClient } from '../../config/api'
-import { formatUtcToVietnamDateTime } from '../../utils/dateTime'
+import { formatUtcToVietnamDateTime, toVietnamDatetimeLocal, vietnamDatetimeLocalToUtcIso } from '../../utils/dateTime'
 import { formatCurrency } from '../../utils/pricing'
 import type { ApiResponse, MonthlySubscriptionDto, ParkingSessionDto, ReservationDto, UserDto } from '../../utils/apiServices'
 
@@ -34,10 +34,17 @@ interface PaymentForm {
   transactionReference: string
 }
 
+type ReferenceKind = 'user' | 'reservation' | 'subscription' | 'session'
+type ReferenceDetail =
+  | { kind: 'user'; data: UserDto }
+  | { kind: 'reservation'; data: ReservationDto }
+  | { kind: 'subscription'; data: MonthlySubscriptionDto }
+  | { kind: 'session'; data: ParkingSessionDto }
+
 const EMPTY_FORM: PaymentForm = {
   userId: '', sessionId: '', reservationId: '', subscriptionId: '', amount: '',
   paymentMethod: 'Cash', paymentType: 'CheckoutFee', paymentTime: '',
-  paymentStatus: 'Pending', transactionReference: '',
+  paymentStatus: 'Success', transactionReference: '',
 }
 
 const LABELS: Record<string, string> = {
@@ -51,11 +58,7 @@ function label(value?: string) {
 }
 
 function toLocalInput(value?: string) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const offset = date.getTimezoneOffset() * 60000
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16)
+  return toVietnamDatetimeLocal(value)
 }
 
 function toForm(payment: PaymentDto): PaymentForm {
@@ -85,6 +88,10 @@ export default function ManagerPayments() {
   const [subscriptions, setSubscriptions] = useState<MonthlySubscriptionDto[]>([])
   const [referencesLoading, setReferencesLoading] = useState(false)
   const [referenceError, setReferenceError] = useState<string | null>(null)
+  const [referenceModal, setReferenceModal] = useState<{ kind: ReferenceKind; title: string } | null>(null)
+  const [referenceDetail, setReferenceDetail] = useState<ReferenceDetail | null>(null)
+  const [referenceDetailLoading, setReferenceDetailLoading] = useState(false)
+  const [referenceDetailError, setReferenceDetailError] = useState<string | null>(null)
 
   const fetchPayments = useCallback(async () => {
     setLoading(true)
@@ -131,14 +138,71 @@ export default function ManagerPayments() {
     })
   }, [fetchPayments, fetchReferenceOptions])
 
+  const getPaymentSubject = useCallback((payment: PaymentDto) => {
+    const lines: string[] = []
+    const user = users.find((item) => item.userId === payment.userId)
+    if (payment.userId) {
+      lines.push(user
+        ? `${user.fullName || user.userName} · ${user.email}`
+        : 'Không tải được thông tin khách hàng')
+    }
+
+    if (payment.reservationId) {
+      const reservation = reservations.find((item) => item.reservationId === payment.reservationId)
+      lines.push(reservation
+        ? [
+            reservation.licensePlate,
+            reservation.vehicleTypeName || reservation.vehicleType?.typeName,
+            formatUtcToVietnamDateTime(reservation.expectedEntryTime),
+          ].filter(Boolean).join(' · ')
+        : 'Không tải được thông tin đặt chỗ')
+    }
+
+    if (payment.subscriptionId) {
+      const subscription = subscriptions.find((item) => item.subscriptionId === payment.subscriptionId)
+      lines.push(subscription
+        ? `${subscription.licensePlate} · ${subscription.packageName || 'Chưa rõ gói'}`
+        : 'Không tải được thông tin gói tháng')
+    }
+
+    if (payment.sessionId) {
+      const session = sessions.find((item) => item.sessionId === payment.sessionId)
+      lines.push(session
+        ? `${session.licensePlateIn} · ${formatUtcToVietnamDateTime(session.entryTime)}`
+        : 'Không tải được thông tin phiên gửi xe')
+    }
+
+    return {
+      lines: lines.length > 0 ? lines : ['Không có thông tin liên kết'],
+      searchText: lines.join(' '),
+    }
+  }, [reservations, sessions, subscriptions, users])
+
+  const getPayerName = useCallback((payment: PaymentDto) => {
+    const user = users.find((item) => item.userId === payment.userId)
+    if (user) return user.fullName || user.userName
+
+    const reservation = reservations.find((item) => item.reservationId === payment.reservationId)
+    if (reservation) return reservation.userFullName || reservation.user?.fullName || 'Chưa rõ khách hàng'
+
+    const subscription = subscriptions.find((item) => item.subscriptionId === payment.subscriptionId)
+    if (subscription) return subscription.fullName || 'Chưa rõ khách hàng'
+
+    const session = sessions.find((item) => item.sessionId === payment.sessionId)
+    if (session) return session.driverFullName || 'Khách vãng lai'
+
+    return payment.userId ? 'Không tải được thông tin khách hàng' : 'Không liên kết khách hàng'
+  }, [reservations, sessions, subscriptions, users])
+
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
     return payments.filter((item) => {
       if (statusFilter !== 'all' && item.paymentStatus.toLowerCase() !== statusFilter) return false
-      return !term || [item.paymentId, item.transactionReference, item.userId, item.sessionId, item.reservationId, item.subscriptionId]
+      const subject = getPaymentSubject(item)
+      return !term || [item.paymentId, item.transactionReference, subject.searchText]
         .filter(Boolean).join(' ').toLowerCase().includes(term)
     })
-  }, [payments, query, statusFilter])
+  }, [getPaymentSubject, payments, query, statusFilter])
 
   const success = payments.filter((item) => item.paymentStatus.toLowerCase() === 'success')
   const selectableUsers = users.filter((user) => {
@@ -147,6 +211,60 @@ export default function ManagerPayments() {
   })
   const openCreate = () => { setForm(EMPTY_FORM); setEditing(null); setError(null); void fetchReferenceOptions() }
   const openEdit = (payment: PaymentDto) => { setForm(toForm(payment)); setEditing(payment); setSelected(null); setError(null); void fetchReferenceOptions() }
+
+  const openReference = async (kind: ReferenceKind, id: string) => {
+    const titles: Record<ReferenceKind, string> = {
+      user: 'Chi tiết khách hàng',
+      reservation: 'Chi tiết đặt chỗ',
+      subscription: 'Chi tiết đăng ký tháng',
+      session: 'Chi tiết phiên gửi xe',
+    }
+    setReferenceModal({ kind, title: titles[kind] })
+    setReferenceDetail(null)
+    setReferenceDetailError(null)
+    setReferenceDetailLoading(true)
+    try {
+      if (kind === 'user') {
+        const response = await apiClient.get<ApiResponse<UserDto>>(`/User/${id}`)
+        if (!response.isSuccess || !response.result) throw new Error(response.message || 'Không thể tải khách hàng.')
+        setReferenceDetail({ kind, data: response.result })
+      } else if (kind === 'reservation') {
+        const response = await apiClient.get<ApiResponse<ReservationDto>>(`/reservations/${id}`)
+        if (!response.isSuccess || !response.result) throw new Error(response.message || 'Không thể tải đặt chỗ.')
+        setReferenceDetail({ kind, data: response.result })
+      } else if (kind === 'subscription') {
+        const response = await apiClient.get<ApiResponse<MonthlySubscriptionDto>>(`/MonthlySubscription/${id}`)
+        if (!response.isSuccess || !response.result) throw new Error(response.message || 'Không thể tải đăng ký tháng.')
+        setReferenceDetail({ kind, data: response.result })
+      } else {
+        const response = await apiClient.get<ApiResponse<ParkingSessionDto>>(`/ParkingSession/${id}`)
+        if (!response.isSuccess || !response.result) throw new Error(response.message || 'Không thể tải phiên gửi xe.')
+        setReferenceDetail({ kind, data: response.result })
+      }
+    } catch (requestError) {
+      setReferenceDetailError(requestError instanceof Error ? requestError.message : 'Không thể tải dữ liệu liên kết.')
+    } finally {
+      setReferenceDetailLoading(false)
+    }
+  }
+
+  const renderReferenceButtons = (payment: PaymentDto) => {
+    const paymentType = (payment.paymentType ?? '').replace(/[\s_-]/g, '').toLowerCase()
+    const references: Array<{ kind: Exclude<ReferenceKind, 'user'>; id: string; label: string }> = []
+
+    if (paymentType === 'deposit' && payment.reservationId) {
+      references.push({ kind: 'reservation', id: payment.reservationId, label: 'Xem đặt chỗ' })
+    } else if (paymentType === 'checkoutfee' && payment.sessionId) {
+      references.push({ kind: 'session', id: payment.sessionId, label: 'Xem phiên gửi xe' })
+    } else if ((paymentType === 'subscriptionfee' || paymentType === 'subscriptionrenewal') && payment.subscriptionId) {
+      references.push({ kind: 'subscription', id: payment.subscriptionId, label: 'Xem gói tháng' })
+    }
+
+    if (references.length === 0) return <small>Không có liên kết</small>
+    return <div className="manager-row-actions">{references.map((reference) => (
+      <button key={reference.kind} type="button" className="btn btn-outline btn-sm manager-payment-reference-button" onClick={() => void openReference(reference.kind, reference.id)}><Eye size={14} aria-hidden /> {reference.label}</button>
+    ))}</div>
+  }
 
   const handlePaymentTypeChange = (paymentType: string) => {
     setForm((current) => ({
@@ -192,7 +310,7 @@ export default function ManagerPayments() {
       userId: optionalGuid(form.userId), sessionId: optionalGuid(form.sessionId),
       reservationId: optionalGuid(form.reservationId), subscriptionId: optionalGuid(form.subscriptionId),
       amount: Number(form.amount), paymentMethod: form.paymentMethod, paymentType: form.paymentType,
-      paymentTime: form.paymentTime ? new Date(form.paymentTime).toISOString() : editing?.paymentTime ?? null,
+      paymentTime: form.paymentTime ? vietnamDatetimeLocalToUtcIso(form.paymentTime) : editing?.paymentTime ?? null,
       paymentStatus: form.paymentStatus, transactionReference: form.transactionReference.trim() || null,
     }
     try {
@@ -201,7 +319,7 @@ export default function ManagerPayments() {
         : await apiClient.post<ApiResponse<PaymentDto>>('/payments', payload)
       if (!response.isSuccess) throw new Error(response.message || 'Không thể lưu thanh toán.')
       setEditing(undefined)
-      await fetchPayments()
+      await Promise.all([fetchPayments(), fetchReferenceOptions()])
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Không thể lưu thanh toán.')
     } finally {
@@ -239,10 +357,10 @@ export default function ManagerPayments() {
             <div className="manager-filter-controls"><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="all">Tất cả trạng thái</option><option value="pending">Chờ xử lý</option><option value="success">Thành công</option><option value="failed">Thất bại</option></select></div>
           </div>
           {error && <div className="manager-inline-error" role="alert">{error}</div>}
-          <div className="table-wrap manager-table-wrap"><table className="ui-table manager-resource-table manager-payment-table"><thead><tr><th>Mã thanh toán</th><th>Thời gian</th><th>Loại</th><th>Phương thức</th><th>Số tiền</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
-            {loading && payments.length === 0 && <tr><td colSpan={7}><div className="manager-empty-state">Đang tải dữ liệu...</div></td></tr>}
-            {!loading && filtered.length === 0 && <tr><td colSpan={7}><div className="manager-empty-state">Không có giao dịch phù hợp.</div></td></tr>}
-            {filtered.map((payment) => <tr key={payment.paymentId}><td><code className="manager-code-value">{payment.paymentId.slice(0, 8)}…</code></td><td>{formatUtcToVietnamDateTime(payment.paymentTime)}</td><td>{label(payment.paymentType)}</td><td>{label(payment.paymentMethod)}</td><td><strong className="manager-payment-amount">{formatCurrency(payment.amount)}</strong></td><td><span className={`manager-payment-status ${payment.paymentStatus.toLowerCase()}`}><i />{label(payment.paymentStatus)}</span></td><td><div className="manager-row-actions"><button type="button" className="btn btn-outline btn-sm" onClick={() => void openDetail(payment)}><Eye size={15} /> Xem</button><button type="button" className="btn btn-outline btn-sm manager-edit-button" onClick={() => openEdit(payment)}><Pencil size={15} aria-hidden /> Sửa</button><button type="button" className="btn btn-ghost btn-sm manager-danger-action" onClick={() => setDeleteTarget(payment)}><Trash2 size={15} /> Xóa</button></div></td></tr>)}
+          <div className="table-wrap manager-table-wrap"><table className="ui-table manager-resource-table manager-payment-table"><thead><tr><th>Mã thanh toán</th><th>Thanh toán cho</th><th>Thời gian</th><th>Loại</th><th>Phương thức</th><th>Số tiền</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
+            {loading && payments.length === 0 && <tr><td colSpan={8}><div className="manager-empty-state">Đang tải dữ liệu...</div></td></tr>}
+            {!loading && filtered.length === 0 && <tr><td colSpan={8}><div className="manager-empty-state">Không có giao dịch phù hợp.</div></td></tr>}
+            {filtered.map((payment) => <tr key={payment.paymentId}><td><code className="manager-code-value">{payment.paymentId.slice(0, 8)}…</code></td><td>{renderReferenceButtons(payment)}</td><td>{formatUtcToVietnamDateTime(payment.paymentTime)}</td><td>{label(payment.paymentType)}</td><td>{label(payment.paymentMethod)}</td><td><strong className="manager-payment-amount">{formatCurrency(payment.amount)}</strong></td><td><span className={`manager-payment-status ${payment.paymentStatus.toLowerCase()}`}><i />{label(payment.paymentStatus)}</span></td><td><div className="manager-row-actions"><button type="button" className="btn btn-outline btn-sm" onClick={() => void openDetail(payment)}><Eye size={15} /> Xem</button><button type="button" className="btn btn-outline btn-sm manager-edit-button" onClick={() => openEdit(payment)}><Pencil size={15} aria-hidden /> Sửa</button><button type="button" className="btn btn-ghost btn-sm manager-danger-action" onClick={() => setDeleteTarget(payment)}><Trash2 size={15} /> Xóa</button></div></td></tr>)}
           </tbody></table></div>
         </section>
       </div>
@@ -280,7 +398,16 @@ export default function ManagerPayments() {
         </div>
       )}
 
-      {selected && <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSelected(null)}><div className="modal-panel manager-payment-modal"><div className="manager-modal-header"><div><h3 className="modal-title">Chi tiết thanh toán</h3><p>{selected.paymentId}</p></div><button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelected(null)}><X size={20} /></button></div><div className="manager-payment-modal-hero"><span><Banknote size={25} /></span><div><small>Số tiền</small><strong>{formatCurrency(selected.amount)}</strong><span className={`manager-payment-status ${selected.paymentStatus.toLowerCase()}`}><i />{label(selected.paymentStatus)}</span></div></div><div className="manager-payment-detail-grid"><div><span>Thời gian</span><strong>{formatUtcToVietnamDateTime(selected.paymentTime)}</strong></div><div><span>Phương thức</span><strong>{label(selected.paymentMethod)}</strong></div><div><span>Loại</span><strong>{label(selected.paymentType)}</strong></div><div><span>Ordercode</span><code>{selected.transactionReference || 'Không có'}</code></div></div><div className="form-actions"><button type="button" className="btn btn-outline manager-edit-button" onClick={() => openEdit(selected)}><Pencil size={16} aria-hidden /> Sửa</button><button type="button" className="btn btn-ghost manager-danger-action" onClick={() => setDeleteTarget(selected)}><Trash2 size={16} /> Xóa</button></div></div></div>}
+      {selected && <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSelected(null)}><div className="modal-panel manager-payment-modal"><div className="manager-modal-header"><div><h3 className="modal-title">Chi tiết thanh toán</h3><p>Thông tin giao dịch và đối tượng liên kết</p></div><button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelected(null)}><X size={20} /></button></div><div className={`manager-payment-modal-hero manager-payment-modal-hero--${selected.paymentStatus.toLowerCase()}`}><span><Banknote size={25} /></span><div><small>Số tiền</small><strong>{formatCurrency(selected.amount)}</strong><span className={`manager-payment-status ${selected.paymentStatus.toLowerCase()}`}><i />{label(selected.paymentStatus)}</span></div></div><div className="manager-payment-detail-grid manager-payment-detail-grid--complete"><div><span>Mã thanh toán</span><code>{selected.paymentId}</code></div><div><span>Trạng thái</span><strong>{label(selected.paymentStatus)}</strong></div><div><span>Người thanh toán</span><strong>{getPayerName(selected)}</strong></div><div><span>Loại thanh toán</span><strong>{label(selected.paymentType)}</strong></div><div><span>Phương thức</span><strong>{label(selected.paymentMethod)}</strong></div><div><span>Thời gian thanh toán</span><strong>{formatUtcToVietnamDateTime(selected.paymentTime)}</strong></div><div><span>Order code</span><code>{selected.transactionReference || 'Không có'}</code></div><div className="manager-payment-reference-field"><span>Thanh toán cho</span>{renderReferenceButtons(selected)}</div></div><div className="form-actions"><button type="button" className="btn btn-outline manager-edit-button" onClick={() => openEdit(selected)}><Pencil size={16} aria-hidden /> Sửa</button><button type="button" className="btn btn-ghost manager-danger-action" onClick={() => setDeleteTarget(selected)}><Trash2 size={16} /> Xóa</button></div></div></div>}
+      {referenceModal && <div className="modal-overlay" onClick={(event) => event.target === event.currentTarget && setReferenceModal(null)}><div className="modal-panel manager-form-modal manager-payment-reference-modal" role="dialog" aria-modal="true"><div className="manager-modal-header"><div><h3 className="modal-title">{referenceModal.title}</h3><p>Dữ liệu liên kết trực tiếp với thanh toán.</p></div><button type="button" className="btn btn-ghost btn-sm" aria-label="Đóng" onClick={() => setReferenceModal(null)}><X size={20} /></button></div>
+        {referenceDetailLoading && <div className="manager-empty-state"><RefreshCw size={20} className="spin" aria-hidden /> Đang tải chi tiết...</div>}
+        {referenceDetailError && <div className="manager-inline-error" role="alert">{referenceDetailError}</div>}
+        {referenceDetail?.kind === 'user' && <div className="manager-payment-detail-grid"><div><span>Họ tên</span><strong>{referenceDetail.data.fullName}</strong></div><div><span>Tài khoản</span><strong>{referenceDetail.data.userName}</strong></div><div><span>Email</span><strong>{referenceDetail.data.email}</strong></div><div><span>Số điện thoại</span><strong>{referenceDetail.data.phoneNumber || 'Chưa có'}</strong></div><div><span>Vai trò</span><strong>{referenceDetail.data.roleName}</strong></div><div><span>Trạng thái</span><strong>{referenceDetail.data.status}</strong></div></div>}
+        {referenceDetail?.kind === 'reservation' && <><div className="manager-payment-session-hero manager-payment-reservation-hero"><div className="manager-session-plate"><small>ĐẶT CHỖ</small><strong>{referenceDetail.data.licensePlate || 'CHƯA CÓ BIỂN'}</strong></div><div><span>Trạng thái đặt chỗ</span><strong>{label(referenceDetail.data.status)}</strong><small>{referenceDetail.data.userFullName || referenceDetail.data.user?.fullName || 'Chưa có tên khách hàng'}</small></div></div><div className="manager-payment-detail-grid manager-payment-session-detail-grid"><div><span>Khách hàng</span><strong>{referenceDetail.data.userFullName || referenceDetail.data.user?.fullName || 'Chưa có tên'}</strong></div><div><span>Loại xe</span><strong>{referenceDetail.data.vehicleTypeName || referenceDetail.data.vehicleType?.typeName || 'Chưa rõ'}</strong></div><div><span>Thời gian dự kiến đến</span><strong>{formatUtcToVietnamDateTime(referenceDetail.data.expectedEntryTime)}</strong></div><div><span>Thời điểm đặt chỗ</span><strong>{referenceDetail.data.createdAt ? formatUtcToVietnamDateTime(referenceDetail.data.createdAt) : 'Chưa ghi nhận'}</strong></div></div></>}
+        {referenceDetail?.kind === 'subscription' && <><div className="manager-payment-session-hero manager-payment-subscription-hero"><div className="manager-session-plate"><small>VIỆT NAM</small><strong>{referenceDetail.data.licensePlate}</strong></div><div><span>Gói đăng ký</span><strong>{referenceDetail.data.packageName || 'Chưa rõ gói'}</strong><small>{referenceDetail.data.fullName || 'Chưa có tên khách hàng'}</small></div></div><div className="manager-payment-detail-grid manager-payment-session-detail-grid"><div><span>Loại xe</span><strong>{referenceDetail.data.vehicleType || 'Chưa rõ'}</strong></div><div><span>Trạng thái</span><strong>{label(referenceDetail.data.status)}</strong></div><div><span>Giá gói</span><strong>{formatCurrency(referenceDetail.data.price)}</strong></div><div><span>Slot cố định</span><strong>{referenceDetail.data.fixedSlot || 'Không cố định'}</strong></div><div><span>Ngày bắt đầu</span><strong>{formatUtcToVietnamDateTime(referenceDetail.data.startDate)}</strong></div><div><span>Ngày kết thúc</span><strong>{formatUtcToVietnamDateTime(referenceDetail.data.endDate)}</strong></div></div></>}
+        {referenceDetail?.kind === 'session' && <><div className="manager-payment-session-hero"><div className="manager-session-plate"><small>VIỆT NAM</small><strong>{referenceDetail.data.licensePlateIn}</strong>{referenceDetail.data.licensePlateOut && referenceDetail.data.licensePlateOut !== referenceDetail.data.licensePlateIn && <span>Ra: {referenceDetail.data.licensePlateOut}</span>}</div><div><span>Trạng thái phiên</span><strong>{label(referenceDetail.data.status)}</strong><small>{referenceDetail.data.exitTime ? 'Phiên đã ghi nhận thời gian xe ra' : 'Xe chưa hoàn tất checkout'}</small></div></div><div className="manager-payment-detail-grid manager-payment-session-detail-grid"><div><span>Người gửi</span><strong>{referenceDetail.data.driverFullName || 'Khách vãng lai'}</strong></div><div><span>Loại xe</span><strong>{referenceDetail.data.vehicleTypeName || 'Chưa rõ'}</strong></div><div><span>Thời gian vào</span><strong>{formatUtcToVietnamDateTime(referenceDetail.data.entryTime)}</strong></div><div><span>Thời gian ra</span><strong>{referenceDetail.data.exitTime ? formatUtcToVietnamDateTime(referenceDetail.data.exitTime) : 'Chưa ra'}</strong></div><div><span>Slot được xếp</span><strong>{referenceDetail.data.assignedSlotCode || 'Chưa xếp slot'}</strong></div><div><span>Slot thực tế</span><strong>{referenceDetail.data.actualSlotCode || 'Chưa ghi nhận'}</strong></div><div><span>Cổng vào</span><strong>{referenceDetail.data.entryGateName || 'Chưa xác định'}</strong></div><div><span>Cổng ra</span><strong>{referenceDetail.data.exitGateName || 'Chưa ghi nhận'}</strong></div></div></>}
+        <div className="form-actions"><button type="button" className="btn btn-primary" onClick={() => setReferenceModal(null)}>Đóng</button></div>
+      </div></div>}
       <ManagerConfirmActionModal open={Boolean(deleteTarget)} title="Xóa giao dịch?" description={<>Bạn có chắc muốn xóa giao dịch <strong>{deleteTarget?.paymentId}</strong>? Hành động này không thể hoàn tác.</>} targetLabel={deleteTarget ? `${deleteTarget.paymentId.slice(0, 8)}…` : undefined} targetMeta={deleteTarget ? `${formatCurrency(deleteTarget.amount)} · ${label(deleteTarget.paymentStatus)}` : undefined} targetIcon={<Banknote size={18} aria-hidden />} note="Việc xóa giao dịch có thể ảnh hưởng đến dữ liệu đối soát và báo cáo doanh thu." errorFallback="Không thể xóa thanh toán." onCancel={() => setDeleteTarget(null)} onConfirm={deletePayment} />
     </ManagerPageShell>
   )

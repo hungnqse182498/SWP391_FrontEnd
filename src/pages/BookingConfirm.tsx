@@ -8,6 +8,7 @@ import ProtectedRoute from '../components/ProtectedRoute'
 import { useAuth } from '../context/AuthContext'
 import { useBooking } from '../context/BookingContext'
 import { formatCurrency } from '../utils/pricing'
+import { toVietnamDatetimeLocal, vietnamDatetimeLocalToUtcIso } from '../utils/dateTime'
 
 function ConfirmContent() {
   const navigate = useNavigate()
@@ -19,11 +20,7 @@ function ConfirmContent() {
 
   useEffect(() => {
     if (!draft) return
-    const d = new Date(draft.startTime)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    setStartLocal(
-      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`,
-    )
+    setStartLocal(toVietnamDatetimeLocal(draft.startTime))
     setHours(draft.hours)
     setPlate(draft.vehiclePlate)
   }, [draft])
@@ -44,7 +41,7 @@ function ConfirmContent() {
     setDraft({
       ...draft,
       hours: isPreRegistered ? 1 : hours,
-      startTime: new Date(startLocal).toISOString(),
+      startTime: vietnamDatetimeLocalToUtcIso(startLocal),
       vehiclePlate: plate.trim(),
     })
     navigate('/thanh-toan')

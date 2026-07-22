@@ -5,7 +5,8 @@ import { Link } from 'react-router-dom'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { ConfirmDialog, ToastContainer, useToast } from '../../components/Toast'
 import { reservationApi, type ReservationDto } from '../../utils/apiServices'
-import { parseBackendUtcDate } from '../../utils/dateTime'
+import { bookingTimeBoundsLocal, parseDatetimeLocal } from '../../utils/bookingTime'
+import { parseBackendUtcDate, vietnamDatetimeLocalToUtcIso } from '../../utils/dateTime'
 import { formatDateTime } from '../../utils/pricing'
 
 const statusLabel: Record<string, string> = {
@@ -123,8 +124,8 @@ function HistoryContent() {
       return
     }
 
-    const selectedTime = new Date(newTime).getTime()
-    const nowTime = new Date().getTime()
+    const selectedTime = parseDatetimeLocal(newTime).getTime()
+    const nowTime = Date.now()
     const diffHours = (selectedTime - nowTime) / (1000 * 60 * 60)
 
     if (diffHours < 0) {
@@ -137,7 +138,7 @@ function HistoryContent() {
     }
 
     try {
-      const isoTime = new Date(newTime).toISOString()
+      const isoTime = vietnamDatetimeLocalToUtcIso(newTime)
       const res = await reservationApi.changeTime(id, isoTime)
       if (res.isSuccess) {
         toast.success('Đổi giờ check-in thành công!')
@@ -160,10 +161,7 @@ function HistoryContent() {
   }
 
   // Calculate time limits for datetime input
-  const nowLocal = new Date()
-  const tzoffset = nowLocal.getTimezoneOffset() * 60000
-  const minTimeStr = new Date(nowLocal.getTime() - tzoffset).toISOString().slice(0, 16)
-  const maxTimeStr = new Date(nowLocal.getTime() + 5 * 60 * 60 * 1000 - tzoffset).toISOString().slice(0, 16)
+  const { min: minTimeStr, max: maxTimeStr } = bookingTimeBoundsLocal()
 
   return (
     <section className="history-page">

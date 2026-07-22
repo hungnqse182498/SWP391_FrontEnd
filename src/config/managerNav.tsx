@@ -9,6 +9,7 @@ import {
   Layers,
   Package,
   CalendarRange,
+  CalendarCheck2,
   ParkingSquare,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -56,6 +57,13 @@ export const MANAGER_NAV: NavItem[] = [
     path: '/manager/sessions',
     icon: <Clock size={18} />,
     desc: 'Theo dõi phiên gửi xe',
+  },
+  {
+    id: 'reservations',
+    label: 'Quản lý đặt chỗ',
+    path: '/manager/reservations',
+    icon: <CalendarCheck2 size={18} />,
+    desc: 'Theo dõi lịch hẹn và trạng thái đặt chỗ',
   },
   {
     id: 'monthly-subscriptions',

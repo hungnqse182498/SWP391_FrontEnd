@@ -50,6 +50,7 @@ import ManagerSubscriptionPackages from './pages/manager/SubscriptionPackages'
 import ManagerMonthlySubscriptions from './pages/manager/MonthlySubscriptions'
 
 import ManagerParkingSessions from './pages/manager/ParkingSessions'
+import ManagerReservations from './pages/manager/Reservations'
 import ManagerPayments from './pages/manager/Payments'
 import ManagerVehicleChangeRequests from './pages/manager/VehicleChangeRequests'
 
@@ -150,6 +151,8 @@ export default function App() {
               <Route path="manager/monthly-subscriptions" element={<ManagerMonthlySubscriptions />} />
 
               <Route path="manager/sessions" element={<ManagerParkingSessions />} />
+
+              <Route path="manager/reservations" element={<ManagerReservations />} />
 
               <Route path="manager/payments" element={<ManagerPayments />} />
 

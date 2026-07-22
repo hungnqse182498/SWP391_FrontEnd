@@ -26,11 +26,13 @@ interface VehicleChangeRequestDto {
   oldLicensePlate?: string
   newLicensePlate?: string
   reason?: string
+  rejectionReason?: string
   status?: string
   createdAt?: string
   processedAt?: string
   userFullName?: string
   packageName?: string
+  handledByFullName?: string
 }
 
 type DateFilter = 'all' | 'today' | '7days' | '30days'
@@ -217,7 +219,7 @@ export default function ManagerVehicleChangeRequests() {
                   <article key={request.requestId} className={`manager-change-card${isPending ? ' pending' : ''}`}>
                     <div className="manager-change-details">
                       <div className="manager-change-person"><span><UserRound size={20} aria-hidden /></span><div><strong>{request.userFullName || 'Khách hàng'}</strong><small><Package size={13} aria-hidden /> {request.packageName || 'Chưa rõ gói'}</small></div></div>
-                      <div className="manager-change-info"><p><strong>Lý do:</strong> {request.reason || 'Không cung cấp'}</p><span><Clock3 size={14} aria-hidden /> {request.createdAt ? formatUtcToVietnamDateTime(request.createdAt) : 'Không rõ thời gian'}</span>{request.processedAt && <span>Đã xử lý: {formatUtcToVietnamDateTime(request.processedAt)}</span>}</div>
+                      <div className="manager-change-info"><p><strong>Lý do khách gửi:</strong> {request.reason || 'Không cung cấp'}</p>{request.rejectionReason && <p><strong>Lý do từ chối:</strong> {request.rejectionReason}</p>}<span><Clock3 size={14} aria-hidden /> {request.createdAt ? formatUtcToVietnamDateTime(request.createdAt) : 'Không rõ thời gian'}</span>{request.processedAt && <span>Đã xử lý: {formatUtcToVietnamDateTime(request.processedAt)}{request.handledByFullName ? ` · ${request.handledByFullName}` : ''}</span>}</div>
                     </div>
                     <div className="manager-change-plates"><div><small>Biển số hiện tại</small><strong>{request.oldLicensePlate || '—'}</strong></div><ArrowRight size={20} aria-hidden /><div className="new"><small>Biển số đề nghị</small><strong>{request.newLicensePlate || '—'}</strong></div></div>
                     <div className="manager-change-side"><span className={`manager-change-status status-${normalizedStatus}`}><i />{statusLabel(request.status)}</span>{isPending && <div><button type="button" className="btn btn-primary btn-sm" onClick={() => openModal('approve', request)}><Check size={16} aria-hidden /> Duyệt</button><button type="button" className="btn btn-ghost btn-sm manager-danger-action" onClick={() => openModal('reject', request)}><X size={16} aria-hidden /> Từ chối</button></div>}</div>

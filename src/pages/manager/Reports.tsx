@@ -34,6 +34,7 @@ import type { PieLabelRenderProps } from 'recharts'
 import ManagerPageShell from '../../components/ManagerPageShell'
 import { apiClient } from '../../config/api'
 import { formatCurrency } from '../../utils/pricing'
+import { toVietnamDateInput } from '../../utils/dateTime'
 import type { ReactNode } from 'react'
 
 /* ── colour palette ─────────────────────────────────────────── */
@@ -120,40 +121,31 @@ interface OperationsDTO {
 }
 
 /* ── Date helpers ────────────────────────────────────────────── */
-function toDateStr(d: Date) {
-  return d.toISOString().slice(0, 10)
-}
-
-function startOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), 1)
-}
-
-function daysAgo(n: number) {
-  const d = new Date()
-  d.setDate(d.getDate() - n)
-  return d
+function shiftCalendarDate(value: string, days: number) {
+  const date = new Date(`${value}T12:00:00Z`)
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
 }
 
 type Preset = 'today' | '7d' | '30d' | 'this-month' | 'last-month' | 'custom'
 
 function presetDates(preset: Preset): { from: string; to: string } {
-  const now = new Date()
+  const today = toVietnamDateInput()
   switch (preset) {
     case 'today':
-      return { from: toDateStr(now), to: toDateStr(now) }
+      return { from: today, to: today }
     case '7d':
-      return { from: toDateStr(daysAgo(6)), to: toDateStr(now) }
+      return { from: shiftCalendarDate(today, -6), to: today }
     case '30d':
-      return { from: toDateStr(daysAgo(29)), to: toDateStr(now) }
+      return { from: shiftCalendarDate(today, -29), to: today }
     case 'this-month':
-      return { from: toDateStr(startOfMonth(now)), to: toDateStr(now) }
+      return { from: `${today.slice(0, 7)}-01`, to: today }
     case 'last-month': {
-      const first = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      const last = new Date(now.getFullYear(), now.getMonth(), 0)
-      return { from: toDateStr(first), to: toDateStr(last) }
+      const last = shiftCalendarDate(`${today.slice(0, 7)}-01`, -1)
+      return { from: `${last.slice(0, 7)}-01`, to: last }
     }
     default:
-      return { from: toDateStr(daysAgo(29)), to: toDateStr(now) }
+      return { from: shiftCalendarDate(today, -29), to: today }
   }
 }
 

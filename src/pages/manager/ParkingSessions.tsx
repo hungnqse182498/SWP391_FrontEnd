@@ -3,7 +3,9 @@ import {
   Activity,
   CalendarDays,
   CarFront,
+  ChevronDown,
   Clock3,
+  CreditCard,
   Eye,
   Fingerprint,
   Hash,
@@ -26,8 +28,11 @@ import {
   formatUtcToVietnamDate,
   formatUtcToVietnamDateTime,
   parseBackendUtcDate,
+  toVietnamDatetimeLocal,
+  vietnamDatetimeLocalToUtcIso,
 } from '../../utils/dateTime'
 import type { ApiResponse, ParkingSessionDto } from '../../utils/apiServices'
+import { formatCurrency } from '../../utils/pricing'
 
 type DateFilter = 'all' | 'today' | '7days' | '30days'
 
@@ -46,11 +51,7 @@ const EMPTY_SESSION_FORM: SessionForm = {
 }
 
 function toLocalInput(value?: string) {
-  if (!value) return ''
-  const date = parseBackendUtcDate(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const offset = date.getTimezoneOffset() * 60000
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16)
+  return toVietnamDatetimeLocal(value)
 }
 
 function sessionToForm(session: ParkingSessionDto): SessionForm {
@@ -75,6 +76,14 @@ const STATUS_LABELS: Record<string, string> = {
 function statusLabel(status?: string) {
   const normalized = status?.toLowerCase() ?? ''
   return STATUS_LABELS[normalized] ?? status ?? 'Không rõ'
+}
+
+function paymentStatusLabel(status?: string) {
+  const normalized = status?.toLowerCase() ?? ''
+  if (normalized === 'success') return 'Đã thanh toán'
+  if (normalized === 'pending') return 'Chờ thanh toán'
+  if (normalized === 'failed') return 'Thanh toán thất bại'
+  return status || 'Chưa có thanh toán'
 }
 
 function sessionDuration(session: ParkingSessionDto, referenceTime: number) {
@@ -145,7 +154,12 @@ export default function ManagerParkingSessions() {
   }, [fetchSessions])
 
   const openCreate = () => {
-    setSessionForm({ ...EMPTY_SESSION_FORM, vehicleTypeId: vehicleOptions[0]?.id ?? '', entryGateId: gateOptions.find((gate) => gate.type?.toLowerCase() === 'entry')?.id ?? gateOptions[0]?.id ?? '' })
+    setSessionForm({
+      ...EMPTY_SESSION_FORM,
+      vehicleTypeId: vehicleOptions[0]?.id ?? '',
+      entryGateId: gateOptions.find((gate) => gate.type?.toLowerCase() === 'entry')?.id ?? gateOptions[0]?.id ?? '',
+      entryTime: toLocalInput(new Date().toISOString()),
+    })
     setEditingSession(null)
   }
 
@@ -172,16 +186,21 @@ export default function ManagerParkingSessions() {
     const base = {
       driverUserId: optional(sessionForm.driverUserId), licensePlateIn: sessionForm.licensePlateIn.trim().toUpperCase(),
       entryImageUrl: optional(sessionForm.entryImageUrl), vehicleTypeId: sessionForm.vehicleTypeId,
-      entryTime: sessionForm.entryTime ? new Date(sessionForm.entryTime).toISOString() : null,
+      entryTime: sessionForm.entryTime ? vietnamDatetimeLocalToUtcIso(sessionForm.entryTime) : null,
       entryGateId: sessionForm.entryGateId, assignedSlotId: optional(sessionForm.assignedSlotId),
       actualSlotId: optional(sessionForm.actualSlotId), status: sessionForm.status,
     }
     const payload = editingSession ? {
       ...base, sessionId: editingSession.sessionId, licensePlateOut: optional(sessionForm.licensePlateOut),
-      exitImageUrl: optional(sessionForm.exitImageUrl), entryTime: new Date(sessionForm.entryTime).toISOString(),
-      exitTime: sessionForm.exitTime ? new Date(sessionForm.exitTime).toISOString() : null,
+      exitImageUrl: optional(sessionForm.exitImageUrl), entryTime: vietnamDatetimeLocalToUtcIso(sessionForm.entryTime),
+      exitTime: sessionForm.exitTime ? vietnamDatetimeLocalToUtcIso(sessionForm.exitTime) : null,
       exitGateId: optional(sessionForm.exitGateId),
-    } : base
+    } : {
+      ...base, licensePlateOut: optional(sessionForm.licensePlateOut),
+      exitImageUrl: optional(sessionForm.exitImageUrl),
+      exitTime: sessionForm.exitTime ? vietnamDatetimeLocalToUtcIso(sessionForm.exitTime) : null,
+      exitGateId: optional(sessionForm.exitGateId),
+    }
     try {
       const response = editingSession
         ? await apiClient.put<ApiResponse<ParkingSessionDto>>('/ParkingSession', payload)
@@ -323,6 +342,7 @@ export default function ManagerParkingSessions() {
                         <span><Clock3 size={15} aria-hidden /><span><small>Giờ vào</small><strong>{formatUtcToVietnamDateTime(session.entryTime)}</strong></span></span>
                         <span><MapPin size={15} aria-hidden /><span><small>Vị trí</small><strong>{slot}</strong></span></span>
                         <span><Activity size={15} aria-hidden /><span><small>Thời lượng</small><strong>{sessionDuration(session, referenceTime)}</strong></span></span>
+                        <span><CreditCard size={15} aria-hidden /><span><small>Phí gửi xe</small><strong>{session.paymentAmount != null ? formatCurrency(session.paymentAmount) : isActive ? 'Chưa tính phí' : 'Chưa có thanh toán'}</strong></span></span>
                       </div>
                     </div>
                     <div className="manager-session-side">
@@ -339,23 +359,52 @@ export default function ManagerParkingSessions() {
 
       {editingSession !== undefined && (
         <div className="modal-overlay" onClick={(event) => event.target === event.currentTarget && setEditingSession(undefined)}>
-          <div className="modal-panel manager-form-modal" role="dialog" aria-modal="true">
-            <div className="manager-modal-header"><div><h3 className="modal-title">{editingSession ? 'Sửa phiên gửi xe' : 'Thêm phiên gửi xe'}</h3><p>Thông tin phải khớp với loại xe, cổng và slot trong hệ thống.</p></div><button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditingSession(undefined)}><X size={20} /></button></div>
-            <form onSubmit={saveSession}><div className="form-grid-2">
-              <div className="form-field"><label>Biển số vào *</label><input required value={sessionForm.licensePlateIn} onChange={(e) => setSessionForm({...sessionForm, licensePlateIn: e.target.value})} /></div>
-              <div className="form-field"><label>Biển số ra</label><input value={sessionForm.licensePlateOut} onChange={(e) => setSessionForm({...sessionForm, licensePlateOut: e.target.value})} /></div>
-              <div className="form-field"><label>Loại phương tiện *</label><select required value={sessionForm.vehicleTypeId} onChange={(e) => setSessionForm({...sessionForm, vehicleTypeId: e.target.value})}><option value="">Chọn loại xe</option>{vehicleOptions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
-              <div className="form-field"><label>Trạng thái *</label><select value={sessionForm.status} onChange={(e) => setSessionForm({...sessionForm, status: e.target.value})}><option value="Active">Đang trong bãi</option><option value="Completed">Đã hoàn thành</option><option value="Exception">Có sự cố</option></select></div>
-              <div className="form-field"><label>Cổng vào *</label><select required value={sessionForm.entryGateId} onChange={(e) => setSessionForm({...sessionForm, entryGateId: e.target.value})}><option value="">Chọn cổng vào</option>{gateOptions.map((item) => <option key={item.id} value={item.id}>{item.label}{item.type ? ` (${item.type})` : ''}</option>)}</select></div>
-              <div className="form-field"><label>Cổng ra</label><select value={sessionForm.exitGateId} onChange={(e) => setSessionForm({...sessionForm, exitGateId: e.target.value})}><option value="">Chưa có</option>{gateOptions.map((item) => <option key={item.id} value={item.id}>{item.label}{item.type ? ` (${item.type})` : ''}</option>)}</select></div>
-              <div className="form-field"><label>Thời gian vào{editingSession ? ' *' : ''}</label><input type="datetime-local" required={Boolean(editingSession)} value={sessionForm.entryTime} onChange={(e) => setSessionForm({...sessionForm, entryTime: e.target.value})} /></div>
-              <div className="form-field"><label>Thời gian ra</label><input type="datetime-local" value={sessionForm.exitTime} onChange={(e) => setSessionForm({...sessionForm, exitTime: e.target.value})} /></div>
-              <div className="form-field"><label>Slot được xếp</label><select value={sessionForm.assignedSlotId} onChange={(e) => setSessionForm({...sessionForm, assignedSlotId: e.target.value})}><option value="">Chưa xếp</option>{slotOptions.map((item) => <option key={item.id} value={item.id}>{item.label}{item.type ? ` · ${item.type}` : ''}</option>)}</select></div>
-              <div className="form-field"><label>Slot thực tế</label><select value={sessionForm.actualSlotId} onChange={(e) => setSessionForm({...sessionForm, actualSlotId: e.target.value})}><option value="">Chưa ghi nhận</option>{slotOptions.map((item) => <option key={item.id} value={item.id}>{item.label}{item.type ? ` · ${item.type}` : ''}</option>)}</select></div>
-              <div className="form-field form-field--full"><label>Driver User ID</label><input placeholder="UUID (tùy chọn)" value={sessionForm.driverUserId} onChange={(e) => setSessionForm({...sessionForm, driverUserId: e.target.value})} /></div>
-              <div className="form-field"><label>URL ảnh vào</label><input type="url" value={sessionForm.entryImageUrl} onChange={(e) => setSessionForm({...sessionForm, entryImageUrl: e.target.value})} /></div>
-              <div className="form-field"><label>URL ảnh ra</label><input type="url" value={sessionForm.exitImageUrl} onChange={(e) => setSessionForm({...sessionForm, exitImageUrl: e.target.value})} /></div>
-            </div>{error && <div className="manager-inline-error">{error}</div>}<div className="form-actions"><button type="button" className="btn btn-ghost" onClick={() => setEditingSession(undefined)}>Hủy</button><button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Đang lưu...' : 'Lưu phiên'}</button></div></form>
+          <div className="modal-panel manager-form-modal manager-session-form-modal" role="dialog" aria-modal="true">
+            <div className="manager-modal-header">
+              <div><h3 className="modal-title">{editingSession ? 'Sửa phiên gửi xe' : 'Thêm phiên gửi xe'}</h3><p>{editingSession ? 'Cập nhật thông tin vận hành của phiên.' : 'Nhập thông tin xe vào bãi để tạo phiên mới.'}</p></div>
+              <button type="button" className="btn btn-ghost btn-sm" aria-label="Đóng" onClick={() => setEditingSession(undefined)}><X size={20} /></button>
+            </div>
+            <form onSubmit={saveSession} className="manager-session-form">
+              <section className="manager-session-form-section">
+                <div className="manager-session-form-section-title"><CarFront size={18} /><div><h4>Phương tiện</h4><p>Thông tin nhận diện và trạng thái hiện tại.</p></div></div>
+                <div className="form-grid-2">
+                  <div className="form-field"><label>Biển số vào *</label><input required autoFocus placeholder="Ví dụ: 60A-999.99" value={sessionForm.licensePlateIn} onChange={(e) => setSessionForm({...sessionForm, licensePlateIn: e.target.value.toUpperCase()})} /></div>
+                  <div className="form-field"><label>Loại phương tiện *</label><select required value={sessionForm.vehicleTypeId} onChange={(e) => setSessionForm({...sessionForm, vehicleTypeId: e.target.value})}><option value="">Chọn loại xe</option>{vehicleOptions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
+                  <div className="form-field"><label>Trạng thái *</label><select value={sessionForm.status} onChange={(e) => setSessionForm({...sessionForm, status: e.target.value})}><option value="Active">Đang trong bãi</option><option value="Completed">Đã hoàn thành</option><option value="Exception">Có sự cố</option></select></div>
+                  <div className="form-field"><label>Biển số ra</label><input placeholder="Nếu khác biển số vào" value={sessionForm.licensePlateOut} onChange={(e) => setSessionForm({...sessionForm, licensePlateOut: e.target.value.toUpperCase()})} /></div>
+                </div>
+              </section>
+
+              <section className="manager-session-form-section">
+                <div className="manager-session-form-section-title"><MapPin size={18} /><div><h4>Cổng và vị trí</h4><p>Chọn đúng luồng di chuyển và chỗ đỗ của xe.</p></div></div>
+                <div className="form-grid-2">
+                  <div className="form-field"><label>Cổng vào *</label><select required value={sessionForm.entryGateId} onChange={(e) => setSessionForm({...sessionForm, entryGateId: e.target.value})}><option value="">Chọn cổng vào</option>{gateOptions.filter((item) => !item.type || item.type.toLowerCase() === 'entry').map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
+                  <div className="form-field"><label>Cổng ra{sessionForm.status === 'Completed' ? ' *' : ''}</label><select required={sessionForm.status === 'Completed'} value={sessionForm.exitGateId} onChange={(e) => setSessionForm({...sessionForm, exitGateId: e.target.value})}><option value="">Chưa ghi nhận</option>{gateOptions.filter((item) => !item.type || item.type.toLowerCase() === 'exit').map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
+                  <div className="form-field"><label>Slot được xếp</label><select value={sessionForm.assignedSlotId} onChange={(e) => setSessionForm({...sessionForm, assignedSlotId: e.target.value})}><option value="">Chưa xếp</option>{slotOptions.map((item) => <option key={item.id} value={item.id}>{item.label}{item.type ? ` · ${item.type}` : ''}</option>)}</select></div>
+                  <div className="form-field"><label>Slot thực tế</label><select value={sessionForm.actualSlotId} onChange={(e) => setSessionForm({...sessionForm, actualSlotId: e.target.value})}><option value="">Chưa ghi nhận</option>{slotOptions.map((item) => <option key={item.id} value={item.id}>{item.label}{item.type ? ` · ${item.type}` : ''}</option>)}</select></div>
+                </div>
+              </section>
+
+              <section className="manager-session-form-section">
+                <div className="manager-session-form-section-title"><Clock3 size={18} /><div><h4>Thời gian</h4><p>Kiểm tra thời điểm vào và ra của xe.</p></div></div>
+                <div className="form-grid-2">
+                  <div className="form-field"><label>Thời gian vào *</label><input type="datetime-local" required value={sessionForm.entryTime} onChange={(e) => setSessionForm({...sessionForm, entryTime: e.target.value})} /></div>
+                  <div className="form-field"><label>Thời gian ra{sessionForm.status === 'Completed' ? ' *' : ''}</label><input type="datetime-local" required={sessionForm.status === 'Completed'} value={sessionForm.exitTime} onChange={(e) => setSessionForm({...sessionForm, exitTime: e.target.value})} /></div>
+                </div>
+              </section>
+
+              <details className="manager-session-advanced">
+                <summary><span><UserRound size={17} /> Thông tin nâng cao</span><small>UUID người lái và đường dẫn ảnh</small><ChevronDown size={17} /></summary>
+                <div className="form-grid-2">
+                  <div className="form-field form-field--full"><label>Mã người lái</label><input placeholder="UUID — không bắt buộc" value={sessionForm.driverUserId} onChange={(e) => setSessionForm({...sessionForm, driverUserId: e.target.value})} /></div>
+                  <div className="form-field"><label>Đường dẫn ảnh vào</label><input type="url" placeholder="https://..." value={sessionForm.entryImageUrl} onChange={(e) => setSessionForm({...sessionForm, entryImageUrl: e.target.value})} /></div>
+                  <div className="form-field"><label>Đường dẫn ảnh ra</label><input type="url" placeholder="https://..." value={sessionForm.exitImageUrl} onChange={(e) => setSessionForm({...sessionForm, exitImageUrl: e.target.value})} /></div>
+                </div>
+              </details>
+
+              {error && <div className="manager-inline-error">{error}</div>}
+              <div className="form-actions manager-session-form-actions"><button type="button" className="btn btn-ghost" onClick={() => setEditingSession(undefined)}>Hủy</button><button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Đang lưu...' : editingSession ? 'Lưu thay đổi' : 'Tạo phiên'}</button></div>
+            </form>
           </div>
         </div>
       )}
@@ -387,6 +436,16 @@ export default function ManagerParkingSessions() {
             </section>
 
             <section className="manager-session-detail-section">
+              <div className="manager-session-section-heading"><CreditCard size={17} aria-hidden /><div><h4>Thanh toán</h4><p>Khoản phí checkout được liên kết với phiên gửi xe.</p></div></div>
+              <div className="manager-session-detail-grid">
+                <div><CreditCard size={17} aria-hidden /><span>Phí gửi xe</span><strong>{selectedSession.paymentAmount != null ? formatCurrency(selectedSession.paymentAmount) : 'Chưa có thanh toán'}</strong></div>
+                <div><Activity size={17} aria-hidden /><span>Trạng thái</span><strong>{paymentStatusLabel(selectedSession.paymentStatus)}</strong></div>
+                <div><CreditCard size={17} aria-hidden /><span>Phương thức</span><strong>{selectedSession.paymentMethod || 'Chưa ghi nhận'}</strong></div>
+                <div><CalendarDays size={17} aria-hidden /><span>Thời gian thanh toán</span><strong>{selectedSession.paymentTime ? formatUtcToVietnamDateTime(selectedSession.paymentTime) : 'Chưa ghi nhận'}</strong></div>
+              </div>
+            </section>
+
+            <section className="manager-session-detail-section">
               <div className="manager-session-section-heading"><MapPin size={17} aria-hidden /><div><h4>Cổng và vị trí đỗ</h4><p>Đối chiếu vị trí được phân bổ với dữ liệu vận hành thực tế.</p></div></div>
               <div className="manager-session-detail-grid manager-session-detail-grid--route">
                 <div><MapPin size={17} aria-hidden /><span>Cổng vào</span><strong>{selectedSession.entryGateName || 'Chưa xác định'}</strong><code>{selectedSession.entryGateId}</code></div>
@@ -409,7 +468,30 @@ export default function ManagerParkingSessions() {
               </div>
             </section>
             {selectedSession.ticket && <div className="manager-session-ticket"><QrCode size={21} aria-hidden /><div><strong>Mã vé phiên đang hoạt động</strong><code>{selectedSession.ticket.qrPayload}</code></div><img src={selectedSession.ticket.qrCodeDataUrl} alt={`QR vé xe ${selectedSession.licensePlateIn}`} /></div>}
-            <div className="form-actions"><button type="button" className="btn btn-outline manager-edit-button" onClick={() => openEdit(selectedSession)}><Pencil size={16} aria-hidden /> Sửa</button><button type="button" className="btn btn-ghost manager-danger-action" onClick={() => setDeleteTarget(selectedSession)}><Trash2 size={16} /> Xóa</button></div>
+            <div className="form-actions manager-session-modal-actions">
+              <button
+                type="button"
+                className="btn manager-session-modal-edit"
+                onClick={() => {
+                  const session = selectedSession
+                  setSelectedSession(null)
+                  openEdit(session)
+                }}
+              >
+                <Pencil size={16} aria-hidden /> Sửa phiên
+              </button>
+              <button
+                type="button"
+                className="btn manager-session-modal-delete"
+                onClick={() => {
+                  const session = selectedSession
+                  setSelectedSession(null)
+                  setDeleteTarget(session)
+                }}
+              >
+                <Trash2 size={16} aria-hidden /> Xóa phiên
+              </button>
+            </div>
           </div>
         </div>
       )}

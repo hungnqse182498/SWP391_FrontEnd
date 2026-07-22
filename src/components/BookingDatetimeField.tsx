@@ -57,7 +57,8 @@ export default function BookingDatetimeField({
           >
             {dates.map((option) => {
               const [year, month, day] = option.split('-').map(Number)
-              const label = new Date(year, month - 1, day).toLocaleDateString('vi-VN', {
+              const label = new Date(Date.UTC(year, month - 1, day, 12)).toLocaleDateString('vi-VN', {
+                timeZone: 'Asia/Ho_Chi_Minh',
                 weekday: 'short',
                 day: '2-digit',
                 month: '2-digit',

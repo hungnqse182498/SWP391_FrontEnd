@@ -2,6 +2,7 @@ import { Car, MapPin, Search } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import BookingDatetimeField from "./BookingDatetimeField";
+import { ToastContainer, useToast } from "./Toast";
 import {
   clampBookingDatetimeLocal,
   defaultBookingDatetimeLocal,
@@ -11,6 +12,7 @@ import {
 export default function HeroSection() {
   const navigate = useNavigate();
   const [startTime, setStartTime] = useState(defaultBookingDatetimeLocal);
+  const toast = useToast();
 
   const handleSearch = (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
@@ -19,7 +21,7 @@ export default function HeroSection() {
       : defaultBookingDatetimeLocal();
 
     if (!isBookingDatetimeLocalValid(normalized)) {
-      alert("Vui lòng chọn thời gian trong vòng 5 giờ tới.");
+      toast.warning("Thời gian dự kiến đến phải nằm trong vòng 5 giờ tính từ thời điểm hiện tại.");
       return;
     }
 
@@ -28,6 +30,7 @@ export default function HeroSection() {
 
   return (
     <section className="home-hero">
+      <ToastContainer toasts={toast.toasts} onClose={toast.close} />
       <div className="home-hero-media" aria-hidden>
         <img src="/image/banner.jpg" alt="" className="home-hero-img" />
         <div className="home-hero-overlay" />

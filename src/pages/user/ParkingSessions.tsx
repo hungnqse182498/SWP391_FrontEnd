@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Car, ChevronRight, CircleParking, Clock3, DoorOpen, Image, MapPin, QrCode, ShieldAlert, X } from 'lucide-react'
 import ProtectedRoute from '../../components/ProtectedRoute'
-import { formatUtcToVietnamDateTime } from '../../utils/dateTime'
+import { formatUtcToVietnamDateTime, parseBackendUtcDate } from '../../utils/dateTime'
 import { parkingSessionApi, type ParkingSessionDto } from '../../utils/apiServices'
 
 type SessionFilter = 'all' | 'active' | 'completed'
@@ -25,8 +25,8 @@ function statusClass(status: string) {
 }
 
 function durationLabel(session: ParkingSessionDto) {
-  const start = new Date(session.entryTime).getTime()
-  const end = session.exitTime ? new Date(session.exitTime).getTime() : Date.now()
+  const start = parseBackendUtcDate(session.entryTime).getTime()
+  const end = session.exitTime ? parseBackendUtcDate(session.exitTime).getTime() : Date.now()
   const totalMinutes = Math.max(0, Math.floor((end - start) / 60000))
   const days = Math.floor(totalMinutes / 1440)
   const hours = Math.floor((totalMinutes % 1440) / 60)
@@ -49,7 +49,7 @@ function ParkingSessionsContent() {
       if (res.isSuccess) {
         setSessions(
           [...(res.result || [])].sort(
-            (left, right) => new Date(right.entryTime).getTime() - new Date(left.entryTime).getTime(),
+            (left, right) => parseBackendUtcDate(right.entryTime).getTime() - parseBackendUtcDate(left.entryTime).getTime(),
           ),
         )
       } else {
