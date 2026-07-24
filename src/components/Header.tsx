@@ -11,6 +11,7 @@ import {
   UserPlus,
   Package,
   CircleParking,
+  TriangleAlert,
 } from 'lucide-react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
@@ -108,6 +109,10 @@ export default function Header() {
                     <CircleParking size={16} strokeWidth={2} aria-hidden />
                     Phiên gửi xe
                   </NavLink>
+                  <NavLink to="/bao-cao-su-co">
+                    <TriangleAlert size={16} strokeWidth={2} aria-hidden />
+                    Báo sự cố
+                  </NavLink>
                 </>
               )}
             </>
@@ -171,6 +176,10 @@ export default function Header() {
                       <Link to="/phien-gui-xe" role="menuitem" onClick={closeMenu}>
                         <CircleParking size={16} strokeWidth={2} aria-hidden />
                         Phiên gửi xe
+                      </Link>
+                      <Link to="/bao-cao-su-co" role="menuitem" onClick={closeMenu}>
+                        <TriangleAlert size={16} strokeWidth={2} aria-hidden />
+                        Báo cáo sự cố
                       </Link>
                       <Link to="/dat-cho" role="menuitem" onClick={closeMenu}>
                         <Car size={16} strokeWidth={2} aria-hidden />

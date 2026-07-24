@@ -1,27 +1,17 @@
-import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { AlertCircle, ExternalLink, LogOut, QrCode } from 'lucide-react'
-import StaffLayout from '../../components/StaffLayout'
-import ProtectedRoute from '../../components/ProtectedRoute'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { useLocation } from 'react-router-dom'
+import { ExternalLink, LogOut, QrCode } from 'lucide-react'
+import StaffPageShell from '../../components/StaffPageShell'
 import {
   gateApi,
   parkingOperationApi,
   type GateDto,
+  type ParkingCheckOutResponse,
   type ParkingOnlinePayment,
   type ParkingQrDecodeResult,
 } from '../../utils/apiServices'
 import { formatNowInVietnamTime } from '../../utils/dateTime'
-
-interface StaffMenuItem {
-  id: string
-  label: string
-  icon: ReactNode
-}
-
-const menuItems: StaffMenuItem[] = [
-  { id: 'checkout', label: 'Xử lý xe ra bãi', icon: <LogOut size={18} /> },
-  { id: 'exception', label: 'Xử lý ngoại lệ', icon: <AlertCircle size={18} /> },
-]
+import { formatCurrency } from '../../utils/pricing'
 
 function getOnlinePaymentUrl(payment: ParkingOnlinePayment | null) {
   return payment?.paymentUrl || payment?.PaymentUrl || ''
@@ -36,7 +26,8 @@ function getOnlinePaymentLinkId(payment: ParkingOnlinePayment | null) {
 }
 
 export default function Checkout() {
-  const navigate = useNavigate()
+  const location = useLocation()
+  const initialState = location.state as { sessionId?: string; licensePlate?: string; qrPayload?: string } | null
   const fileInputRef = useRef<HTMLInputElement>(null)
   const qrInputRef = useRef<HTMLInputElement>(null)
 
@@ -46,16 +37,17 @@ export default function Checkout() {
   const [uploading, setUploading] = useState(false)
   const [qrUploading, setQrUploading] = useState(false)
   const [qrDecode, setQrDecode] = useState<ParkingQrDecodeResult | null>(null)
-  const [qrPayload, setQrPayload] = useState('')
-  const [sessionId, setSessionId] = useState('')
-  const [licensePlate, setLicensePlate] = useState('')
-  const [exitTimePreview, setExitTimePreview] = useState('')
+  const [qrPayload, setQrPayload] = useState(initialState?.qrPayload ?? '')
+  const [sessionId, setSessionId] = useState(initialState?.sessionId ?? '')
+  const [licensePlate, setLicensePlate] = useState(initialState?.licensePlate ?? '')
+  const [exitTimePreview, setExitTimePreview] = useState(() => initialState?.licensePlate ? formatNowInVietnamTime() : '')
   const [gateId, setGateId] = useState('')
   const [exitGates, setExitGates] = useState<GateDto[]>([])
   const [paymentMethod, setPaymentMethod] = useState('Cash')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [onlinePayment, setOnlinePayment] = useState<ParkingOnlinePayment | null>(null)
+  const [checkoutResult, setCheckoutResult] = useState<ParkingCheckOutResponse | null>(null)
 
   useEffect(() => {
     gateApi
@@ -88,6 +80,7 @@ export default function Checkout() {
     setUploading(true)
     setMessage('')
     setOnlinePayment(null)
+    setCheckoutResult(null)
     setPlateForCheckout('')
 
     try {
@@ -118,6 +111,7 @@ export default function Checkout() {
     setQrUploading(true)
     setMessage('')
     setOnlinePayment(null)
+    setCheckoutResult(null)
     setQrDecode(null)
     setQrPayload('')
     setSessionId('')
@@ -159,6 +153,7 @@ export default function Checkout() {
     setLoading(true)
     setMessage('')
     setOnlinePayment(null)
+    setCheckoutResult(null)
     try {
       const customerType =
         checkOutType === 'auto'
@@ -180,6 +175,7 @@ export default function Checkout() {
         exitImageUrl: exitImageUrl || undefined,
       })
       if (res.isSuccess) {
+        setCheckoutResult(res.result ?? null)
         const payment = res.result?.onlinePayment ?? res.result?.OnlinePayment ?? null
         setOnlinePayment(payment)
         setMessage(res.message || 'Checkout thành công')
@@ -202,24 +198,16 @@ export default function Checkout() {
   }
 
   return (
-    <ProtectedRoute allowedRoles={['staff']}>
-      <StaffLayout
-        items={menuItems}
-        activeItem="checkout"
-        onSelectItem={(id) => {
-          if (id === 'checkout') navigate('/staff/checkout')
-          else if (id === 'exception') navigate('/staff/exception')
-        }}
-      >
-        <div className="staff-content-wrapper">
+      <StaffPageShell activeItem="checkout">
+        <div className="staff-content-wrapper staff-manager-page manager-resource-page">
           <div className="staff-section">
-            <h2>Xử lý xe ra bãi</h2>
-            <p className="section-desc">
-              Kiểm tra biển số và xác nhận xe ra bãi.
-            </p>
+            <header className="manager-resource-header">
+              <div className="manager-resource-title"><span className="manager-resource-icon manager-resource-icon--orange"><LogOut size={24} aria-hidden /></span><div><h2>Checkout tại cổng ra</h2><p>Đọc vé QR, đối chiếu biển số, tính phí và xác nhận xe rời bãi.</p></div></div>
+            </header>
 
-            <div className="scan-container">
-              <div className="camera-preview">
+            <div className="scan-container staff-checkout-layout">
+              <div className="camera-preview card-panel staff-checkout-camera-card">
+                <div className="scan-card-heading"><span className="scan-step-badge">1</span><div><h3>Ảnh xe tại cổng ra</h3><p>Tải ảnh để nhận diện và đối chiếu biển số lúc vào.</p></div></div>
                 <div className="camera-frame clickable" onClick={() => fileInputRef.current?.click()}>
                   {imagePreviewUrl ? (
                     <img src={imagePreviewUrl} className="camera-preview-img" alt="Exit Plate Preview" />
@@ -251,7 +239,8 @@ export default function Checkout() {
                 />
               </div>
 
-              <div className="scan-form">
+              <div className="scan-form card-panel staff-checkout-form-card">
+                <div className="scan-card-heading"><span className="scan-step-badge">2</span><div><h3>Xác nhận thông tin checkout</h3><p>Đọc QR vé xe, chọn cổng ra và phương thức thanh toán.</p></div></div>
                 <div className="form-field">
                   <label>Loại check-out</label>
                   <select
@@ -261,6 +250,7 @@ export default function Checkout() {
                       setCheckOutType(event.target.value as 'auto' | 'guest' | 'resident' | 'reservation')
                       setMessage('')
                       setOnlinePayment(null)
+                      setCheckoutResult(null)
                     }}
                   >
                     <option value="auto">Tự nhận diện từ vé QR</option>
@@ -285,6 +275,7 @@ export default function Checkout() {
                       setSessionId('')
                       setQrDecode(null)
                       setOnlinePayment(null)
+                      setCheckoutResult(null)
                     }}
                   />
                   <button
@@ -316,6 +307,7 @@ export default function Checkout() {
                     onChange={(event) => {
                       setPlateForCheckout(event.target.value)
                       setOnlinePayment(null)
+                      setCheckoutResult(null)
                     }}
                     onBlur={() => preparePlateForCheckout(licensePlate)}
                     onKeyDown={(event) => {
@@ -332,6 +324,7 @@ export default function Checkout() {
                     onChange={(event) => {
                       setGateId(event.target.value)
                       setOnlinePayment(null)
+                      setCheckoutResult(null)
                     }}
                   >
                     {exitGates.length === 0 && <option value="">Chưa có cổng ra</option>}
@@ -353,6 +346,7 @@ export default function Checkout() {
                       onChange={(event) => {
                         setPaymentMethod(event.target.value)
                         setOnlinePayment(null)
+                        setCheckoutResult(null)
                       }}
                     >
                       <option value="Cash">Tiền mặt</option>
@@ -387,11 +381,13 @@ export default function Checkout() {
                 <div className="scan-result">
                   <h3>Thông tin checkout</h3>
                   <div className="scan-info">
-                    <p><strong>Biển số ra:</strong> {licensePlate || 'Chưa nhập'}</p>
+                    <p><strong>Biển số ra:</strong> {checkoutResult?.session?.licensePlateOut || checkoutResult?.Session?.licensePlateOut || licensePlate || 'Chưa nhập'}</p>
                     <p><strong>Giờ hiện tại:</strong> {exitTimePreview || formatNowInVietnamTime()}</p>
-                    <p><strong>SessionId:</strong> {sessionId || 'Chưa có'}</p>
+                    <p><strong>SessionId:</strong> {checkoutResult?.session?.sessionId || checkoutResult?.Session?.sessionId || sessionId || 'Chưa có'}</p>
                     <p><strong>Loại mã QR:</strong> {qrDecode?.codeType || 'Chưa đọc QR'}</p>
-                    {checkOutType === 'resident' ? (
+                    {(checkoutResult?.fee || checkoutResult?.Fee) ? (
+                      <p className="fee-amount"><strong>Phí gửi:</strong> {formatCurrency((checkoutResult.fee || checkoutResult.Fee)!.amount)}</p>
+                    ) : checkOutType === 'resident' ? (
                       <p className="fee-amount"><strong>Phí gửi:</strong> Miễn phí nếu còn gói tháng hợp lệ</p>
                     ) : (
                       <p className="fee-amount"><strong>Thanh toán:</strong> {paymentMethod}</p>
@@ -423,7 +419,6 @@ export default function Checkout() {
             </div>
           </div>
         </div>
-      </StaffLayout>
-    </ProtectedRoute>
+      </StaffPageShell>
   )
 }

@@ -5,7 +5,6 @@ import Header from './Header'
 export default function Layout() {
   const location = useLocation()
   const isHome = location.pathname === '/' || location.pathname === '/dat-cho'
-  const isManager = location.pathname.startsWith('/manager')
   const isStaffOrAdmin =
     location.pathname.startsWith('/staff') ||
     location.pathname.startsWith('/admin') ||
@@ -18,8 +17,8 @@ export default function Layout() {
         className={
           isHome
             ? 'app-main app-main--home'
-            : isManager
-              ? 'app-main app-main--manager'
+            : isStaffOrAdmin
+              ? 'app-main app-main--workspace'
               : 'app-main'
         }
       >

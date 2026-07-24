@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 interface SidebarItem {
@@ -56,6 +56,10 @@ export default function StaffLayout({ children, items, activeItem, onSelectItem 
 
       {/* Main Content */}
       <div className="staff-main">
+        <div className="staff-mobile-nav">
+          <button type="button" className="sidebar-toggle-btn" onClick={() => setSidebarOpen(true)} aria-label="Mở menu chức năng"><Menu size={21} aria-hidden /></button>
+          <strong>Chức năng hệ thống</strong>
+        </div>
         {/* Content */}
         <main className="staff-content">
           {children}

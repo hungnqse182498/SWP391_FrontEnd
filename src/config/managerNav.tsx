@@ -11,6 +11,7 @@ import {
   CalendarRange,
   CalendarCheck2,
   ParkingSquare,
+  AlertTriangle,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -64,6 +65,13 @@ export const MANAGER_NAV: NavItem[] = [
     path: '/manager/reservations',
     icon: <CalendarCheck2 size={18} />,
     desc: 'Theo dõi lịch hẹn và trạng thái đặt chỗ',
+  },
+  {
+    id: 'incidents',
+    label: 'Quản lý sự cố',
+    path: '/manager/incidents',
+    icon: <AlertTriangle size={18} />,
+    desc: 'Phân công và theo dõi xử lý sự cố',
   },
   {
     id: 'monthly-subscriptions',

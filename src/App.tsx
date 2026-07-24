@@ -20,8 +20,6 @@ import StaffDashboard from './pages/staff/Dashboard'
 
 import StaffScanPlate from './pages/staff/ScanPlate'
 
-import StaffCreateSession from './pages/staff/CreateSession'
-
 import StaffCheckout from './pages/staff/Checkout'
 
 import StaffException from './pages/staff/Exception'
@@ -53,6 +51,7 @@ import ManagerParkingSessions from './pages/manager/ParkingSessions'
 import ManagerReservations from './pages/manager/Reservations'
 import ManagerPayments from './pages/manager/Payments'
 import ManagerVehicleChangeRequests from './pages/manager/VehicleChangeRequests'
+import ManagerIncidents from './pages/manager/Incidents'
 
 import UserBooking from './pages/user/Booking'
 
@@ -68,6 +67,7 @@ import UserSubscribeMonthly from './pages/user/SubscribeMonthly'
 import UserRegister from './pages/user/Register'
 import UserMySubscriptions from './pages/user/MySubscriptions'
 import UserParkingSessions from './pages/user/ParkingSessions'
+import UserIncidentReports from './pages/user/IncidentReports'
 
 import LegalHub from './pages/user/LegalHub'
 
@@ -111,6 +111,8 @@ export default function App() {
 
               <Route path="phien-gui-xe" element={<UserParkingSessions />} />
 
+              <Route path="bao-cao-su-co" element={<UserIncidentReports />} />
+
               <Route path="lich-su" element={<UserBookingHistory />} />
 
               <Route path="legal" element={<LegalHub />} />
@@ -120,8 +122,6 @@ export default function App() {
               <Route path="staff/dashboard" element={<StaffDashboard />} />
 
               <Route path="staff/scan-plate" element={<StaffScanPlate />} />
-
-              <Route path="staff/create-session" element={<StaffCreateSession />} />
 
               <Route path="staff/checkout" element={<StaffCheckout />} />
 
@@ -157,6 +157,8 @@ export default function App() {
               <Route path="manager/payments" element={<ManagerPayments />} />
 
               <Route path="manager/vehicle-change-requests" element={<ManagerVehicleChangeRequests />} />
+
+              <Route path="manager/incidents" element={<ManagerIncidents />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
 

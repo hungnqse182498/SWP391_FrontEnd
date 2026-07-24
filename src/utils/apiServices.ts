@@ -317,6 +317,21 @@ export const subscriptionRenewalApi = {
     ),
 }
 
+export interface IncidentReportDto {
+  incidentId: string
+  sessionId?: string
+  reportedByUserId: string
+  reportedByUserFullName?: string
+  issueType: string
+  description: string
+  proofImageUrl?: string
+  status: string
+  handledByStaffId?: string
+  handledByStaffFullName?: string
+  resolvedAt?: string
+  resolutionNotes?: string
+}
+
 export const vehicleChangeRequestApi = {
   getMy: () =>
     apiClient.get<ApiResponse<VehicleChangeRequestDto[]>>('/VehicleChangeRequest/my-requests'),
@@ -375,4 +390,41 @@ export const parkingOperationApi = {
 export const parkingSessionApi = {
   getAll: () => apiClient.get<ApiResponse<ParkingSessionDto[]>>('/ParkingSession'),
   getMy: () => apiClient.get<ApiResponse<ParkingSessionDto[]>>('/ParkingSession/my'),
+}
+
+export const incidentReportApi = {
+  getAll: () => apiClient.get<ApiResponse<IncidentReportDto[]>>('/IncidentReport'),
+  getById: (id: string) => apiClient.get<ApiResponse<IncidentReportDto>>(`/IncidentReport/${id}`),
+  getMy: () => apiClient.get<ApiResponse<IncidentReportDto[]>>('/IncidentReport/my-reports'),
+  uploadProof: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiClient.post<{ imageUrl: string }>('/IncidentReport/upload-proof', formData)
+  },
+  create: (data: {
+    sessionId?: string
+    reportedByUserId?: string
+    issueType: string
+    description: string
+    proofImageUrl?: string
+    status?: string
+    handledByStaffId?: string
+  }) => apiClient.post<ApiResponse<IncidentReportDto>>('/IncidentReport', data),
+  update: (data: {
+    incidentId: string
+    sessionId?: string
+    reportedByUserId: string
+    issueType: string
+    description: string
+    proofImageUrl?: string
+    status: string
+    handledByStaffId?: string
+    resolvedAt?: string
+    resolutionNotes?: string
+  }) => apiClient.put<ApiResponse<IncidentReportDto>>('/IncidentReport', data),
+  remove: (id: string) => apiClient.delete<ApiResponse>(`/IncidentReport/${id}`),
+  assign: (id: string, staffId: string) =>
+    apiClient.put<ApiResponse<IncidentReportDto>>(`/IncidentReport/${id}/assign/${staffId}`, {}),
+  resolve: (id: string, staffId: string, resolutionNotes: string) =>
+    apiClient.put<ApiResponse<IncidentReportDto>>(`/IncidentReport/${id}/resolve/${staffId}`, { resolutionNotes }),
 }

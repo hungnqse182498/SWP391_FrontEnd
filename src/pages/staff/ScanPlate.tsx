@@ -1,22 +1,35 @@
-import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
+  Activity,
   CalendarClock,
+  CalendarDays,
   Car,
+  CarFront,
   CheckCircle2,
   Clock,
+  Clock3,
+  CreditCard,
+  Eye,
+  Fingerprint,
+  Hash,
+  ImageIcon,
+  LogOut,
+  MapPin,
+  ParkingSquare,
   QrCode,
   RotateCcw,
+  Search,
   Smartphone,
   Upload,
   UserCheck,
   UserRound,
   UsersRound,
   X,
-} from 'lucide-react'
-import StaffLayout from '../../components/StaffLayout'
-import ProtectedRoute from '../../components/ProtectedRoute'
+} from "lucide-react";
+import StaffPageShell from "../../components/StaffPageShell";
+import { navigateStaffNav } from "../../config/staffNav";
 import {
   parkingOperationApi,
   parkingSessionApi,
@@ -29,791 +42,1735 @@ import {
   type ParkingSessionDto,
   type ReservationDto,
   type VehicleTypeDto,
-} from '../../utils/apiServices'
-import { formatNowInVietnamTime, formatUtcToVietnamDateTime, parseBackendUtcDate } from '../../utils/dateTime'
+} from "../../utils/apiServices";
+import {
+  formatNowInVietnamTime,
+  formatUtcToVietnamDateTime,
+  parseBackendUtcDate,
+} from "../../utils/dateTime";
+import { formatCurrency } from "../../utils/pricing";
 
-type GatePanel = 'scan' | 'reservations' | 'active-vehicles'
-
-interface StaffMenuItem {
-  id: string
-  label: string
-  icon: ReactNode
-}
+type GatePanel = "scan" | "reservations" | "active-vehicles";
 
 interface CheckInTicketView {
-  sessionId: string
-  qrPayload: string
-  qrCodeDataUrl: string
-  licensePlate?: string
-  vehicleTypeName?: string
-  slotCode?: string
-  entryTime?: string
+  sessionId: string;
+  qrPayload: string;
+  qrCodeDataUrl: string;
+  licensePlate?: string;
+  vehicleTypeName?: string;
+  slotCode?: string;
+  entryTime?: string;
 }
 
 type LooseParkingSessionTicket = ParkingSessionTicket & {
-  QrPayload?: string
-  QrCodeDataUrl?: string
-}
+  QrPayload?: string;
+  QrCodeDataUrl?: string;
+};
 
 type CheckInResult = Partial<ParkingSessionDto> & {
-  licensePlate?: string
-  ticket?: LooseParkingSessionTicket
-  Ticket?: LooseParkingSessionTicket
-  SessionId?: string
-  LicensePlate?: string
-  LicensePlateIn?: string
-  VehicleTypeName?: string
-  ActualSlotCode?: string
-  AssignedSlotCode?: string
-  EntryTime?: string
-}
-
-const menuItems: StaffMenuItem[] = [
-  { id: 'scan', label: 'Quét biển số', icon: <Smartphone size={18} /> },
-  { id: 'reservations', label: 'Đơn đặt trước', icon: <CalendarClock size={18} /> },
-  { id: 'active-vehicles', label: 'Xe đang trong bãi', icon: <Car size={18} /> },
-  { id: 'checkin', label: 'Tạo lượt gửi xe', icon: <Car size={18} /> },
-  { id: 'exception', label: 'Xử lý ngoại lệ', icon: <AlertCircle size={18} /> },
-]
+  licensePlate?: string;
+  ticket?: LooseParkingSessionTicket;
+  Ticket?: LooseParkingSessionTicket;
+  SessionId?: string;
+  LicensePlate?: string;
+  LicensePlateIn?: string;
+  VehicleTypeName?: string;
+  ActualSlotCode?: string;
+  AssignedSlotCode?: string;
+  EntryTime?: string;
+};
 
 const panelCopy: Record<GatePanel, { title: string; desc: string }> = {
   scan: {
-    title: 'Quét xe vào bãi',
-    desc: 'Kiểm tra biển số và xác nhận xe vào bãi.',
+    title: "Quét xe vào bãi",
+    desc: "Kiểm tra biển số và xác nhận xe vào bãi.",
   },
   reservations: {
-    title: 'Đơn đặt trước',
-    desc: 'Danh sách đơn đặt trước đang chờ xe đến cổng vào.',
+    title: "Đơn đặt trước",
+    desc: "Danh sách đơn đặt trước đang chờ xe đến cổng vào.",
   },
-  'active-vehicles': {
-    title: 'Xe đang trong bãi',
-    desc: 'Danh sách xe đã check-in và chưa checkout.',
+  "active-vehicles": {
+    title: "Xe đang trong bãi",
+    desc: "Danh sách xe đã check-in và chưa checkout.",
   },
-}
+};
 
 function formatDateTime(value?: string) {
-  if (!value) return 'Chưa có'
-  return formatUtcToVietnamDateTime(value)
+  if (!value) return "Chưa có";
+  return formatUtcToVietnamDateTime(value);
+}
+
+function safeTime(value?: string | null) {
+  if (!value) return 0;
+  const time = parseBackendUtcDate(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function parkingDuration(entryTime: string | undefined, now: number) {
+  const entryTimestamp = safeTime(entryTime);
+  if (!now || !entryTimestamp) return "Chưa xác định";
+  const totalMinutes = Math.max(0, Math.floor((now - entryTimestamp) / 60_000));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  return [
+    days ? `${days} ngày` : "",
+    hours ? `${hours} giờ` : "",
+    `${minutes} phút`,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function statusLabel(status?: string) {
-  const normalized = status?.toLowerCase()
-  if (normalized === 'confirmed') return 'Đã xác nhận'
-  if (normalized === 'pending') return 'Chờ thanh toán'
-  if (normalized === 'active') return 'Đang trong bãi'
-  if (normalized === 'completed') return 'Đã hoàn tất'
-  if (normalized === 'cancelled') return 'Đã hủy'
-  return status || 'Không rõ'
+  const normalized = status?.toLowerCase();
+  if (normalized === "confirmed") return "Đã xác nhận";
+  if (normalized === "modified") return "Đã đổi giờ";
+  if (normalized === "pending") return "Chờ thanh toán";
+  if (normalized === "checkedin") return "Đã check-in";
+  if (normalized === "noshow") return "Không đến";
+  if (normalized === "active") return "Đang trong bãi";
+  if (normalized === "completed") return "Đã hoàn tất";
+  if (normalized === "cancelled") return "Đã hủy";
+  return status || "Không rõ";
+}
+
+function paymentStatusLabel(status?: string) {
+  const normalized = status?.toLowerCase();
+  if (normalized === "paid" || normalized === "success") return "Đã thanh toán";
+  if (normalized === "pending") return "Chờ thanh toán";
+  if (normalized === "failed") return "Thanh toán thất bại";
+  return status || "Chưa có thanh toán";
 }
 
 function getReservationPlate(reservation: ReservationDto) {
   return (
     reservation.licensePlate ||
     reservation.parkingSessions?.[0]?.licensePlateIn ||
-    'Chưa ghi nhận'
-  )
+    "Chưa ghi nhận"
+  );
 }
 
 function toCheckInTicketView(result?: CheckInResult): CheckInTicketView | null {
-  const ticket = result?.ticket ?? result?.Ticket
-  const qrPayload = ticket?.qrPayload ?? ticket?.QrPayload
-  const qrCodeDataUrl = ticket?.qrCodeDataUrl ?? ticket?.QrCodeDataUrl
-  if (!qrCodeDataUrl || !qrPayload) return null
+  const ticket = result?.ticket ?? result?.Ticket;
+  const qrPayload = ticket?.qrPayload ?? ticket?.QrPayload;
+  const qrCodeDataUrl = ticket?.qrCodeDataUrl ?? ticket?.QrCodeDataUrl;
+  if (!qrCodeDataUrl || !qrPayload) return null;
 
   return {
     sessionId: result?.sessionId || result?.SessionId || qrPayload,
     qrPayload,
     qrCodeDataUrl,
-    licensePlate: result?.licensePlateIn || result?.LicensePlateIn || result?.licensePlate || result?.LicensePlate,
+    licensePlate:
+      result?.licensePlateIn ||
+      result?.LicensePlateIn ||
+      result?.licensePlate ||
+      result?.LicensePlate,
     vehicleTypeName: result?.vehicleTypeName || result?.VehicleTypeName,
-    slotCode: result?.actualSlotCode || result?.ActualSlotCode || result?.assignedSlotCode || result?.AssignedSlotCode,
+    slotCode:
+      result?.actualSlotCode ||
+      result?.ActualSlotCode ||
+      result?.assignedSlotCode ||
+      result?.AssignedSlotCode,
     entryTime: result?.entryTime || result?.EntryTime,
-  }
+  };
 }
 
-function PlateVisual({ plate, muted = false }: { plate?: string; muted?: boolean }) {
+function PlateVisual({
+  plate,
+  muted = false,
+}: {
+  plate?: string;
+  muted?: boolean;
+}) {
   return (
-    <div className={`license-plate-visual${muted ? ' license-plate-visual--muted' : ''}`}>
-      <span>{plate || 'NO PLATE'}</span>
+    <div
+      className={`license-plate-visual${muted ? " license-plate-visual--muted" : ""}`}
+    >
+      <span>{plate || "NO PLATE"}</span>
     </div>
-  )
+  );
 }
 
 export default function ScanPlate() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const locationState = location.state as { activePanel?: GatePanel } | null
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const qrInputRef = useRef<HTMLInputElement>(null)
+  const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = location.state as { activePanel?: GatePanel } | null;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const qrInputRef = useRef<HTMLInputElement>(null);
 
-  const [activePanel, setActivePanel] = useState<GatePanel>(locationState?.activePanel ?? 'scan')
-  const [imagePreviewUrl, setImagePreviewUrl] = useState('')
-  const [entryImageUrl, setEntryImageUrl] = useState('')
-  const [uploading, setUploading] = useState(false)
-  const [licensePlate, setLicensePlate] = useState('')
-  const [entryTimePreview, setEntryTimePreview] = useState('')
-  const [vehicleTypeId, setVehicleTypeId] = useState('')
-  const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeDto[]>([])
-  const [gateId, setGateId] = useState('')
-  const [entryGates, setEntryGates] = useState<GateDto[]>([])
-  const [checkInType, setCheckInType] = useState<'guest' | 'resident' | 'reservation'>('guest')
-  const [reservationId, setReservationId] = useState('')
-  const [qrPayload, setQrPayload] = useState('')
-  const [qrDecode, setQrDecode] = useState<ParkingQrDecodeResult | null>(null)
-  const [qrUploading, setQrUploading] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
-  const [checkInTicket, setCheckInTicket] = useState<CheckInTicketView | null>(null)
-  const [reservations, setReservations] = useState<ReservationDto[]>([])
-  const [activeSessions, setActiveSessions] = useState<ParkingSessionDto[]>([])
-  const [ticketSession, setTicketSession] = useState<ParkingSessionDto | null>(null)
-  const [listLoading, setListLoading] = useState(false)
-  const [listError, setListError] = useState('')
+  const [activePanel, setActivePanel] = useState<GatePanel>(
+    locationState?.activePanel ?? "scan",
+  );
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
+  const [entryImageUrl, setEntryImageUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [licensePlate, setLicensePlate] = useState("");
+  const [entryTimePreview, setEntryTimePreview] = useState("");
+  const [vehicleTypeId, setVehicleTypeId] = useState("");
+  const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeDto[]>([]);
+  const [gateId, setGateId] = useState("");
+  const [entryGates, setEntryGates] = useState<GateDto[]>([]);
+  const [checkInType, setCheckInType] = useState<
+    "guest" | "resident" | "reservation"
+  >("guest");
+  const [reservationId, setReservationId] = useState("");
+  const [qrPayload, setQrPayload] = useState("");
+  const [qrDecode, setQrDecode] = useState<ParkingQrDecodeResult | null>(null);
+  const [qrUploading, setQrUploading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [checkInTicket, setCheckInTicket] = useState<CheckInTicketView | null>(
+    null,
+  );
+  const [reservations, setReservations] = useState<ReservationDto[]>([]);
+  const [activeSessions, setActiveSessions] = useState<ParkingSessionDto[]>([]);
+  const [activeVehicleQuery, setActiveVehicleQuery] = useState("");
+  const [activeVehicleFilter, setActiveVehicleFilter] = useState<
+    "all" | "reservation" | "walkin"
+  >("all");
+  const [activeDetailSession, setActiveDetailSession] =
+    useState<ParkingSessionDto | null>(null);
+  const [ticketSession, setTicketSession] = useState<ParkingSessionDto | null>(
+    null,
+  );
+  const [listLoading, setListLoading] = useState(false);
+  const [listError, setListError] = useState("");
+  const [reservationQuery, setReservationQuery] = useState("");
+  const [reservationFilter, setReservationFilter] = useState<
+    "all" | "ready" | "upcoming" | "pending"
+  >("all");
+  const [currentTime, setCurrentTime] = useState(0);
+
+  useEffect(() => {
+    const initialTimer = window.setTimeout(() => setCurrentTime(Date.now()), 0);
+    const timer = window.setInterval(() => setCurrentTime(Date.now()), 30_000);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (locationState?.activePanel) {
+      queueMicrotask(() => setActivePanel(locationState.activePanel!));
+    }
+  }, [locationState?.activePanel]);
 
   const loadGateLists = async () => {
-    setListLoading(true)
-    setListError('')
+    setListLoading(true);
+    setListError("");
     try {
       const [reservationRes, sessionRes] = await Promise.all([
         reservationApi.getAll(),
         parkingSessionApi.getAll(),
-      ])
+      ]);
 
       if (reservationRes.isSuccess && reservationRes.result) {
         setReservations(
           reservationRes.result
-            .filter((item) => !['cancelled', 'completed'].includes(item.status?.toLowerCase()))
+            .filter((item) =>
+              ["pending", "confirmed", "modified"].includes(
+                item.status?.toLowerCase(),
+              ),
+            )
             .sort(
               (left, right) =>
                 parseBackendUtcDate(left.expectedEntryTime).getTime() -
                 parseBackendUtcDate(right.expectedEntryTime).getTime(),
             ),
-        )
+        );
       }
 
       if (sessionRes.isSuccess && sessionRes.result) {
         setActiveSessions(
           sessionRes.result
-            .filter((item) => item.status?.toLowerCase() === 'active' && !item.exitTime)
+            .filter(
+              (item) =>
+                item.status?.toLowerCase() === "active" && !item.exitTime,
+            )
             .sort(
               (left, right) =>
-                parseBackendUtcDate(right.entryTime).getTime() - parseBackendUtcDate(left.entryTime).getTime(),
+                parseBackendUtcDate(right.entryTime).getTime() -
+                parseBackendUtcDate(left.entryTime).getTime(),
             ),
-        )
+        );
       }
     } catch (err) {
-      console.error(err)
-      setListError('Chưa tải được danh sách từ API. Vui lòng kiểm tra quyền staff hoặc backend.')
+      console.error(err);
+      setListError(
+        "Chưa tải được danh sách từ API. Vui lòng kiểm tra quyền staff hoặc backend.",
+      );
     } finally {
-      setListLoading(false)
+      setListLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
     vehicleTypeApi
       .getAll()
       .then((res) => {
         if (res.isSuccess && res.result) {
-          setVehicleTypes(res.result)
-          if (res.result[0]) setVehicleTypeId(res.result[0].vehicleTypeId)
+          setVehicleTypes(res.result);
+          if (res.result[0]) setVehicleTypeId(res.result[0].vehicleTypeId);
         }
       })
-      .catch(console.error)
+      .catch(console.error);
 
     gateApi
       .getAll()
       .then((res) => {
         if (res.isSuccess && res.result) {
-          const gates = res.result.filter((gate) => gate.gateType?.toLowerCase() === 'entry')
-          setEntryGates(gates)
-          if (gates[0]) setGateId(gates[0].gateId)
+          const gates = res.result.filter(
+            (gate) => gate.gateType?.toLowerCase() === "entry",
+          );
+          setEntryGates(gates);
+          if (gates[0]) setGateId(gates[0].gateId);
         }
       })
-      .catch(console.error)
+      .catch(console.error);
 
     queueMicrotask(() => {
-      void loadGateLists()
-    })
-  }, [])
+      void loadGateLists();
+    });
+  }, []);
 
   const setPlateForConfirm = (plate: string) => {
-    const nextPlate = plate.toUpperCase()
-    setLicensePlate(nextPlate)
-    setEntryTimePreview(nextPlate.trim() ? formatNowInVietnamTime() : '')
-  }
+    const nextPlate = plate.toUpperCase();
+    setLicensePlate(nextPlate);
+    setEntryTimePreview(nextPlate.trim() ? formatNowInVietnamTime() : "");
+  };
 
   const resetScan = (options: { keepResult?: boolean } = {}) => {
-    setImagePreviewUrl('')
-    setEntryImageUrl('')
-    setReservationId('')
-    setQrPayload('')
-    setQrDecode(null)
-    setPlateForConfirm('')
+    setImagePreviewUrl("");
+    setEntryImageUrl("");
+    setReservationId("");
+    setQrPayload("");
+    setQrDecode(null);
+    setPlateForConfirm("");
     if (!options.keepResult) {
-      setMessage('')
-      setCheckInTicket(null)
+      setMessage("");
+      setCheckInTicket(null);
     }
-    if (fileInputRef.current) fileInputRef.current.value = ''
-    if (qrInputRef.current) qrInputRef.current.value = ''
-  }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (qrInputRef.current) qrInputRef.current.value = "";
+  };
 
   const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-    setImagePreviewUrl(URL.createObjectURL(file))
-    setUploading(true)
-    setMessage('')
-    setCheckInTicket(null)
-    setPlateForConfirm('')
+    setImagePreviewUrl(URL.createObjectURL(file));
+    setUploading(true);
+    setMessage("");
+    setCheckInTicket(null);
+    setPlateForConfirm("");
 
     try {
-      const res = await parkingOperationApi.uploadAndRecognizePlate(file)
+      const res = await parkingOperationApi.uploadAndRecognizePlate(file);
       if (res?.imageUrl) {
-        setEntryImageUrl(res.imageUrl)
+        setEntryImageUrl(res.imageUrl);
         if (res.licensePlate) {
-          setPlateForConfirm(res.licensePlate)
+          setPlateForConfirm(res.licensePlate);
         } else {
-          setMessage(res.message || 'Không nhận diện được biển số.')
+          setMessage(res.message || "Không nhận diện được biển số.");
         }
       } else {
-        setMessage('Tải ảnh thất bại hoặc không nhận được đường dẫn ảnh.')
+        setMessage("Tải ảnh thất bại hoặc không nhận được đường dẫn ảnh.");
       }
     } catch (err) {
-      console.error(err)
-      setMessage(err instanceof Error ? err.message : 'Lỗi kết nối khi upload ảnh.')
+      console.error(err);
+      setMessage(
+        err instanceof Error ? err.message : "Lỗi kết nối khi upload ảnh.",
+      );
     } finally {
-      setUploading(false)
+      setUploading(false);
     }
-  }
+  };
 
   const handleConfirmCheckIn = async () => {
-    if (!licensePlate.trim() || !gateId) return
-    if (checkInType !== 'reservation' && !vehicleTypeId) return
-    if (checkInType === 'reservation' && !reservationId && !qrPayload.trim()) {
-      setMessage('Vui lòng upload ảnh QR đặt chỗ hoặc nhập mã QR đặt chỗ')
-      return
+    if (!licensePlate.trim() || !gateId) return;
+    if (checkInType !== "reservation" && !vehicleTypeId) return;
+    if (checkInType === "reservation" && !reservationId && !qrPayload.trim()) {
+      setMessage("Vui lòng upload ảnh QR đặt chỗ hoặc nhập mã QR đặt chỗ");
+      return;
     }
-    setLoading(true)
-    setMessage('')
-    setCheckInTicket(null)
+    setLoading(true);
+    setMessage("");
+    setCheckInTicket(null);
     try {
       const payload = {
         customerType:
-          checkInType === 'resident'
-            ? 'Resident'
-            : checkInType === 'reservation'
-              ? 'Reservation'
-              : 'Guest',
+          checkInType === "resident"
+            ? "Resident"
+            : checkInType === "reservation"
+              ? "Reservation"
+              : "Guest",
         licensePlate: licensePlate.trim(),
-        vehicleTypeId: checkInType === 'reservation' ? undefined : vehicleTypeId,
+        vehicleTypeId:
+          checkInType === "reservation" ? undefined : vehicleTypeId,
         reservationId: reservationId || undefined,
         qrPayload: qrPayload.trim() || undefined,
         gateId,
         entryImageUrl: entryImageUrl || undefined,
-      } as const
-      const res = await parkingOperationApi.checkIn(payload)
+      } as const;
+      const res = await parkingOperationApi.checkIn(payload);
 
       if (res.isSuccess) {
-        const ticket = toCheckInTicketView(res.result)
-        resetScan({ keepResult: true })
-        setCheckInTicket(ticket)
-        setMessage(res.message || 'Check-in thành công')
-        loadGateLists()
+        const ticket = toCheckInTicketView(res.result);
+        resetScan({ keepResult: true });
+        setCheckInTicket(ticket);
+        setMessage(res.message || "Check-in thành công");
+        loadGateLists();
       } else {
-        setMessage(res.message || 'Check-in thất bại')
+        setMessage(res.message || "Check-in thất bại");
       }
     } catch (err) {
-      console.error(err)
-      setMessage(err instanceof Error ? err.message : 'Lỗi kết nối API')
+      console.error(err);
+      setMessage(err instanceof Error ? err.message : "Lỗi kết nối API");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleQrUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-    setQrUploading(true)
-    setMessage('')
-    setCheckInTicket(null)
-    setQrDecode(null)
-    setReservationId('')
-    setQrPayload('')
+    setQrUploading(true);
+    setMessage("");
+    setCheckInTicket(null);
+    setQrDecode(null);
+    setReservationId("");
+    setQrPayload("");
 
     try {
-      const res = await parkingOperationApi.uploadAndDecodeQr(file)
+      const res = await parkingOperationApi.uploadAndDecodeQr(file);
       if (res.isSuccess && res.result) {
-        setQrDecode(res.result)
-        setQrPayload(res.result.qrPayload)
-        setReservationId(res.result.reservationId || '')
+        setQrDecode(res.result);
+        setQrPayload(res.result.qrPayload);
+        setReservationId(res.result.reservationId || "");
         if (!res.result.reservationId) {
-          setMessage('QR đã đọc được nhưng không phải mã đặt chỗ. Vui lòng dùng QR reservation để check-in đặt trước.')
+          setMessage(
+            "QR đã đọc được nhưng không phải mã đặt chỗ. Vui lòng dùng QR reservation để check-in đặt trước.",
+          );
         }
       } else {
-        setMessage(res.message || 'Không đọc được mã QR.')
+        setMessage(res.message || "Không đọc được mã QR.");
       }
     } catch (err) {
-      console.error(err)
-      setMessage(err instanceof Error ? err.message : 'Lỗi kết nối khi upload QR.')
+      console.error(err);
+      setMessage(
+        err instanceof Error ? err.message : "Lỗi kết nối khi upload QR.",
+      );
     } finally {
-      setQrUploading(false)
+      setQrUploading(false);
     }
-  }
+  };
 
   const handleSelectSidebar = (id: string) => {
-    if (id === 'scan' || id === 'reservations' || id === 'active-vehicles') {
-      setActivePanel(id)
-      if (id !== 'scan') loadGateLists()
-    } else if (id === 'checkin') navigate('/staff/create-session')
-    else if (id === 'exception') navigate('/staff/exception')
-  }
-
-  const selectCheckInType = (type: 'guest' | 'resident' | 'reservation') => {
-    setCheckInType(type)
-    setMessage('')
-    setCheckInTicket(null)
-    if (type !== 'reservation') {
-      setReservationId('')
-      setQrPayload('')
-      setQrDecode(null)
+    if (id === "scan" || id === "reservations" || id === "active-vehicles") {
+      setActivePanel(id);
+      if (id !== "scan") loadGateLists();
+    } else {
+      navigateStaffNav(id, navigate);
     }
-  }
+  };
+
+  const selectCheckInType = (type: "guest" | "resident" | "reservation") => {
+    setCheckInType(type);
+    setMessage("");
+    setCheckInTicket(null);
+    if (type !== "reservation") {
+      setReservationId("");
+      setQrPayload("");
+      setQrDecode(null);
+    }
+  };
 
   const handleUseReservation = (reservation: ReservationDto) => {
-    resetScan()
-    setCheckInType('reservation')
-    setReservationId(reservation.reservationId)
-    const plate = getReservationPlate(reservation)
-    if (plate !== 'Chưa ghi nhận') setPlateForConfirm(plate)
-    setActivePanel('scan')
-  }
+    resetScan();
+    setCheckInType("reservation");
+    setReservationId(reservation.reservationId);
+    const plate = getReservationPlate(reservation);
+    if (plate !== "Chưa ghi nhận") setPlateForConfirm(plate);
+    setActivePanel("scan");
+  };
 
-  const hasReservationCode = Boolean(reservationId || qrPayload.trim())
+  const hasReservationCode = Boolean(reservationId || qrPayload.trim());
+  const reservationRows = useMemo(() => {
+    const now = currentTime;
+    const query = reservationQuery.trim().toLocaleLowerCase("vi-VN");
+
+    return reservations.filter((reservation) => {
+      const status = reservation.status?.toLowerCase();
+      const expectedAt = parseBackendUtcDate(
+        reservation.expectedEntryTime,
+      ).getTime();
+      const ready =
+        ["confirmed", "modified"].includes(status) &&
+        now >= expectedAt - 30 * 60_000 &&
+        now <= expectedAt + 30 * 60_000;
+      const upcoming =
+        ["confirmed", "modified"].includes(status) &&
+        now < expectedAt - 30 * 60_000;
+      const matchesFilter =
+        reservationFilter === "all" ||
+        (reservationFilter === "ready" && ready) ||
+        (reservationFilter === "upcoming" && upcoming) ||
+        (reservationFilter === "pending" && status === "pending");
+      const haystack = [
+        reservation.reservationId,
+        reservation.userFullName,
+        reservation.user?.fullName,
+        reservation.user?.phoneNumber,
+        reservation.user?.email,
+        reservation.vehicleTypeName,
+        getReservationPlate(reservation),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("vi-VN");
+
+      return matchesFilter && (!query || haystack.includes(query));
+    });
+  }, [currentTime, reservationFilter, reservationQuery, reservations]);
+
+  const reservationCounts = useMemo(() => {
+    const now = currentTime;
+    return reservations.reduce(
+      (counts, reservation) => {
+        const status = reservation.status?.toLowerCase();
+        const expectedAt = parseBackendUtcDate(
+          reservation.expectedEntryTime,
+        ).getTime();
+        if (status === "pending") counts.pending += 1;
+        if (
+          ["confirmed", "modified"].includes(status) &&
+          now < expectedAt - 30 * 60_000
+        )
+          counts.upcoming += 1;
+        if (
+          ["confirmed", "modified"].includes(status) &&
+          now >= expectedAt - 30 * 60_000 &&
+          now <= expectedAt + 30 * 60_000
+        )
+          counts.ready += 1;
+        return counts;
+      },
+      { ready: 0, upcoming: 0, pending: 0 },
+    );
+  }, [currentTime, reservations]);
+
+  const activeSessionCounts = useMemo(
+    () => ({
+      reservation: activeSessions.filter((session) =>
+        Boolean(session.reservationId),
+      ).length,
+      walkin: activeSessions.filter((session) => !session.reservationId).length,
+    }),
+    [activeSessions],
+  );
+
+  const activeSessionRows = useMemo(() => {
+    const query = activeVehicleQuery.trim().toLocaleLowerCase("vi-VN");
+    return activeSessions
+      .filter((session) => {
+        if (activeVehicleFilter === "reservation" && !session.reservationId)
+          return false;
+        if (activeVehicleFilter === "walkin" && session.reservationId)
+          return false;
+        if (!query) return true;
+        return [
+          session.licensePlateIn,
+          session.driverFullName,
+          session.vehicleTypeName,
+          session.assignedSlotCode,
+          session.actualSlotCode,
+          session.sessionId,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLocaleLowerCase("vi-VN")
+          .includes(query);
+      })
+      .sort(
+        (left, right) => safeTime(left.entryTime) - safeTime(right.entryTime),
+      );
+  }, [activeSessions, activeVehicleFilter, activeVehicleQuery]);
+
+  const getReservationAction = (reservation: ReservationDto) => {
+    const status = reservation.status?.toLowerCase();
+    if (status === "pending")
+      return { enabled: false, label: "Chưa thanh toán" };
+    if (!["confirmed", "modified"].includes(status))
+      return { enabled: false, label: "Không thể check-in" };
+    const now = currentTime;
+    const expectedAt = parseBackendUtcDate(
+      reservation.expectedEntryTime,
+    ).getTime();
+    if (now < expectedAt - 30 * 60_000)
+      return { enabled: false, label: "Chưa đến giờ check-in" };
+    if (now > expectedAt + 30 * 60_000)
+      return { enabled: false, label: "Đã quá giờ check-in" };
+    return { enabled: true, label: "Check-in đơn này" };
+  };
+
   const canConfirm = Boolean(
     !loading &&
-      !uploading &&
-      !qrUploading &&
-      licensePlate.trim() &&
-      gateId &&
-      (checkInType === 'reservation' ? hasReservationCode : vehicleTypeId),
-  )
+    !uploading &&
+    !qrUploading &&
+    licensePlate.trim() &&
+    gateId &&
+    (checkInType === "reservation" ? hasReservationCode : vehicleTypeId),
+  );
 
   return (
-    <ProtectedRoute allowedRoles={['staff']}>
-      <StaffLayout items={menuItems} activeItem={activePanel} onSelectItem={handleSelectSidebar}>
-        <div className="staff-content-wrapper">
-          <div className="staff-section">
-            <header className="staff-page-heading">
+    <StaffPageShell activeItem={activePanel} onSelectItem={handleSelectSidebar}>
+      <div className="staff-content-wrapper staff-manager-page manager-resource-page">
+        <div className="staff-section">
+          <header className="manager-resource-header">
+            <div className="manager-resource-title">
+              <span className="manager-resource-icon manager-resource-icon--green">
+                {activePanel === "scan" ? (
+                  <Smartphone size={24} aria-hidden />
+                ) : activePanel === "reservations" ? (
+                  <CalendarClock size={24} aria-hidden />
+                ) : (
+                  <Car size={24} aria-hidden />
+                )}
+              </span>
               <div>
                 <h2>{panelCopy[activePanel].title}</h2>
-                <p className="section-desc">{panelCopy[activePanel].desc}</p>
+                <p>{panelCopy[activePanel].desc}</p>
               </div>
-              {activePanel !== 'scan' && (
-                <button type="button" className="btn btn-outline btn-sm" onClick={loadGateLists} disabled={listLoading}>
-                  {listLoading ? 'Đang tải...' : 'Làm mới'}
+            </div>
+            {activePanel !== "scan" && (
+              <div className="manager-header-actions">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={loadGateLists}
+                  disabled={listLoading}
+                >
+                  <RotateCcw
+                    size={17}
+                    className={listLoading ? "spin" : ""}
+                    aria-hidden
+                  />{" "}
+                  {listLoading ? "Đang tải..." : "Làm mới"}
                 </button>
-              )}
-            </header>
+              </div>
+            )}
+          </header>
 
-            {activePanel === 'scan' && (
-              <div className="scan-entry-layout">
-                <div className="camera-preview scan-entry-camera card-panel">
-                  <div className="scan-card-heading">
-                    <span className="scan-step-badge">1</span>
-                    <div>
-                      <h3>Nhận diện biển số</h3>
-                      <p>Chụp rõ toàn bộ biển số hoặc nhập thủ công ở bước bên cạnh.</p>
-                    </div>
+          {activePanel === "scan" && (
+            <div className="scan-entry-layout">
+              <div className="camera-preview scan-entry-camera card-panel">
+                <div className="scan-card-heading">
+                  <span className="scan-step-badge">1</span>
+                  <div>
+                    <h3>Nhận diện biển số</h3>
+                    <p>
+                      Chụp rõ toàn bộ biển số hoặc nhập thủ công ở bước bên
+                      cạnh.
+                    </p>
                   </div>
-                  <div className="camera-frame clickable camera-frame--compact" onClick={() => fileInputRef.current?.click()}>
-                    {imagePreviewUrl ? (
-                      <img src={imagePreviewUrl} className="camera-preview-img" alt="Ảnh biển số xe" />
-                    ) : (
-                      <div className="camera-placeholder">
-                        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                          <circle cx="12" cy="13" r="4" />
-                        </svg>
-                        <p>Nhấn để chọn ảnh biển số</p>
-                        <small>Hỗ trợ JPG, PNG từ camera hoặc thiết bị</small>
-                      </div>
-                    )}
-
-                    {uploading && (
-                      <>
-                        <div className="ocr-scanning-line" />
-                        <div className="ocr-loading-overlay">
-                          <span>Đang nhận diện biển số...</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="upload-input-hidden"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                  />
-                  <button type="button" className="btn btn-outline btn-block" onClick={() => fileInputRef.current?.click()}>
-                    <Upload size={17} aria-hidden />
-                    {imagePreviewUrl ? 'Đổi ảnh khác' : 'Chọn ảnh biển số'}
-                  </button>
                 </div>
+                <div
+                  className="camera-frame clickable camera-frame--compact"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {imagePreviewUrl ? (
+                    <img
+                      src={imagePreviewUrl}
+                      className="camera-preview-img"
+                      alt="Ảnh biển số xe"
+                    />
+                  ) : (
+                    <div className="camera-placeholder">
+                      <svg
+                        width="52"
+                        height="52"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                      </svg>
+                      <p>Nhấn để chọn ảnh biển số</p>
+                      <small>Hỗ trợ JPG, PNG từ camera hoặc thiết bị</small>
+                    </div>
+                  )}
 
-                <div className="scan-entry-form card-panel">
-                  <div className="scan-card-heading">
-                    <span className="scan-step-badge">2</span>
-                    <div>
-                      <h3>Xác nhận thông tin xe</h3>
-                      <p>Kiểm tra biển số, loại khách và cổng trước khi cho xe vào.</p>
+                  {uploading && (
+                    <>
+                      <div className="ocr-scanning-line" />
+                      <div className="ocr-loading-overlay">
+                        <span>Đang nhận diện biển số...</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="upload-input-hidden"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline btn-block"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload size={17} aria-hidden />
+                  {imagePreviewUrl ? "Đổi ảnh khác" : "Chọn ảnh biển số"}
+                </button>
+              </div>
+
+              <div className="scan-entry-form card-panel">
+                <div className="scan-card-heading">
+                  <span className="scan-step-badge">2</span>
+                  <div>
+                    <h3>Xác nhận thông tin xe</h3>
+                    <p>
+                      Kiểm tra biển số, loại khách và cổng trước khi cho xe vào.
+                    </p>
+                  </div>
+                </div>
+                <div className="scan-entry-grid">
+                  <div className="form-field">
+                    <label htmlFor="license-plate">Biển số xe</label>
+                    <input
+                      id="license-plate"
+                      type="text"
+                      className="input-standalone plate-input"
+                      placeholder="Nhập biển số"
+                      value={licensePlate}
+                      onChange={(event) =>
+                        setPlateForConfirm(event.target.value)
+                      }
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label>Giờ hiện tại</label>
+                    <div className="input-readonly">
+                      {entryTimePreview || formatNowInVietnamTime()}
                     </div>
                   </div>
-                  <div className="scan-entry-grid">
-                    <div className="form-field">
-                      <label htmlFor="license-plate">Biển số xe</label>
-                      <input
-                        id="license-plate"
-                        type="text"
-                        className="input-standalone plate-input"
-                        placeholder="Nhập biển số"
-                        value={licensePlate}
-                        onChange={(event) => setPlateForConfirm(event.target.value)}
-                      />
-                    </div>
 
-                    <div className="form-field">
-                      <label>Giờ hiện tại</label>
-                      <div className="input-readonly">{entryTimePreview || formatNowInVietnamTime()}</div>
-                    </div>
-
-                    <div className="form-field form-field--full">
-                      <label>Loại khách</label>
-                      <div className="checkin-type-selector" role="group" aria-label="Chọn loại khách check-in">
-                        <button
-                          type="button"
-                          className={checkInType === 'guest' ? 'active' : ''}
-                          aria-pressed={checkInType === 'guest'}
-                          onClick={() => selectCheckInType('guest')}
-                        >
-                          <UsersRound size={19} aria-hidden />
-                          <span><strong>Vãng lai</strong><small>Khách gửi xe thông thường</small></span>
-                        </button>
-                        <button
-                          type="button"
-                          className={checkInType === 'resident' ? 'active' : ''}
-                          aria-pressed={checkInType === 'resident'}
-                          onClick={() => selectCheckInType('resident')}
-                        >
-                          <UserCheck size={19} aria-hidden />
-                          <span><strong>Khách tháng</strong><small>Đã có gói gửi xe</small></span>
-                        </button>
-                        <button
-                          type="button"
-                          className={checkInType === 'reservation' ? 'active' : ''}
-                          aria-pressed={checkInType === 'reservation'}
-                          onClick={() => selectCheckInType('reservation')}
-                        >
-                          <CalendarClock size={19} aria-hidden />
-                          <span><strong>Đặt trước</strong><small>Có mã QR hoặc mã đơn</small></span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {checkInType !== 'reservation' && (
-                      <div className="form-field">
-                        <label htmlFor="vehicle-type">Loại phương tiện</label>
-                        <select
-                          id="vehicle-type"
-                          className="input-standalone select"
-                          value={vehicleTypeId}
-                          onChange={(event) => setVehicleTypeId(event.target.value)}
-                        >
-                          {vehicleTypes.map((vehicleType) => (
-                            <option key={vehicleType.vehicleTypeId} value={vehicleType.vehicleTypeId}>
-                              {vehicleType.typeName}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    {checkInType === 'reservation' && (
-                      <div className="form-field form-field--full reservation-code-field">
-                        <label>Mã QR đặt chỗ</label>
-                        <div className={`input-readonly${reservationId ? ' input-readonly--success' : ''}`}>
-                          {reservationId ? `ReservationId: ${reservationId}` : 'Upload QR hoặc nhập payload bên dưới'}
-                        </div>
-                        <input
-                          type="text"
-                          className="input-standalone"
-                          placeholder="Dán QR payload / ReservationId"
-                          value={qrPayload}
-                          onChange={(event) => {
-                            setQrPayload(event.target.value.trim())
-                            setReservationId('')
-                            setQrDecode(null)
-                          }}
-                        />
-                        <div className="reservation-code-actions">
-                          <button
-                            type="button"
-                            className="btn btn-outline btn-sm"
-                            disabled={qrUploading}
-                            onClick={() => qrInputRef.current?.click()}
-                          >
-                            <QrCode size={16} aria-hidden />
-                            {qrUploading ? 'Đang đọc QR...' : 'Quét QR từ ảnh'}
-                          </button>
-                          {hasReservationCode && (
-                            <span className="scan-ready-label"><CheckCircle2 size={16} aria-hidden /> Đã nhận mã đặt chỗ</span>
-                          )}
-                        </div>
-                        <input
-                          type="file"
-                          ref={qrInputRef}
-                          className="upload-input-hidden"
-                          accept="image/*"
-                          onChange={handleQrUpload}
-                        />
-                      </div>
-                    )}
-
-                    <div className="form-field">
-                      <label htmlFor="gate">Cổng vào</label>
-                      <select
-                        id="gate"
-                        className="input-standalone select"
-                        value={gateId}
-                        onChange={(event) => setGateId(event.target.value)}
+                  <div className="form-field form-field--full">
+                    <label>Loại khách</label>
+                    <div
+                      className="checkin-type-selector"
+                      role="group"
+                      aria-label="Chọn loại khách check-in"
+                    >
+                      <button
+                        type="button"
+                        className={checkInType === "guest" ? "active" : ""}
+                        aria-pressed={checkInType === "guest"}
+                        onClick={() => selectCheckInType("guest")}
                       >
-                        {entryGates.length === 0 && <option value="">Chưa có cổng vào</option>}
-                        {entryGates.map((gate) => (
-                          <option key={gate.gateId} value={gate.gateId}>
-                            {gate.gateName}
-                            {gate.floorName ? ` · ${gate.floorName}` : ''}
+                        <UsersRound size={19} aria-hidden />
+                        <span>
+                          <strong>Vãng lai</strong>
+                          <small>Khách gửi xe thông thường</small>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className={checkInType === "resident" ? "active" : ""}
+                        aria-pressed={checkInType === "resident"}
+                        onClick={() => selectCheckInType("resident")}
+                      >
+                        <UserCheck size={19} aria-hidden />
+                        <span>
+                          <strong>Khách tháng</strong>
+                          <small>Đã có gói gửi xe</small>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className={
+                          checkInType === "reservation" ? "active" : ""
+                        }
+                        aria-pressed={checkInType === "reservation"}
+                        onClick={() => selectCheckInType("reservation")}
+                      >
+                        <CalendarClock size={19} aria-hidden />
+                        <span>
+                          <strong>Đặt trước</strong>
+                          <small>Có mã QR hoặc mã đơn</small>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {checkInType !== "reservation" && (
+                    <div className="form-field">
+                      <label htmlFor="vehicle-type">Loại phương tiện</label>
+                      <select
+                        id="vehicle-type"
+                        className="input-standalone select"
+                        value={vehicleTypeId}
+                        onChange={(event) =>
+                          setVehicleTypeId(event.target.value)
+                        }
+                      >
+                        {vehicleTypes.map((vehicleType) => (
+                          <option
+                            key={vehicleType.vehicleTypeId}
+                            value={vehicleType.vehicleTypeId}
+                          >
+                            {vehicleType.typeName}
                           </option>
                         ))}
                       </select>
                     </div>
-                  </div>
+                  )}
 
-                  {checkInType === 'reservation' && qrDecode && (
-                    <div className="scan-result">
-                      <h3>QR đặt chỗ</h3>
-                      <div className="scan-info">
-                        <p><strong>Loại mã:</strong> {qrDecode.codeType}</p>
-                        <p><strong>ReservationId:</strong> {qrDecode.reservationId || 'Không có'}</p>
-                        <p><strong>Payload:</strong> {qrDecode.qrPayload}</p>
+                  {checkInType === "reservation" && (
+                    <div className="form-field form-field--full reservation-code-field">
+                      <label>Mã QR đặt chỗ</label>
+                      <div
+                        className={`input-readonly${reservationId ? " input-readonly--success" : ""}`}
+                      >
+                        {reservationId
+                          ? `ReservationId: ${reservationId}`
+                          : "Upload QR hoặc nhập payload bên dưới"}
                       </div>
-                    </div>
-                  )}
-
-                  {message && (
-                    <p className={`alert-inline ${checkInTicket ? 'alert-success' : 'alert-error'}`} role="status">
-                      {checkInTicket ? <CheckCircle2 size={18} aria-hidden /> : <AlertCircle size={18} aria-hidden />}
-                      {message}
-                    </p>
-                  )}
-
-                  {checkInTicket && (
-                    <div className="reservation-ticket-card staff-checkin-ticket">
-                      <img src={checkInTicket.qrCodeDataUrl} alt="Mã QR vé xe" className="reservation-ticket-qr" />
-                      <div>
-                        <span>Vé xe sau check-in</span>
-                        <code className="reservation-ticket-code">{checkInTicket.qrPayload}</code>
-                        <div className="staff-checkin-ticket-meta">
-                          <p><strong>SessionId:</strong> {checkInTicket.sessionId}</p>
-                          {checkInTicket.licensePlate && <p><strong>Biển số:</strong> {checkInTicket.licensePlate}</p>}
-                          {checkInTicket.vehicleTypeName && <p><strong>Loại xe:</strong> {checkInTicket.vehicleTypeName}</p>}
-                          {checkInTicket.slotCode && <p><strong>Ô:</strong> {checkInTicket.slotCode}</p>}
-                          {checkInTicket.entryTime && <p><strong>Giờ vào:</strong> {formatDateTime(checkInTicket.entryTime)}</p>}
-                        </div>
+                      <input
+                        type="text"
+                        className="input-standalone"
+                        placeholder="Dán QR payload / ReservationId"
+                        value={qrPayload}
+                        onChange={(event) => {
+                          setQrPayload(event.target.value.trim());
+                          setReservationId("");
+                          setQrDecode(null);
+                        }}
+                      />
+                      <div className="reservation-code-actions">
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          disabled={qrUploading}
+                          onClick={() => qrInputRef.current?.click()}
+                        >
+                          <QrCode size={16} aria-hidden />
+                          {qrUploading ? "Đang đọc QR..." : "Quét QR từ ảnh"}
+                        </button>
+                        {hasReservationCode && (
+                          <span className="scan-ready-label">
+                            <CheckCircle2 size={16} aria-hidden /> Đã nhận mã
+                            đặt chỗ
+                          </span>
+                        )}
                       </div>
+                      <input
+                        type="file"
+                        ref={qrInputRef}
+                        className="upload-input-hidden"
+                        accept="image/*"
+                        onChange={handleQrUpload}
+                      />
                     </div>
                   )}
 
-                  <div className="scan-entry-actions">
-                    <div className={`scan-submit-status${canConfirm ? ' ready' : ''}`}>
-                      {canConfirm ? (
-                        <><CheckCircle2 size={17} aria-hidden /> Thông tin đã sẵn sàng</>
-                      ) : (
-                        <><AlertCircle size={17} aria-hidden /> Vui lòng nhập đủ thông tin bắt buộc</>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn-success"
-                      disabled={!canConfirm}
-                      onClick={handleConfirmCheckIn}
+                  <div className="form-field">
+                    <label htmlFor="gate">Cổng vào</label>
+                    <select
+                      id="gate"
+                      className="input-standalone select"
+                      value={gateId}
+                      onChange={(event) => setGateId(event.target.value)}
                     >
-                      <CheckCircle2 size={18} aria-hidden />
-                      {loading ? 'Đang xử lý...' : 'Xác nhận vào bãi'}
-                    </button>
-                    <button type="button" className="btn btn-ghost" onClick={() => resetScan()}>
-                      <RotateCcw size={17} aria-hidden />
-                      Làm lại
-                    </button>
+                      {entryGates.length === 0 && (
+                        <option value="">Chưa có cổng vào</option>
+                      )}
+                      {entryGates.map((gate) => (
+                        <option key={gate.gateId} value={gate.gateId}>
+                          {gate.gateName}
+                          {gate.floorName ? ` · ${gate.floorName}` : ""}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-              </div>
-            )}
 
-            {activePanel !== 'scan' && (
-              <section className="staff-gate-board">
-                {listError && <p className="alert-inline alert-error">{listError}</p>}
+                {checkInType === "reservation" && qrDecode && (
+                  <div className="scan-result">
+                    <h3>QR đặt chỗ</h3>
+                    <div className="scan-info">
+                      <p>
+                        <strong>Loại mã:</strong> {qrDecode.codeType}
+                      </p>
+                      <p>
+                        <strong>ReservationId:</strong>{" "}
+                        {qrDecode.reservationId || "Không có"}
+                      </p>
+                      <p>
+                        <strong>Payload:</strong> {qrDecode.qrPayload}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-                <div className="staff-gate-grid staff-gate-grid--single">
-                  {activePanel === 'reservations' && (
-                    <div className="staff-gate-column card-panel">
-                      <div className="staff-gate-column-head">
-                        <CalendarClock size={20} strokeWidth={2.2} aria-hidden />
-                        <div>
-                          <h4>Đơn đã đặt trước</h4>
-                          <span>{reservations.length} đơn đang chờ xe vào</span>
-                        </div>
-                      </div>
+                {message && (
+                  <p
+                    className={`alert-inline ${checkInTicket ? "alert-success" : "alert-error"}`}
+                    role="status"
+                  >
+                    {checkInTicket ? (
+                      <CheckCircle2 size={18} aria-hidden />
+                    ) : (
+                      <AlertCircle size={18} aria-hidden />
+                    )}
+                    {message}
+                  </p>
+                )}
 
-                      <div className="staff-vehicle-card-list">
-                        {reservations.length === 0 ? (
-                          <div className="staff-empty-state">Chưa có đơn đặt trước cần xử lý.</div>
-                        ) : (
-                          reservations.map((reservation) => {
-                            const reservationPlate = getReservationPlate(reservation)
-                            return (
-                              <article key={reservation.reservationId} className="staff-vehicle-card">
-                                <PlateVisual plate={reservationPlate} muted={reservationPlate === 'Chưa ghi nhận'} />
-                                <div className="staff-vehicle-info">
-                                  <div className="staff-vehicle-title">
-                                    <strong>{reservation.user?.fullName || 'Khách đặt trước'}</strong>
-                                    <span>{statusLabel(reservation.status)}</span>
-                                  </div>
-                                  <p>
-                                    <UserRound size={15} aria-hidden />
-                                    {reservation.user?.phoneNumber ||
-                                      reservation.user?.email ||
-                                      'Chưa có thông tin liên hệ'}
-                                  </p>
-                                  <p>
-                                    <Clock size={15} aria-hidden />
-                                    Giờ dự kiến vào: {formatDateTime(reservation.expectedEntryTime)}
-                                  </p>
-                                  <button
-                                    type="button"
-                                    className="btn btn-primary btn-sm staff-reservation-checkin-btn"
-                                    onClick={() => handleUseReservation(reservation)}
-                                  >
-                                    <CheckCircle2 size={16} aria-hidden />
-                                    Check-in đơn này
-                                  </button>
-                                </div>
-                              </article>
-                            )
-                          })
+                {checkInTicket && (
+                  <div className="reservation-ticket-card staff-checkin-ticket">
+                    <img
+                      src={checkInTicket.qrCodeDataUrl}
+                      alt="Mã QR vé xe"
+                      className="reservation-ticket-qr"
+                    />
+                    <div>
+                      <span>Vé xe sau check-in</span>
+                      <code className="reservation-ticket-code">
+                        {checkInTicket.qrPayload}
+                      </code>
+                      <div className="staff-checkin-ticket-meta">
+                        <p>
+                          <strong>SessionId:</strong> {checkInTicket.sessionId}
+                        </p>
+                        {checkInTicket.licensePlate && (
+                          <p>
+                            <strong>Biển số:</strong>{" "}
+                            {checkInTicket.licensePlate}
+                          </p>
+                        )}
+                        {checkInTicket.vehicleTypeName && (
+                          <p>
+                            <strong>Loại xe:</strong>{" "}
+                            {checkInTicket.vehicleTypeName}
+                          </p>
+                        )}
+                        {checkInTicket.slotCode && (
+                          <p>
+                            <strong>Ô:</strong> {checkInTicket.slotCode}
+                          </p>
+                        )}
+                        {checkInTicket.entryTime && (
+                          <p>
+                            <strong>Giờ vào:</strong>{" "}
+                            {formatDateTime(checkInTicket.entryTime)}
+                          </p>
                         )}
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {activePanel === 'active-vehicles' && (
-                    <div className="staff-gate-column card-panel">
-                      <div className="staff-gate-column-head">
-                        <Car size={20} strokeWidth={2.2} aria-hidden />
-                        <div>
-                          <h4>Xe đang trong bãi</h4>
-                          <span>{activeSessions.length} xe chưa ra</span>
-                        </div>
+                <div className="scan-entry-actions">
+                  <div
+                    className={`scan-submit-status${canConfirm ? " ready" : ""}`}
+                  >
+                    {canConfirm ? (
+                      <>
+                        <CheckCircle2 size={17} aria-hidden /> Thông tin đã sẵn
+                        sàng
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle size={17} aria-hidden /> Vui lòng nhập đủ
+                        thông tin bắt buộc
+                      </>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-success"
+                    disabled={!canConfirm}
+                    onClick={handleConfirmCheckIn}
+                  >
+                    <CheckCircle2 size={18} aria-hidden />
+                    {loading ? "Đang xử lý..." : "Xác nhận vào bãi"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => resetScan()}
+                  >
+                    <RotateCcw size={17} aria-hidden />
+                    Làm lại
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activePanel !== "scan" && (
+            <section className="staff-gate-board">
+              {listError && (
+                <p className="alert-inline alert-error">{listError}</p>
+              )}
+
+              <div className="staff-gate-grid staff-gate-grid--single">
+                {activePanel === "reservations" && (
+                  <div className="staff-gate-column card-panel staff-reservation-panel">
+                    <div className="staff-gate-column-head">
+                      <CalendarClock size={20} strokeWidth={2.2} aria-hidden />
+                      <div>
+                        <h4>Đơn đã đặt trước</h4>
+                        <span>
+                          {reservations.length} đơn đang chờ xử lý tại cổng
+                        </span>
                       </div>
+                    </div>
 
-                      <div className="staff-vehicle-card-list">
-                        {activeSessions.length === 0 ? (
-                          <div className="staff-empty-state">Chưa có xe đang trong bãi.</div>
-                        ) : (
-                          activeSessions.map((session) => (
-                            <article key={session.sessionId} className="staff-vehicle-card">
-                              <PlateVisual plate={session.licensePlateIn} />
+                    <div className="staff-reservation-summary">
+                      <div className="staff-reservation-stat staff-reservation-stat--ready">
+                        <span>Có thể check-in</span>
+                        <strong>{reservationCounts.ready}</strong>
+                      </div>
+                      <div className="staff-reservation-stat">
+                        <span>Sắp đến</span>
+                        <strong>{reservationCounts.upcoming}</strong>
+                      </div>
+                      <div className="staff-reservation-stat staff-reservation-stat--pending">
+                        <span>Chờ thanh toán</span>
+                        <strong>{reservationCounts.pending}</strong>
+                      </div>
+                    </div>
+
+                    <div className="staff-reservation-toolbar">
+                      <label className="manager-search-field">
+                        <Search size={18} aria-hidden />
+                        <input
+                          value={reservationQuery}
+                          onChange={(event) =>
+                            setReservationQuery(event.target.value)
+                          }
+                          placeholder="Tìm khách hàng, số điện thoại hoặc mã đơn..."
+                        />
+                        {reservationQuery && (
+                          <button
+                            type="button"
+                            aria-label="Xóa tìm kiếm"
+                            onClick={() => setReservationQuery("")}
+                          >
+                            <X size={16} aria-hidden />
+                          </button>
+                        )}
+                      </label>
+                      <div
+                        className="manager-segmented-filter"
+                        aria-label="Lọc đơn đặt trước"
+                      >
+                        {(
+                          [
+                            ["all", "Tất cả"],
+                            ["ready", "Có thể check-in"],
+                            ["upcoming", "Sắp đến"],
+                            ["pending", "Chờ thanh toán"],
+                          ] as const
+                        ).map(([value, label]) => (
+                          <button
+                            key={value}
+                            type="button"
+                            className={
+                              reservationFilter === value ? "active" : ""
+                            }
+                            onClick={() => setReservationFilter(value)}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="staff-vehicle-card-list">
+                      {reservationRows.length === 0 ? (
+                        <div className="staff-empty-state">
+                          Không có đơn đặt trước phù hợp.
+                        </div>
+                      ) : (
+                        reservationRows.map((reservation) => {
+                          const reservationPlate =
+                            getReservationPlate(reservation);
+                          const action = getReservationAction(reservation);
+                          return (
+                            <article
+                              key={reservation.reservationId}
+                              className={`staff-vehicle-card staff-reservation-card${action.enabled ? " staff-reservation-card--ready" : ""}`}
+                            >
+                              <div className="staff-reservation-card-icon">
+                                <CalendarClock size={23} aria-hidden />
+                              </div>
                               <div className="staff-vehicle-info">
                                 <div className="staff-vehicle-title">
-                                  <strong>{session.driverFullName || 'Khách vãng lai'}</strong>
-                                  <span>{statusLabel(session.status)}</span>
+                                  <strong>
+                                    {reservation.userFullName ||
+                                      reservation.user?.fullName ||
+                                      "Khách đặt trước"}
+                                  </strong>
+                                  <span
+                                    className={`staff-reservation-status status-${reservation.status?.toLowerCase()}`}
+                                  >
+                                    {statusLabel(reservation.status)}
+                                  </span>
                                 </div>
                                 <p>
-                                  <Car size={15} aria-hidden />
-                                  {session.vehicleTypeName || 'Chưa rõ loại xe'}
-                                  {session.assignedSlotCode ? ` · Ô ${session.assignedSlotCode}` : ''}
+                                  <UserRound size={15} aria-hidden />
+                                  {reservation.user?.phoneNumber ||
+                                    reservation.user?.email ||
+                                    "Chưa có thông tin liên hệ"}
                                 </p>
                                 <p>
                                   <Clock size={15} aria-hidden />
-                                  Giờ vào: {formatDateTime(session.entryTime)}
+                                  Giờ dự kiến vào:{" "}
+                                  {formatDateTime(
+                                    reservation.expectedEntryTime,
+                                  )}
                                 </p>
-                                {session.ticket?.qrCodeDataUrl && (
+                                <div className="staff-reservation-meta">
+                                  <span>
+                                    {reservation.vehicleTypeName ||
+                                      reservation.vehicleType?.typeName ||
+                                      "Chưa rõ loại xe"}
+                                  </span>
+                                  <span>
+                                    Mã:{" "}
+                                    {reservation.reservationId
+                                      .slice(0, 8)
+                                      .toUpperCase()}
+                                  </span>
+                                  {reservationPlate !== "Chưa ghi nhận" && (
+                                    <span>Biển số: {reservationPlate}</span>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  className={`btn btn-sm staff-reservation-checkin-btn ${action.enabled ? "btn-primary" : "btn-outline"}`}
+                                  onClick={() =>
+                                    handleUseReservation(reservation)
+                                  }
+                                  disabled={!action.enabled}
+                                >
+                                  <CheckCircle2 size={16} aria-hidden />
+                                  {action.label}
+                                </button>
+                              </div>
+                            </article>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {activePanel === "active-vehicles" && (
+                  <div className="staff-active-vehicle-panel">
+                    <div className="staff-active-summary">
+                      <article>
+                        <span>Tổng xe trong bãi</span>
+                        <strong>{activeSessions.length}</strong>
+                        <small>Chưa checkout</small>
+                      </article>
+                      <article>
+                        <span>Xe đặt trước</span>
+                        <strong>{activeSessionCounts.reservation}</strong>
+                        <small>Có mã đặt chỗ</small>
+                      </article>
+                      <article>
+                        <span>Xe vào trực tiếp</span>
+                        <strong>{activeSessionCounts.walkin}</strong>
+                        <small>Khách lượt hoặc khách tháng</small>
+                      </article>
+                    </div>
+
+                    <div className="card-panel staff-active-list-panel">
+                      <div className="staff-active-toolbar">
+                        <label className="manager-search-field">
+                          <Search size={18} aria-hidden />
+                          <input
+                            value={activeVehicleQuery}
+                            onChange={(event) =>
+                              setActiveVehicleQuery(event.target.value)
+                            }
+                            placeholder="Tìm biển số, khách hàng, loại xe hoặc vị trí..."
+                          />
+                          {activeVehicleQuery && (
+                            <button
+                              type="button"
+                              aria-label="Xóa tìm kiếm"
+                              onClick={() => setActiveVehicleQuery("")}
+                            >
+                              <X size={16} />
+                            </button>
+                          )}
+                        </label>
+                        <div
+                          className="manager-segmented-filter"
+                          aria-label="Lọc xe trong bãi"
+                        >
+                          {(
+                            [
+                              ["all", "Tất cả"],
+                              ["reservation", "Đặt trước"],
+                              ["walkin", "Vào trực tiếp"],
+                            ] as const
+                          ).map(([value, label]) => (
+                            <button
+                              key={value}
+                              type="button"
+                              className={
+                                activeVehicleFilter === value ? "active" : ""
+                              }
+                              onClick={() => setActiveVehicleFilter(value)}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="staff-active-list-heading">
+                        <div>
+                          <Car size={19} />
+                          <span>
+                            <strong>Danh sách phương tiện</strong>
+                            <small>Ưu tiên xe đã đỗ lâu ở đầu danh sách</small>
+                          </span>
+                        </div>
+                        <strong>{activeSessionRows.length} xe</strong>
+                      </div>
+
+                      <div className="staff-vehicle-card-list staff-active-vehicle-list">
+                        {activeSessionRows.length === 0 ? (
+                          <div className="staff-empty-state">
+                            {activeSessions.length === 0
+                              ? "Chưa có xe đang trong bãi."
+                              : "Không tìm thấy xe phù hợp."}
+                          </div>
+                        ) : (
+                          activeSessionRows.map((session) => (
+                            <article
+                              key={session.sessionId}
+                              className="staff-vehicle-card staff-active-vehicle-card"
+                            >
+                              <div className="staff-active-vehicle-identity">
+                                <PlateVisual plate={session.licensePlateIn} />
+                                <span>
+                                  {session.reservationId
+                                    ? "Xe đặt trước"
+                                    : "Vào trực tiếp"}
+                                </span>
+                              </div>
+                              <div className="staff-vehicle-info">
+                                <div className="staff-vehicle-title">
+                                  <strong>
+                                    {session.driverFullName || "Khách vãng lai"}
+                                  </strong>
+                                  <span>{statusLabel(session.status)}</span>
+                                </div>
+                                <div className="staff-active-vehicle-meta">
+                                  <span>
+                                    <Car size={15} />
+                                    {session.vehicleTypeName ||
+                                      "Chưa rõ loại xe"}
+                                  </span>
+                                  <span>
+                                    <MapPin size={15} />Ô{" "}
+                                    {session.actualSlotCode ||
+                                      session.assignedSlotCode ||
+                                      "chưa xếp"}
+                                  </span>
+                                  <span>
+                                    <Clock size={15} />
+                                    Vào {formatDateTime(session.entryTime)}
+                                  </span>
+                                  <span className="staff-active-duration">
+                                    <Clock size={15} />
+                                    Đã gửi{" "}
+                                    {parkingDuration(
+                                      session.entryTime,
+                                      currentTime,
+                                    )}
+                                  </span>
+                                </div>
+                                <div className="staff-vehicle-actions staff-active-vehicle-actions">
                                   <button
                                     type="button"
-                                    className="btn btn-outline btn-sm staff-ticket-button"
-                                    onClick={() => setTicketSession(session)}
+                                    className="btn btn-outline btn-sm"
+                                    onClick={() =>
+                                      setActiveDetailSession(session)
+                                    }
                                   >
-                                    <QrCode size={16} aria-hidden />
-                                    Xem mã vé
+                                    <Eye size={16} />
+                                    Chi tiết
                                   </button>
-                                )}
+                                  {session.ticket?.qrCodeDataUrl && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-outline btn-sm staff-ticket-button"
+                                      onClick={() => setTicketSession(session)}
+                                    >
+                                      <QrCode size={16} aria-hidden /> Xem mã vé
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary btn-sm"
+                                    onClick={() =>
+                                      navigate("/staff/checkout", {
+                                        state: {
+                                          sessionId: session.sessionId,
+                                          licensePlate: session.licensePlateIn,
+                                          qrPayload:
+                                            session.ticket?.qrPayload || "",
+                                        },
+                                      })
+                                    }
+                                  >
+                                    <LogOut size={16} />
+                                    Checkout
+                                  </button>
+                                </div>
                               </div>
                             </article>
                           ))
                         )}
                       </div>
                     </div>
-                  )}
-                </div>
-              </section>
-            )}
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
 
-            {ticketSession?.ticket && (
+          {activeDetailSession && (
+            <div
+              className="modal-overlay"
+              onClick={(event) =>
+                event.target === event.currentTarget &&
+                setActiveDetailSession(null)
+              }
+            >
               <div
-                className="modal-overlay"
-                role="presentation"
-                onClick={(event) => {
-                  if (event.target === event.currentTarget) setTicketSession(null)
-                }}
+                className="modal-panel manager-session-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="staff-active-detail-title"
               >
-                <div
-                  className="modal-panel staff-ticket-modal"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-labelledby="staff-ticket-modal-title"
-                >
-                  <div className="staff-ticket-modal-header">
+                <div className="manager-modal-header">
+                  <div>
+                    <h3 id="staff-active-detail-title" className="modal-title">
+                      Chi tiết phiên gửi xe
+                    </h3>
+                    <p>Toàn bộ thông tin phiên được trả về từ hệ thống.</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    aria-label="Đóng"
+                    onClick={() => setActiveDetailSession(null)}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="manager-session-modal-hero">
+                  <div className="manager-session-plate">
+                    <small>VIỆT NAM</small>
+                    <strong>{activeDetailSession.licensePlateIn}</strong>
+                    {activeDetailSession.licensePlateOut &&
+                      activeDetailSession.licensePlateOut !==
+                        activeDetailSession.licensePlateIn && (
+                        <span>Ra: {activeDetailSession.licensePlateOut}</span>
+                      )}
+                  </div>
+                  <div>
+                    <strong>
+                      {activeDetailSession.driverFullName || "Khách vãng lai"}
+                    </strong>
+                    <span>
+                      {activeDetailSession.vehicleTypeName || "Chưa rõ loại xe"}{" "}
+                      ·{" "}
+                      {activeDetailSession.reservationId
+                        ? "Khách đặt trước"
+                        : activeDetailSession.driverUserId
+                          ? "Khách thành viên"
+                          : "Khách vãng lai"}
+                    </span>
+                    <span
+                      className={`manager-session-status status-${activeDetailSession.status.toLowerCase()}`}
+                    >
+                      <i />
+                      {statusLabel(activeDetailSession.status)}
+                    </span>
+                  </div>
+                </div>
+                <section className="manager-session-detail-section">
+                  <div className="manager-session-section-heading">
+                    <Hash size={17} aria-hidden />
                     <div>
-                      <h3 id="staff-ticket-modal-title" className="modal-title">Mã vé giữ xe</h3>
-                      <p>{ticketSession.licensePlateIn} · {ticketSession.vehicleTypeName || 'Chưa rõ loại xe'}</p>
+                      <h4>Thông tin định danh</h4>
+                      <p>Các mã liên kết của phiên trong backend.</p>
                     </div>
+                  </div>
+                  <div className="manager-session-detail-grid manager-session-detail-grid--ids">
+                    <div>
+                      <Fingerprint size={17} aria-hidden />
+                      <span>Mã phiên</span>
+                      <code>{activeDetailSession.sessionId}</code>
+                    </div>
+                    <div>
+                      <QrCode size={17} aria-hidden />
+                      <span>Mã đặt chỗ</span>
+                      <code>
+                        {activeDetailSession.reservationId || "Không có"}
+                      </code>
+                    </div>
+                    <div>
+                      <UserRound size={17} aria-hidden />
+                      <span>Mã người lái</span>
+                      <code>
+                        {activeDetailSession.driverUserId || "Khách vãng lai"}
+                      </code>
+                    </div>
+                    <div>
+                      <CarFront size={17} aria-hidden />
+                      <span>Mã loại phương tiện</span>
+                      <code>{activeDetailSession.vehicleTypeId || "—"}</code>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="manager-session-detail-section">
+                  <div className="manager-session-section-heading">
+                    <CalendarDays size={17} aria-hidden />
+                    <div>
+                      <h4>Thời gian và biển số</h4>
+                      <p>Thông tin check-in, checkout và thời lượng gửi xe.</p>
+                    </div>
+                  </div>
+                  <div className="manager-session-detail-grid">
+                    <div>
+                      <CalendarDays size={17} aria-hidden />
+                      <span>Thời gian vào</span>
+                      <strong>
+                        {formatDateTime(activeDetailSession.entryTime)}
+                      </strong>
+                    </div>
+                    <div>
+                      <CalendarDays size={17} aria-hidden />
+                      <span>Thời gian ra</span>
+                      <strong>
+                        {activeDetailSession.exitTime
+                          ? formatDateTime(activeDetailSession.exitTime)
+                          : "Chưa checkout"}
+                      </strong>
+                    </div>
+                    <div>
+                      <Clock3 size={17} aria-hidden />
+                      <span>Tổng thời lượng</span>
+                      <strong>
+                        {parkingDuration(
+                          activeDetailSession.entryTime,
+                          currentTime,
+                        )}
+                      </strong>
+                    </div>
+                    <div>
+                      <CarFront size={17} aria-hidden />
+                      <span>Biển số vào → ra</span>
+                      <strong>
+                        {activeDetailSession.licensePlateIn || "—"} →{" "}
+                        {activeDetailSession.licensePlateOut || "Chưa ghi nhận"}
+                      </strong>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="manager-session-detail-section">
+                  <div className="manager-session-section-heading">
+                    <MapPin size={17} aria-hidden />
+                    <div>
+                      <h4>Cổng và vị trí đỗ</h4>
+                      <p>
+                        Đối chiếu vị trí được phân bổ với dữ liệu vận hành thực
+                        tế.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="manager-session-detail-grid manager-session-detail-grid--route">
+                    <div>
+                      <MapPin size={17} aria-hidden />
+                      <span>Cổng vào</span>
+                      <strong>
+                        {activeDetailSession.entryGateName || "Chưa xác định"}
+                      </strong>
+                      <code>{activeDetailSession.entryGateId}</code>
+                    </div>
+                    <div>
+                      <MapPin size={17} aria-hidden />
+                      <span>Cổng ra</span>
+                      <strong>
+                        {activeDetailSession.exitGateName || "Chưa checkout"}
+                      </strong>
+                      <code>{activeDetailSession.exitGateId || "Chưa có"}</code>
+                    </div>
+                    <div>
+                      <ParkingSquare size={17} aria-hidden />
+                      <span>Slot được xếp</span>
+                      <strong>
+                        {activeDetailSession.assignedSlotCode ||
+                          "Chưa xếp slot"}
+                      </strong>
+                      <code>
+                        {activeDetailSession.assignedSlotId || "Chưa có"}
+                      </code>
+                    </div>
+                    <div>
+                      <ParkingSquare size={17} aria-hidden />
+                      <span>Slot thực tế</span>
+                      <strong>
+                        {activeDetailSession.actualSlotCode || "Chưa ghi nhận"}
+                      </strong>
+                      <code>
+                        {activeDetailSession.actualSlotId || "Chưa có"}
+                      </code>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="manager-session-detail-section">
+                  <div className="manager-session-section-heading">
+                    <CreditCard size={17} aria-hidden />
+                    <div>
+                      <h4>Thanh toán</h4>
+                      <p>Khoản phí checkout được liên kết với phiên gửi xe.</p>
+                    </div>
+                  </div>
+                  <div className="manager-session-detail-grid">
+                    <div>
+                      <CreditCard size={17} aria-hidden />
+                      <span>Phí gửi xe</span>
+                      <strong>
+                        {typeof activeDetailSession.paymentAmount === "number"
+                          ? formatCurrency(activeDetailSession.paymentAmount)
+                          : "Chưa có thanh toán"}
+                      </strong>
+                    </div>
+                    <div>
+                      <Activity size={17} aria-hidden />
+                      <span>Trạng thái</span>
+                      <strong>
+                        {paymentStatusLabel(activeDetailSession.paymentStatus)}
+                      </strong>
+                    </div>
+                    <div>
+                      <CreditCard size={17} aria-hidden />
+                      <span>Phương thức</span>
+                      <strong>
+                        {activeDetailSession.paymentMethod || "Chưa ghi nhận"}
+                      </strong>
+                    </div>
+                    <div>
+                      <CalendarDays size={17} aria-hidden />
+                      <span>Thời gian thanh toán</span>
+                      <strong>
+                        {activeDetailSession.paymentTime
+                          ? formatDateTime(activeDetailSession.paymentTime)
+                          : "Chưa ghi nhận"}
+                      </strong>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="manager-session-detail-section">
+                  <div className="manager-session-section-heading">
+                    <ImageIcon size={17} aria-hidden />
+                    <div>
+                      <h4>Ảnh phương tiện vào / ra</h4>
+                      <p>
+                        Ảnh được nhân viên ghi nhận tại thời điểm check-in và
+                        checkout.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="manager-session-image-grid">
+                    <article>
+                      <div>
+                        {activeDetailSession.entryImageUrl ? (
+                          <a
+                            href={activeDetailSession.entryImageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label="Mở ảnh xe lúc vào"
+                          >
+                            <img
+                              src={activeDetailSession.entryImageUrl}
+                              alt={`Xe ${activeDetailSession.licensePlateIn} lúc vào`}
+                              loading="lazy"
+                            />
+                          </a>
+                        ) : (
+                          <span className="manager-session-image-empty">
+                            <ImageIcon size={28} aria-hidden />
+                            Chưa có ảnh lúc vào
+                          </span>
+                        )}
+                      </div>
+                      <strong>Ảnh lúc vào</strong>
+                      <small>
+                        {formatDateTime(activeDetailSession.entryTime)}
+                      </small>
+                    </article>
+                    <article>
+                      <div>
+                        {activeDetailSession.exitImageUrl ? (
+                          <a
+                            href={activeDetailSession.exitImageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label="Mở ảnh xe lúc ra"
+                          >
+                            <img
+                              src={activeDetailSession.exitImageUrl}
+                              alt={`Xe ${activeDetailSession.licensePlateOut || activeDetailSession.licensePlateIn} lúc ra`}
+                              loading="lazy"
+                            />
+                          </a>
+                        ) : (
+                          <span className="manager-session-image-empty">
+                            <ImageIcon size={28} aria-hidden />
+                            Chưa có ảnh lúc ra
+                          </span>
+                        )}
+                      </div>
+                      <strong>Ảnh lúc ra</strong>
+                      <small>
+                        {activeDetailSession.exitTime
+                          ? formatDateTime(activeDetailSession.exitTime)
+                          : "Xe chưa checkout"}
+                      </small>
+                    </article>
+                  </div>
+                </section>
+
+                {activeDetailSession.ticket?.qrCodeDataUrl && (
+                  <div className="manager-session-ticket">
+                    <QrCode size={21} aria-hidden />
+                    <div>
+                      <strong>Mã vé phiên đang hoạt động</strong>
+                      <code>{activeDetailSession.ticket.qrPayload}</code>
+                    </div>
+                    <img
+                      src={activeDetailSession.ticket.qrCodeDataUrl}
+                      alt={`QR vé xe ${activeDetailSession.licensePlateIn}`}
+                    />
+                  </div>
+                )}
+                <div className="form-actions manager-session-modal-actions">
+                  {activeDetailSession.ticket?.qrCodeDataUrl && (
                     <button
                       type="button"
-                      className="btn btn-ghost btn-sm"
-                      aria-label="Đóng mã vé"
-                      onClick={() => setTicketSession(null)}
+                      className="btn manager-session-modal-edit"
+                      onClick={() => {
+                        setTicketSession(activeDetailSession);
+                        setActiveDetailSession(null);
+                      }}
                     >
-                      <X size={20} aria-hidden />
+                      <QrCode size={16} />
+                      Xem mã vé
                     </button>
-                  </div>
-                  <div className="staff-ticket-modal-content">
-                    <img
-                      src={ticketSession.ticket.qrCodeDataUrl}
-                      alt={`Mã QR vé giữ xe ${ticketSession.licensePlateIn}`}
-                      className="staff-ticket-modal-qr"
-                    />
-                    <span>Mã vé / SessionId</span>
-                    <code className="reservation-ticket-code">{ticketSession.ticket.qrPayload}</code>
-                    <p>Giờ vào: {formatDateTime(ticketSession.entryTime)}</p>
-                    <small>Dùng mã QR này để xác minh và làm thủ tục cho khách trong trường hợp mất vé.</small>
-                  </div>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() =>
+                      navigate("/staff/checkout", {
+                        state: {
+                          sessionId: activeDetailSession.sessionId,
+                          licensePlate: activeDetailSession.licensePlateIn,
+                          qrPayload:
+                            activeDetailSession.ticket?.qrPayload || "",
+                        },
+                      })
+                    }
+                  >
+                    <LogOut size={16} />
+                    Làm checkout
+                  </button>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {ticketSession?.ticket && (
+            <div
+              className="modal-overlay"
+              role="presentation"
+              onClick={(event) => {
+                if (event.target === event.currentTarget)
+                  setTicketSession(null);
+              }}
+            >
+              <div
+                className="modal-panel staff-ticket-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="staff-ticket-modal-title"
+              >
+                <div className="staff-ticket-modal-header">
+                  <div>
+                    <h3 id="staff-ticket-modal-title" className="modal-title">
+                      Mã vé giữ xe
+                    </h3>
+                    <p>
+                      {ticketSession.licensePlateIn} ·{" "}
+                      {ticketSession.vehicleTypeName || "Chưa rõ loại xe"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    aria-label="Đóng mã vé"
+                    onClick={() => setTicketSession(null)}
+                  >
+                    <X size={20} aria-hidden />
+                  </button>
+                </div>
+                <div className="staff-ticket-modal-content">
+                  <img
+                    src={ticketSession.ticket.qrCodeDataUrl}
+                    alt={`Mã QR vé giữ xe ${ticketSession.licensePlateIn}`}
+                    className="staff-ticket-modal-qr"
+                  />
+                  <span>Mã vé / SessionId</span>
+                  <code className="reservation-ticket-code">
+                    {ticketSession.ticket.qrPayload}
+                  </code>
+                  <p>Giờ vào: {formatDateTime(ticketSession.entryTime)}</p>
+                  <small>
+                    Dùng mã QR này để xác minh và làm thủ tục cho khách trong
+                    trường hợp mất vé.
+                  </small>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      </StaffLayout>
-    </ProtectedRoute>
-  )
+      </div>
+    </StaffPageShell>
+  );
 }
