@@ -24,6 +24,7 @@ import {
 import ManagerConfirmActionModal from '../../components/ManagerConfirmActionModal'
 import ManagerPageShell from '../../components/ManagerPageShell'
 import { apiClient } from '../../config/api'
+import { useParkingFeePreviews } from '../../hooks/useParkingFeePreviews'
 import {
   formatUtcToVietnamDate,
   formatUtcToVietnamDateTime,
@@ -122,6 +123,7 @@ export default function ManagerParkingSessions() {
   const [vehicleOptions, setVehicleOptions] = useState<SessionOption[]>([])
   const [gateOptions, setGateOptions] = useState<SessionOption[]>([])
   const [slotOptions, setSlotOptions] = useState<SessionOption[]>([])
+  const { previews: feePreviews, errors: feePreviewErrors } = useParkingFeePreviews(sessions)
 
   const fetchSessions = useCallback(async () => {
     setLoading(true)
@@ -152,6 +154,11 @@ export default function ManagerParkingSessions() {
       }).catch(() => setError('Không thể tải loại xe, cổng hoặc slot để chỉnh sửa phiên.'))
     })
   }, [fetchSessions])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setReferenceTime(Date.now()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const openCreate = () => {
     setSessionForm({
@@ -342,7 +349,7 @@ export default function ManagerParkingSessions() {
                         <span><Clock3 size={15} aria-hidden /><span><small>Giờ vào</small><strong>{formatUtcToVietnamDateTime(session.entryTime)}</strong></span></span>
                         <span><MapPin size={15} aria-hidden /><span><small>Vị trí</small><strong>{slot}</strong></span></span>
                         <span><Activity size={15} aria-hidden /><span><small>Thời lượng</small><strong>{sessionDuration(session, referenceTime)}</strong></span></span>
-                        <span><CreditCard size={15} aria-hidden /><span><small>Phí gửi xe</small><strong>{session.paymentAmount != null ? formatCurrency(session.paymentAmount) : isActive ? 'Chưa tính phí' : 'Chưa có thanh toán'}</strong></span></span>
+                        <span><CreditCard size={15} aria-hidden /><span><small>{isActive ? 'Phí tạm tính' : 'Phí gửi xe'}</small><strong>{isActive ? feePreviews[session.sessionId]?.isCoveredBySubscription ? 'Đã gồm trong gói tháng' : feePreviews[session.sessionId] ? formatCurrency(feePreviews[session.sessionId].amount) : feePreviewErrors[session.sessionId] || 'Đang tính phí...' : session.paymentAmount != null ? formatCurrency(session.paymentAmount) : 'Chưa có thanh toán'}</strong></span></span>
                       </div>
                     </div>
                     <div className="manager-session-side">
@@ -438,7 +445,13 @@ export default function ManagerParkingSessions() {
             <section className="manager-session-detail-section">
               <div className="manager-session-section-heading"><CreditCard size={17} aria-hidden /><div><h4>Thanh toán</h4><p>Khoản phí checkout được liên kết với phiên gửi xe.</p></div></div>
               <div className="manager-session-detail-grid">
-                <div><CreditCard size={17} aria-hidden /><span>Phí gửi xe</span><strong>{selectedSession.paymentAmount != null ? formatCurrency(selectedSession.paymentAmount) : 'Chưa có thanh toán'}</strong></div>
+                <div><CreditCard size={17} aria-hidden /><span>{selectedSession.status.toLowerCase() === 'active' ? 'Phí tạm tính hiện tại' : 'Phí gửi xe'}</span><strong>{selectedSession.status.toLowerCase() === 'active' ? feePreviews[selectedSession.sessionId]?.isCoveredBySubscription ? 'Đã gồm trong gói tháng · 0 ₫' : feePreviews[selectedSession.sessionId] ? formatCurrency(feePreviews[selectedSession.sessionId].amount) : feePreviewErrors[selectedSession.sessionId] || 'Đang tính phí...' : selectedSession.paymentAmount != null ? formatCurrency(selectedSession.paymentAmount) : 'Chưa có thanh toán'}</strong></div>
+                {feePreviews[selectedSession.sessionId] && !feePreviews[selectedSession.sessionId].isCoveredBySubscription && (
+                  <>
+                    <div><Clock3 size={17} aria-hidden /><span>Số giờ tính phí</span><strong>{feePreviews[selectedSession.sessionId].billedHours} giờ</strong></div>
+                    <div><CreditCard size={17} aria-hidden /><span>Chính sách áp dụng</span><strong>{formatCurrency(feePreviews[selectedSession.sessionId].basePrice ?? 0)} / {feePreviews[selectedSession.sessionId].baseHours ?? 0} giờ · thêm {formatCurrency(feePreviews[selectedSession.sessionId].extraHourPrice ?? 0)}/giờ{feePreviews[selectedSession.sessionId].hasNightSurcharge ? ` · ${feePreviews[selectedSession.sessionId].nightSurchargeCount} đêm × ${formatCurrency(feePreviews[selectedSession.sessionId].nightSurcharge ?? 0)}` : ''}</strong></div>
+                  </>
+                )}
                 <div><Activity size={17} aria-hidden /><span>Trạng thái</span><strong>{paymentStatusLabel(selectedSession.paymentStatus)}</strong></div>
                 <div><CreditCard size={17} aria-hidden /><span>Phương thức</span><strong>{selectedSession.paymentMethod || 'Chưa ghi nhận'}</strong></div>
                 <div><CalendarDays size={17} aria-hidden /><span>Thời gian thanh toán</span><strong>{selectedSession.paymentTime ? formatUtcToVietnamDateTime(selectedSession.paymentTime) : 'Chưa ghi nhận'}</strong></div>

@@ -21,6 +21,7 @@ import StaffDashboard from './pages/staff/Dashboard'
 import StaffScanPlate from './pages/staff/ScanPlate'
 
 import StaffCheckout from './pages/staff/Checkout'
+import StaffGateSelection from './pages/staff/GateSelection'
 
 import StaffException from './pages/staff/Exception'
 
@@ -123,7 +124,13 @@ export default function App() {
 
               <Route path="staff/scan-plate" element={<StaffScanPlate />} />
 
+              <Route path="staff/reservations" element={<StaffScanPlate initialPanel="reservations" />} />
+
+              <Route path="staff/active-vehicles" element={<StaffScanPlate initialPanel="active-vehicles" />} />
+
               <Route path="staff/checkout" element={<StaffCheckout />} />
+
+              <Route path="staff/chon-cong/:operation" element={<StaffGateSelection />} />
 
               <Route path="staff/exception" element={<StaffException />} />
 

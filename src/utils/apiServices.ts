@@ -139,6 +139,15 @@ export interface SubscriptionRenewalDto {
   renewalDate?: string
 }
 
+export interface FloorDto {
+  floorId: string
+  floorName: string
+  dedicatedVehicleTypeId?: string | null
+  dedicatedVehicleTypeName?: string | null
+  totalCapacity: number
+  isResident: boolean
+}
+
 export interface VehicleChangeRequestDto {
   requestId: string
   subscriptionId: string
@@ -192,6 +201,24 @@ export interface ParkingQrDecodeResult {
   imageUrl?: string
 }
 
+export interface ParkingFeePreview {
+  sessionId: string
+  licensePlate: string
+  entryTime: string
+  exitTime: string
+  totalHours: number
+  billedHours: number
+  amount: number
+  pricingPolicyId?: string
+  basePrice?: number
+  baseHours?: number
+  extraHourPrice?: number
+  nightSurcharge?: number
+  nightSurchargeCount: number
+  hasNightSurcharge: boolean
+  isCoveredBySubscription: boolean
+}
+
 export interface ParkingCheckInRequest {
   customerType: 'Guest' | 'Resident' | 'Reservation'
   qrPayload?: string
@@ -221,20 +248,33 @@ export interface ParkingCheckOutRequest {
 
 export interface ParkingOnlinePayment {
   paymentUrl?: string
+  paymentQrCodeDataUrl?: string
   paymentLinkId?: string
   orderCode?: string
   PaymentUrl?: string
+  PaymentQrCodeDataUrl?: string
   PaymentLinkId?: string
   OrderCode?: string
 }
 
+export interface ParkingCheckoutPayment {
+  paymentId: string
+  sessionId?: string
+  amount: number
+  paymentMethod: string
+  paymentType: string
+  paymentTime: string
+  paymentStatus: 'Pending' | 'Success' | 'Failed' | string
+  transactionReference?: string
+}
+
 export interface ParkingCheckOutResponse {
   session?: ParkingSessionDto
-  payment?: unknown
+  payment?: ParkingCheckoutPayment
   fee?: ParkingFeePreview
   onlinePayment?: ParkingOnlinePayment
   Session?: ParkingSessionDto
-  Payment?: unknown
+  Payment?: ParkingCheckoutPayment
   Fee?: ParkingFeePreview
   OnlinePayment?: ParkingOnlinePayment
 }
@@ -353,6 +393,10 @@ export const gateApi = {
   getAll: () => apiClient.get<ApiResponse<GateDto[]>>('/Gate'),
 }
 
+export const floorApi = {
+  getAll: () => apiClient.get<ApiResponse<FloorDto[]>>('/Floor'),
+}
+
 export const parkingOperationApi = {
   uploadAndRecognizePlate: (file: File) => {
     const formData = new FormData()
@@ -377,6 +421,26 @@ export const parkingOperationApi = {
 
   checkOut: (data: ParkingCheckOutRequest) =>
     apiClient.post<ApiResponse<ParkingCheckOutResponse>>('/ParkingOperation/check-out', data),
+
+  getCheckoutPaymentStatus: (paymentId: string) =>
+    apiClient.get<ApiResponse<ParkingCheckOutResponse>>(
+      `/ParkingOperation/check-out/payment/${paymentId}`,
+    ),
+
+  confirmCashCheckout: (paymentId: string) =>
+    apiClient.post<ApiResponse<ParkingCheckOutResponse>>(
+      `/ParkingOperation/check-out/payment/${paymentId}/confirm-cash`,
+    ),
+
+  cancelCheckout: (paymentId: string) =>
+    apiClient.post<ApiResponse<ParkingCheckOutResponse>>(
+      `/ParkingOperation/check-out/payment/${paymentId}/cancel`,
+    ),
+
+  getFeePreview: (sessionId: string) =>
+    apiClient.get<ApiResponse<ParkingFeePreview>>(
+      `/ParkingOperation/fee-preview/${sessionId}`,
+    ),
 
   getAvailability: (vehicleTypeId?: string, floorKeyword?: string) => {
     const params = new URLSearchParams()

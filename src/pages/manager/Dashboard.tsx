@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
+  AlertTriangle,
   BarChart3,
   Building2,
   Car,
@@ -12,6 +13,7 @@ import {
   Layers,
   Package,
   CalendarRange,
+  CalendarCheck2,
   ParkingSquare,
 } from 'lucide-react'
 import ProtectedRoute from '../../components/ProtectedRoute'
@@ -24,6 +26,8 @@ const hubIcons: Record<string, React.ReactNode> = {
   subscriptions: <Package size={32} />,
   'monthly-subscriptions': <CalendarRange size={32} />,
   sessions: <Clock size={32} />,
+  reservations: <CalendarCheck2 size={32} />,
+  incidents: <AlertTriangle size={32} />,
   payments: <CreditCard size={32} />,
   'vehicle-change-requests': <FileCheck size={32} />,
   slots: <ParkingSquare size={32} />,

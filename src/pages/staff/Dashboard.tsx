@@ -66,7 +66,9 @@ export default function StaffDashboard() {
   }, [loadDashboard])
 
   const activeSessions = useMemo(
-    () => sessions.filter((item) => item.status?.toLowerCase() === 'active' && !item.exitTime),
+    () => sessions
+      .filter((item) => item.status?.toLowerCase() === 'active')
+      .sort((left, right) => parseBackendUtcDate(right.entryTime).getTime() - parseBackendUtcDate(left.entryTime).getTime()),
     [sessions],
   )
   const upcomingReservations = useMemo(
@@ -102,7 +104,7 @@ export default function StaffDashboard() {
           <article className="card-panel staff-operation-panel">
             <div className="staff-operation-panel-head"><div><CalendarCheck2 size={20} aria-hidden /><span><strong>Đặt chỗ sắp đến</strong><small>{upcomingReservations.length} lịch đang hoạt động</small></span></div><button type="button" className="btn btn-outline btn-sm" onClick={() => navigateStaffNav('reservations', navigate)}>Xem tất cả</button></div>
             <div className="staff-dashboard-list">
-              {upcomingReservations.slice(0, 5).map((reservation) => <div key={reservation.reservationId}><span><strong>{reservation.userFullName || 'Khách hàng'}</strong><small>{reservation.vehicleTypeName || 'Chưa rõ loại xe'}</small></span><time>{formatUtcToVietnamDateTime(reservation.expectedEntryTime)}</time></div>)}
+              {upcomingReservations.slice(0, 3).map((reservation) => <div key={reservation.reservationId}><span><strong>{reservation.userFullName || 'Khách hàng'}</strong><small>{reservation.vehicleTypeName || 'Chưa rõ loại xe'}</small></span><time>{formatUtcToVietnamDateTime(reservation.expectedEntryTime)}</time></div>)}
               {!loading && upcomingReservations.length === 0 && <div className="staff-dashboard-list-empty">Không có lịch đặt trước đang chờ.</div>}
             </div>
           </article>
@@ -110,7 +112,7 @@ export default function StaffDashboard() {
           <article className="card-panel staff-operation-panel">
             <div className="staff-operation-panel-head"><div><CarFront size={20} aria-hidden /><span><strong>Xe đang trong bãi</strong><small>{activeSessions.length} phiên hoạt động</small></span></div><button type="button" className="btn btn-outline btn-sm" onClick={() => navigateStaffNav('active-vehicles', navigate)}>Xem tất cả</button></div>
             <div className="staff-dashboard-list">
-              {activeSessions.slice(0, 5).map((session) => <div key={session.sessionId}><span><strong>{session.licensePlateIn}</strong><small>{session.vehicleTypeName || 'Chưa rõ loại xe'} · {session.actualSlotCode || session.assignedSlotCode || 'Chưa xếp ô'}</small></span><time>{formatUtcToVietnamDateTime(session.entryTime)}</time></div>)}
+              {activeSessions.slice(0, 3).map((session) => <div key={session.sessionId}><span><strong>{session.licensePlateIn}</strong><small>{session.vehicleTypeName || 'Chưa rõ loại xe'} · {session.actualSlotCode || session.assignedSlotCode || 'Chưa xếp ô'}</small></span><time>{formatUtcToVietnamDateTime(session.entryTime)}</time></div>)}
               {!loading && activeSessions.length === 0 && <div className="staff-dashboard-list-empty">Hiện không có xe trong bãi.</div>}
             </div>
           </article>
