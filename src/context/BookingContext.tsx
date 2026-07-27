@@ -12,6 +12,7 @@ import { addHours } from '../utils/pricing'
 import { useAuth } from './AuthContext'
 import { apiClient } from '../config/api'
 import { parseBackendUtcDate } from '../utils/dateTime'
+import { normalizeLicensePlate } from '../utils/licensePlate'
 
 interface PricingPolicyRaw {
   policyId: string
@@ -28,7 +29,12 @@ const BOOKINGS_KEY = 'pbms_bookings'
 function loadAllBookings(): BookingRecord[] {
   try {
     const raw = localStorage.getItem(BOOKINGS_KEY)
-    return raw ? (JSON.parse(raw) as BookingRecord[]) : []
+    return raw
+      ? (JSON.parse(raw) as BookingRecord[]).map((booking) => ({
+          ...booking,
+          vehiclePlate: normalizeLicensePlate(booking.vehiclePlate),
+        }))
+      : []
   } catch {
     return []
   }
@@ -136,7 +142,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         hours: draft.hours,
         pricePerHour: isPreRegistered ? total : hourlyRate,
         totalAmount: total,
-        vehiclePlate: draft.vehiclePlate,
+        vehiclePlate: normalizeLicensePlate(draft.vehiclePlate),
         status: 'paid',
         paymentMethod: method,
         createdAt: now,

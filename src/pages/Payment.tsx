@@ -9,6 +9,7 @@ import type { PaymentMethod } from '../types/booking'
 import { reservationApi } from '../utils/apiServices'
 import { vehicleTypeLabel } from '../utils/bookingPricing'
 import { formatCurrency } from '../utils/pricing'
+import { normalizeLicensePlate } from '../utils/licensePlate'
 
 const methods: { id: PaymentMethod; label: string; icon: typeof Wallet }[] = [
   { id: 'momo', label: 'Ví MoMo / PayOS', icon: Smartphone },
@@ -49,7 +50,7 @@ function PaymentContent() {
         const res = await reservationApi.create({
           expectedEntryTime: draft.startTime,
           vehicleTypeName: vehicleTypeLabel(draft.vehicleType ?? 'car'),
-          licensePlate: draft.vehiclePlate,
+          licensePlate: normalizeLicensePlate(draft.vehiclePlate),
         })
 
         if (res.isSuccess && res.result) {

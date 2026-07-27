@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext'
 import { useBooking } from '../context/BookingContext'
 import { formatCurrency } from '../utils/pricing'
 import { toVietnamDatetimeLocal, vietnamDatetimeLocalToUtcIso } from '../utils/dateTime'
+import { normalizeLicensePlate } from '../utils/licensePlate'
 
 function ConfirmContent() {
   const navigate = useNavigate()
@@ -16,13 +17,15 @@ function ConfirmContent() {
   const { draft, setDraft, getPolicy } = useBooking()
   const [hours, setHours] = useState(draft?.hours ?? 2)
   const [startLocal, setStartLocal] = useState('')
-  const [plate, setPlate] = useState(draft?.vehiclePlate ?? profile?.vehiclePlate ?? '')
+  const [plate, setPlate] = useState(
+    normalizeLicensePlate(draft?.vehiclePlate ?? profile?.vehiclePlate ?? ''),
+  )
 
   useEffect(() => {
     if (!draft) return
     setStartLocal(toVietnamDatetimeLocal(draft.startTime))
     setHours(draft.hours)
-    setPlate(draft.vehiclePlate)
+    setPlate(normalizeLicensePlate(draft.vehiclePlate))
   }, [draft])
 
   if (!draft || draft.spots.length === 0) {
@@ -42,7 +45,7 @@ function ConfirmContent() {
       ...draft,
       hours: isPreRegistered ? 1 : hours,
       startTime: vietnamDatetimeLocalToUtcIso(startLocal),
-      vehiclePlate: plate.trim(),
+      vehiclePlate: normalizeLicensePlate(plate),
     })
     navigate('/thanh-toan')
   }
@@ -92,8 +95,8 @@ function ConfirmContent() {
             id="plate"
             icon={Car}
             value={plate}
-            onChange={(e) => setPlate(e.target.value)}
-            placeholder="51A-12345"
+            onChange={(e) => setPlate(normalizeLicensePlate(e.target.value))}
+            placeholder="51A12345"
             required
           />
           <div className="form-field">

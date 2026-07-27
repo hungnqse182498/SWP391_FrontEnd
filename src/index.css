@@ -7330,6 +7330,20 @@ ul, ol { margin: 0; padding: 0; }
   grid-column: 1 / -1;
 }
 
+.staff-checkout-form-card > .alert-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+
+.staff-checkout-form-card > .alert-inline svg {
+  flex: 0 0 auto;
+}
+
 .staff-checkout-form-card .form-field {
   min-width: 0;
   margin: 0;
@@ -7913,4 +7927,213 @@ ul, ol { margin: 0; padding: 0; }
   .staff-incident-title { flex-direction: column; }
   .staff-incident-actions { grid-column: auto; flex-direction: column; }
   .staff-incident-actions .btn { width: 100%; }
+}
+.payment-result-page {
+  position: relative;
+  display: grid;
+  min-height: calc(100vh - 76px);
+  padding: clamp(2rem, 6vw, 5rem) 1rem;
+  overflow: hidden;
+  place-items: center;
+  background:
+    radial-gradient(circle at 18% 15%, rgba(37, 99, 235, 0.12), transparent 30rem),
+    radial-gradient(circle at 85% 80%, rgba(14, 165, 233, 0.1), transparent 28rem),
+    var(--bg);
+}
+
+.payment-result-page--success {
+  background:
+    radial-gradient(circle at 18% 15%, rgba(16, 185, 129, 0.13), transparent 30rem),
+    radial-gradient(circle at 85% 80%, rgba(37, 99, 235, 0.1), transparent 28rem),
+    var(--bg);
+}
+
+.payment-result-page--cancel {
+  background:
+    radial-gradient(circle at 18% 15%, rgba(239, 68, 68, 0.1), transparent 30rem),
+    radial-gradient(circle at 85% 80%, rgba(245, 158, 11, 0.09), transparent 28rem),
+    var(--bg);
+}
+
+.payment-result-card {
+  position: relative;
+  width: min(620px, 100%);
+  overflow: hidden;
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.13);
+  text-align: center;
+}
+
+.payment-result-accent {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 5px;
+  background: linear-gradient(90deg, #10b981, #2563eb);
+}
+
+.payment-result-page--cancel .payment-result-accent {
+  background: linear-gradient(90deg, #ef4444, #f59e0b);
+}
+
+.payment-result-icon {
+  display: grid;
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 1rem;
+  border-radius: 24px;
+  place-items: center;
+}
+
+.payment-result-icon--success {
+  background: #ecfdf5;
+  color: #059669;
+  box-shadow: inset 0 0 0 1px #a7f3d0;
+}
+
+.payment-result-icon--cancel {
+  background: #fef2f2;
+  color: #dc2626;
+  box-shadow: inset 0 0 0 1px #fecaca;
+}
+
+.payment-result-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.65rem;
+  color: var(--blue-700);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.payment-result-page--cancel .payment-result-eyebrow { color: #b45309; }
+.payment-result-card h1 { margin: 0; color: var(--text-heading); font-size: clamp(1.7rem, 5vw, 2.25rem); }
+
+.payment-result-description {
+  max-width: 480px;
+  margin: 0.8rem auto 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+.payment-result-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  text-align: left;
+}
+
+.payment-result-summary > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.1rem 0.55rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.payment-result-summary svg {
+  grid-row: span 2;
+  color: var(--blue-600);
+}
+
+.payment-result-page--cancel .payment-result-summary svg { color: #d97706; }
+.payment-result-summary span { color: var(--text-muted); font-size: 0.72rem; }
+.payment-result-summary strong { overflow-wrap: anywhere; color: var(--text-heading); font-size: 0.85rem; }
+
+.payment-result-ticket {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: 0.65rem 1rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--blue-200);
+  border-radius: 14px;
+  background: var(--blue-50);
+  text-align: left;
+}
+
+.payment-result-ticket > div {
+  display: flex;
+  align-items: center;
+  align-self: end;
+  gap: 0.45rem;
+  color: var(--blue-700);
+  font-weight: 800;
+}
+
+.payment-result-ticket img {
+  grid-row: span 3;
+  width: 132px;
+  height: 132px;
+  padding: 0.35rem;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.payment-result-ticket code { overflow-wrap: anywhere; color: var(--blue-800); font-size: 0.7rem; }
+.payment-result-ticket small { color: var(--text-muted); }
+
+.payment-result-note {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 0.82rem;
+  text-align: left;
+}
+
+.payment-result-note svg { flex: 0 0 auto; }
+
+.payment-result-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 0.7rem;
+  margin-top: 1.35rem;
+}
+
+.payment-result-actions .btn { justify-content: center; }
+
+.payment-result-card--loading {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+}
+
+.payment-result-card--loading strong { margin-top: 1rem; color: var(--text-heading); }
+.payment-result-card--loading p { margin: 0.35rem 0 0; color: var(--text-muted); }
+
+.payment-result-spinner {
+  width: 42px;
+  height: 42px;
+  border: 4px solid var(--blue-100);
+  border-top-color: var(--blue-600);
+  border-radius: 50%;
+  animation: payment-result-spin 0.8s linear infinite;
+}
+
+@keyframes payment-result-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 560px) {
+  .payment-result-page { min-height: calc(100vh - 64px); padding: 1.25rem 0.75rem; }
+  .payment-result-card { padding: 1.35rem 1rem; border-radius: 17px; }
+  .payment-result-summary,
+  .payment-result-actions { grid-template-columns: 1fr; }
+  .payment-result-ticket { grid-template-columns: 1fr; text-align: center; }
+  .payment-result-ticket > div { justify-content: center; }
+  .payment-result-ticket img { grid-row: auto; justify-self: center; }
 }

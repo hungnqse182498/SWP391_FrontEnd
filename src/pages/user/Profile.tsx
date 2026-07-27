@@ -4,12 +4,13 @@ import { useEffect, useState, type FormEvent } from 'react'
 import FormField from '../../components/FormField'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { useAuth } from '../../context/AuthContext'
+import { normalizeLicensePlate } from '../../utils/licensePlate'
 
 function ProfileContent() {
   const { user, profile, updateProfile, refreshProfile } = useAuth()
   const [name, setName] = useState(profile?.name ?? '')
   const [phone, setPhone] = useState(profile?.phone ?? user?.phone ?? '')
-  const [plate, setPlate] = useState(profile?.vehiclePlate ?? '')
+  const [plate, setPlate] = useState(normalizeLicensePlate(profile?.vehiclePlate ?? ''))
   const [address, setAddress] = useState(profile?.address ?? '')
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
@@ -23,7 +24,7 @@ function ProfileContent() {
     if (profile) {
       setName(profile.name)
       setPhone(profile.phone)
-      setPlate(profile.vehiclePlate)
+      setPlate(normalizeLicensePlate(profile.vehiclePlate))
       setAddress(profile.address)
     }
   }, [profile])
@@ -32,7 +33,7 @@ function ProfileContent() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const ok = await updateProfile({ name, phone, vehiclePlate: plate, address })
+    const ok = await updateProfile({ name, phone, vehiclePlate: normalizeLicensePlate(plate), address })
     setLoading(false)
     if (ok) {
       setSaved(true)
@@ -71,7 +72,7 @@ function ProfileContent() {
 
         <FormField label="Họ và tên" name="name" id="p-name" icon={User} value={name} onChange={(e) => setName(e.target.value)} required />
         <FormField label="Số điện thoại" name="phone" id="p-phone" type="tel" icon={Phone} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0901234567" />
-        <FormField label="Biển số xe" name="plate" id="p-plate" icon={User} value={plate} onChange={(e) => setPlate(e.target.value)} placeholder="51A-12345" />
+        <FormField label="Biển số xe" name="plate" id="p-plate" icon={User} value={plate} onChange={(e) => setPlate(normalizeLicensePlate(e.target.value))} placeholder="51A12345" />
         <div className="form-field">
           <label htmlFor="p-address">
             <MapPin size={16} strokeWidth={2} aria-hidden /> Địa chỉ

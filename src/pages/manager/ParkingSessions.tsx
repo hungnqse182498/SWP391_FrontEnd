@@ -32,7 +32,8 @@ import {
   toVietnamDatetimeLocal,
   vietnamDatetimeLocalToUtcIso,
 } from '../../utils/dateTime'
-import type { ApiResponse, ParkingSessionDto } from '../../utils/apiServices'
+import type { ApiResponse, MonthlySubscriptionDto, ParkingSessionDto } from '../../utils/apiServices'
+import { normalizeLicensePlate } from '../../utils/licensePlate'
 import { formatCurrency } from '../../utils/pricing'
 
 type DateFilter = 'all' | 'today' | '7days' | '30days'
@@ -57,8 +58,8 @@ function toLocalInput(value?: string) {
 
 function sessionToForm(session: ParkingSessionDto): SessionForm {
   return {
-    driverUserId: session.driverUserId ?? '', licensePlateIn: session.licensePlateIn,
-    licensePlateOut: session.licensePlateOut ?? '', entryImageUrl: session.entryImageUrl ?? '',
+    driverUserId: session.driverUserId ?? '', licensePlateIn: normalizeLicensePlate(session.licensePlateIn),
+    licensePlateOut: normalizeLicensePlate(session.licensePlateOut ?? ''), entryImageUrl: session.entryImageUrl ?? '',
     exitImageUrl: session.exitImageUrl ?? '', vehicleTypeId: session.vehicleTypeId,
     entryTime: toLocalInput(session.entryTime), exitTime: toLocalInput(session.exitTime),
     entryGateId: session.entryGateId, exitGateId: session.exitGateId ?? '',
@@ -106,8 +107,39 @@ function customerLabel(session: ParkingSessionDto) {
   return 'Khách vãng lai'
 }
 
+function subscriptionForSession(
+  session: ParkingSessionDto,
+  subscriptions: MonthlySubscriptionDto[],
+) {
+  if (session.reservationId) return undefined
+
+  const sessionPlate = normalizeLicensePlate(session.licensePlateIn)
+  const sessionVehicleType = session.vehicleTypeName?.trim().toLowerCase()
+  const coverageTime = session.exitTime
+    ? parseBackendUtcDate(session.exitTime).getTime()
+    : Date.now()
+
+  return subscriptions.find((subscription) => {
+    const status = subscription.status.toLowerCase()
+    const sameVehicleType =
+      !sessionVehicleType ||
+      !subscription.vehicleType ||
+      subscription.vehicleType.trim().toLowerCase() === sessionVehicleType
+
+    return (
+      status !== 'pendingpayment' &&
+      status !== 'cancelled' &&
+      normalizeLicensePlate(subscription.licensePlate) === sessionPlate &&
+      sameVehicleType &&
+      parseBackendUtcDate(subscription.startDate).getTime() <= coverageTime &&
+      parseBackendUtcDate(subscription.endDate).getTime() >= coverageTime
+    )
+  })
+}
+
 export default function ManagerParkingSessions() {
   const [sessions, setSessions] = useState<ParkingSessionDto[]>([])
+  const [subscriptions, setSubscriptions] = useState<MonthlySubscriptionDto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -147,10 +179,12 @@ export default function ManagerParkingSessions() {
         apiClient.get<ApiResponse<Array<{ vehicleTypeId: string; typeName: string }>>>('/VehicleType'),
         apiClient.get<ApiResponse<Array<{ gateId: string; gateName: string; gateType?: string }>>>('/Gate'),
         apiClient.get<ApiResponse<Array<{ slotId: string; slotCode: string; status?: string }>>>('/ParkingSlot'),
-      ]).then(([vehicles, gates, slots]) => {
+        apiClient.get<ApiResponse<MonthlySubscriptionDto[]>>('/MonthlySubscription'),
+      ]).then(([vehicles, gates, slots, monthlySubscriptions]) => {
         setVehicleOptions((vehicles.result ?? []).map((item) => ({ id: item.vehicleTypeId, label: item.typeName })))
         setGateOptions((gates.result ?? []).map((item) => ({ id: item.gateId, label: item.gateName, type: item.gateType })))
         setSlotOptions((slots.result ?? []).map((item) => ({ id: item.slotId, label: item.slotCode, type: item.status })))
+        setSubscriptions(monthlySubscriptions.result ?? [])
       }).catch(() => setError('Không thể tải loại xe, cổng hoặc slot để chỉnh sửa phiên.'))
     })
   }, [fetchSessions])
@@ -159,6 +193,14 @@ export default function ManagerParkingSessions() {
     const timer = window.setInterval(() => setReferenceTime(Date.now()), 30_000)
     return () => window.clearInterval(timer)
   }, [])
+
+  const selectedSubscription = useMemo(
+    () =>
+      selectedSession
+        ? subscriptionForSession(selectedSession, subscriptions)
+        : undefined,
+    [selectedSession, subscriptions],
+  )
 
   const openCreate = () => {
     setSessionForm({
@@ -191,19 +233,19 @@ export default function ManagerParkingSessions() {
     setError(null)
     const optional = (value: string) => value.trim() || null
     const base = {
-      driverUserId: optional(sessionForm.driverUserId), licensePlateIn: sessionForm.licensePlateIn.trim().toUpperCase(),
+      driverUserId: optional(sessionForm.driverUserId), licensePlateIn: normalizeLicensePlate(sessionForm.licensePlateIn),
       entryImageUrl: optional(sessionForm.entryImageUrl), vehicleTypeId: sessionForm.vehicleTypeId,
       entryTime: sessionForm.entryTime ? vietnamDatetimeLocalToUtcIso(sessionForm.entryTime) : null,
       entryGateId: sessionForm.entryGateId, assignedSlotId: optional(sessionForm.assignedSlotId),
       actualSlotId: optional(sessionForm.actualSlotId), status: sessionForm.status,
     }
     const payload = editingSession ? {
-      ...base, sessionId: editingSession.sessionId, licensePlateOut: optional(sessionForm.licensePlateOut),
+      ...base, sessionId: editingSession.sessionId, licensePlateOut: optional(normalizeLicensePlate(sessionForm.licensePlateOut)),
       exitImageUrl: optional(sessionForm.exitImageUrl), entryTime: vietnamDatetimeLocalToUtcIso(sessionForm.entryTime),
       exitTime: sessionForm.exitTime ? vietnamDatetimeLocalToUtcIso(sessionForm.exitTime) : null,
       exitGateId: optional(sessionForm.exitGateId),
     } : {
-      ...base, licensePlateOut: optional(sessionForm.licensePlateOut),
+      ...base, licensePlateOut: optional(normalizeLicensePlate(sessionForm.licensePlateOut)),
       exitImageUrl: optional(sessionForm.exitImageUrl),
       exitTime: sessionForm.exitTime ? vietnamDatetimeLocalToUtcIso(sessionForm.exitTime) : null,
       exitGateId: optional(sessionForm.exitGateId),
@@ -336,6 +378,7 @@ export default function ManagerParkingSessions() {
             <div className="manager-session-list">
               {filteredSessions.map((session) => {
                 const isActive = session.status.toLowerCase() === 'active'
+                const coveringSubscription = subscriptionForSession(session, subscriptions)
                 const slot = session.actualSlotCode || session.assignedSlotCode || 'Chưa xếp ô'
                 return (
                   <article key={session.sessionId} className="manager-session-card">
@@ -349,7 +392,7 @@ export default function ManagerParkingSessions() {
                         <span><Clock3 size={15} aria-hidden /><span><small>Giờ vào</small><strong>{formatUtcToVietnamDateTime(session.entryTime)}</strong></span></span>
                         <span><MapPin size={15} aria-hidden /><span><small>Vị trí</small><strong>{slot}</strong></span></span>
                         <span><Activity size={15} aria-hidden /><span><small>Thời lượng</small><strong>{sessionDuration(session, referenceTime)}</strong></span></span>
-                        <span><CreditCard size={15} aria-hidden /><span><small>{isActive ? 'Phí tạm tính' : 'Phí gửi xe'}</small><strong>{isActive ? feePreviews[session.sessionId]?.isCoveredBySubscription ? 'Đã gồm trong gói tháng' : feePreviews[session.sessionId] ? formatCurrency(feePreviews[session.sessionId].amount) : feePreviewErrors[session.sessionId] || 'Đang tính phí...' : session.paymentAmount != null ? formatCurrency(session.paymentAmount) : 'Chưa có thanh toán'}</strong></span></span>
+                        <span><CreditCard size={15} aria-hidden /><span><small>{coveringSubscription ? 'Quyền lợi gói tháng' : isActive ? 'Phí tạm tính' : 'Phí gửi xe'}</small><strong>{coveringSubscription ? `Đã gồm trong ${coveringSubscription.packageName || 'gói tháng'} · 0 ₫` : isActive ? feePreviews[session.sessionId]?.isCoveredBySubscription ? 'Đã gồm trong gói tháng' : feePreviews[session.sessionId] ? `${formatCurrency(feePreviews[session.sessionId].amount)}${(feePreviews[session.sessionId].depositAmount ?? 0) > 0 ? ` · Đã trừ ${formatCurrency(feePreviews[session.sessionId].depositAmount ?? 0)} tiền cọc` : ''}` : feePreviewErrors[session.sessionId] || 'Đang tính phí...' : session.paymentAmount != null ? formatCurrency(session.paymentAmount) : 'Chưa có thanh toán'}</strong></span></span>
                       </div>
                     </div>
                     <div className="manager-session-side">
@@ -375,10 +418,10 @@ export default function ManagerParkingSessions() {
               <section className="manager-session-form-section">
                 <div className="manager-session-form-section-title"><CarFront size={18} /><div><h4>Phương tiện</h4><p>Thông tin nhận diện và trạng thái hiện tại.</p></div></div>
                 <div className="form-grid-2">
-                  <div className="form-field"><label>Biển số vào *</label><input required autoFocus placeholder="Ví dụ: 60A-999.99" value={sessionForm.licensePlateIn} onChange={(e) => setSessionForm({...sessionForm, licensePlateIn: e.target.value.toUpperCase()})} /></div>
+                  <div className="form-field"><label>Biển số vào *</label><input required autoFocus placeholder="Ví dụ: 60A99999" value={sessionForm.licensePlateIn} onChange={(e) => setSessionForm({...sessionForm, licensePlateIn: normalizeLicensePlate(e.target.value)})} /></div>
                   <div className="form-field"><label>Loại phương tiện *</label><select required value={sessionForm.vehicleTypeId} onChange={(e) => setSessionForm({...sessionForm, vehicleTypeId: e.target.value})}><option value="">Chọn loại xe</option>{vehicleOptions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
                   <div className="form-field"><label>Trạng thái *</label><select value={sessionForm.status} onChange={(e) => setSessionForm({...sessionForm, status: e.target.value})}><option value="Active">Đang trong bãi</option><option value="Completed">Đã hoàn thành</option><option value="Exception">Có sự cố</option></select></div>
-                  <div className="form-field"><label>Biển số ra</label><input placeholder="Nếu khác biển số vào" value={sessionForm.licensePlateOut} onChange={(e) => setSessionForm({...sessionForm, licensePlateOut: e.target.value.toUpperCase()})} /></div>
+                  <div className="form-field"><label>Biển số ra</label><input placeholder="Nếu khác biển số vào" value={sessionForm.licensePlateOut} onChange={(e) => setSessionForm({...sessionForm, licensePlateOut: normalizeLicensePlate(e.target.value)})} /></div>
                 </div>
               </section>
 
@@ -445,16 +488,16 @@ export default function ManagerParkingSessions() {
             <section className="manager-session-detail-section">
               <div className="manager-session-section-heading"><CreditCard size={17} aria-hidden /><div><h4>Thanh toán</h4><p>Khoản phí checkout được liên kết với phiên gửi xe.</p></div></div>
               <div className="manager-session-detail-grid">
-                <div><CreditCard size={17} aria-hidden /><span>{selectedSession.status.toLowerCase() === 'active' ? 'Phí tạm tính hiện tại' : 'Phí gửi xe'}</span><strong>{selectedSession.status.toLowerCase() === 'active' ? feePreviews[selectedSession.sessionId]?.isCoveredBySubscription ? 'Đã gồm trong gói tháng · 0 ₫' : feePreviews[selectedSession.sessionId] ? formatCurrency(feePreviews[selectedSession.sessionId].amount) : feePreviewErrors[selectedSession.sessionId] || 'Đang tính phí...' : selectedSession.paymentAmount != null ? formatCurrency(selectedSession.paymentAmount) : 'Chưa có thanh toán'}</strong></div>
-                {feePreviews[selectedSession.sessionId] && !feePreviews[selectedSession.sessionId].isCoveredBySubscription && (
+                <div><CreditCard size={17} aria-hidden /><span>{selectedSubscription ? 'Quyền lợi gói tháng' : selectedSession.status.toLowerCase() === 'active' ? 'Phí tạm tính hiện tại' : 'Phí gửi xe'}</span><strong>{selectedSubscription ? `Đã gồm trong ${selectedSubscription.packageName || 'gói tháng'} · 0 ₫` : selectedSession.status.toLowerCase() === 'active' ? feePreviews[selectedSession.sessionId]?.isCoveredBySubscription ? 'Đã gồm trong gói tháng · 0 ₫' : feePreviews[selectedSession.sessionId] ? `${formatCurrency(feePreviews[selectedSession.sessionId].amount)}${(feePreviews[selectedSession.sessionId].depositAmount ?? 0) > 0 ? ` · Đã trừ ${formatCurrency(feePreviews[selectedSession.sessionId].depositAmount ?? 0)} tiền cọc` : ''}` : feePreviewErrors[selectedSession.sessionId] || 'Đang tính phí...' : selectedSession.paymentAmount != null ? formatCurrency(selectedSession.paymentAmount) : 'Chưa có thanh toán'}</strong></div>
+                {!selectedSubscription && feePreviews[selectedSession.sessionId] && !feePreviews[selectedSession.sessionId].isCoveredBySubscription && (
                   <>
                     <div><Clock3 size={17} aria-hidden /><span>Số giờ tính phí</span><strong>{feePreviews[selectedSession.sessionId].billedHours} giờ</strong></div>
                     <div><CreditCard size={17} aria-hidden /><span>Chính sách áp dụng</span><strong>{formatCurrency(feePreviews[selectedSession.sessionId].basePrice ?? 0)} / {feePreviews[selectedSession.sessionId].baseHours ?? 0} giờ · thêm {formatCurrency(feePreviews[selectedSession.sessionId].extraHourPrice ?? 0)}/giờ{feePreviews[selectedSession.sessionId].hasNightSurcharge ? ` · ${feePreviews[selectedSession.sessionId].nightSurchargeCount} đêm × ${formatCurrency(feePreviews[selectedSession.sessionId].nightSurcharge ?? 0)}` : ''}</strong></div>
                   </>
                 )}
-                <div><Activity size={17} aria-hidden /><span>Trạng thái</span><strong>{paymentStatusLabel(selectedSession.paymentStatus)}</strong></div>
-                <div><CreditCard size={17} aria-hidden /><span>Phương thức</span><strong>{selectedSession.paymentMethod || 'Chưa ghi nhận'}</strong></div>
-                <div><CalendarDays size={17} aria-hidden /><span>Thời gian thanh toán</span><strong>{selectedSession.paymentTime ? formatUtcToVietnamDateTime(selectedSession.paymentTime) : 'Chưa ghi nhận'}</strong></div>
+                <div><Activity size={17} aria-hidden /><span>Trạng thái</span><strong>{selectedSubscription ? 'Không cần thanh toán riêng' : paymentStatusLabel(selectedSession.paymentStatus)}</strong></div>
+                <div><CreditCard size={17} aria-hidden /><span>Phương thức</span><strong>{selectedSubscription ? 'Gói tháng' : selectedSession.paymentMethod || 'Chưa ghi nhận'}</strong></div>
+                <div><CalendarDays size={17} aria-hidden /><span>Thời gian thanh toán</span><strong>{selectedSubscription ? 'Đã thanh toán khi đăng ký gói' : selectedSession.paymentTime ? formatUtcToVietnamDateTime(selectedSession.paymentTime) : 'Chưa ghi nhận'}</strong></div>
               </div>
             </section>
 

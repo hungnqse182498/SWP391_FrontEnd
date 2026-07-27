@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { authService, type RegisterRequest } from '../utils/authService'
 import { profileApi } from '../utils/apiServices'
+import { normalizeLicensePlate } from '../utils/licensePlate'
 import type { UserProfile } from '../types/profile'
 
 export type UserRole = 'guest' | 'user' | 'customer' | 'staff' | 'manager' | 'admin'
@@ -62,12 +63,18 @@ function profileKey(email: string) {
 
 function loadProfile(email: string, name: string): UserProfile {
   const saved = localStorage.getItem(profileKey(email))
-  if (saved) return JSON.parse(saved) as UserProfile
+  if (saved) {
+    const profile = JSON.parse(saved) as UserProfile
+    return {
+      ...profile,
+      vehiclePlate: normalizeLicensePlate(profile.vehiclePlate),
+    }
+  }
   return {
     email,
     name,
     phone: '',
-    vehiclePlate: '51A-12345',
+    vehiclePlate: '51A12345',
     address: '',
   }
 }
@@ -234,7 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email: u.email,
             name: u.fullName,
             phone: u.phoneNumber ?? '',
-            vehiclePlate: prev?.vehiclePlate ?? '',
+            vehiclePlate: normalizeLicensePlate(prev?.vehiclePlate ?? ''),
             address: prev?.address ?? '',
           }
           localStorage.setItem(profileKey(u.email), JSON.stringify(nextProfile))
@@ -275,7 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email: u.email || user.email,
             name: u.fullName,
             phone: u.phoneNumber ?? '',
-            vehiclePlate: data.vehiclePlate ?? profile?.vehiclePlate ?? '',
+            vehiclePlate: normalizeLicensePlate(data.vehiclePlate ?? profile?.vehiclePlate ?? ''),
             address: data.address ?? profile?.address ?? '',
           }
           setProfile(nextProfile)

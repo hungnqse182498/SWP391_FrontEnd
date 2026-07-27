@@ -1,18 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Activity,
+  CalendarDays,
   Car,
-  ChevronRight,
+  CarFront,
   CircleParking,
   Clock3,
+  CreditCard,
   DoorOpen,
-  Image,
+  Eye,
+  Fingerprint,
+  Hash,
+  Image as ImageIcon,
   MapPin,
+  ParkingSquare,
   QrCode,
   ShieldAlert,
   TriangleAlert,
+  UserRound,
   X,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import ParkingTicketModal from "../../components/ParkingTicketModal";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import {
   formatUtcToVietnamDateTime,
@@ -20,8 +29,12 @@ import {
 } from "../../utils/dateTime";
 import {
   parkingSessionApi,
+  subscriptionApi,
+  type MonthlySubscriptionDto,
   type ParkingSessionDto,
 } from "../../utils/apiServices";
+import { normalizeLicensePlate } from "../../utils/licensePlate";
+import { formatCurrency } from "../../utils/pricing";
 
 type SessionFilter = "all" | "active" | "completed";
 
@@ -69,8 +82,57 @@ function durationLabel(session: ParkingSessionDto) {
     .join(" ");
 }
 
+function paymentStatusLabel(status?: string) {
+  const normalized = status?.toLowerCase() ?? "";
+  if (normalized === "success") return "Đã thanh toán";
+  if (normalized === "pending") return "Chờ thanh toán";
+  if (normalized === "failed") return "Thanh toán thất bại";
+  return status || "Chưa có thanh toán";
+}
+
+function customerLabel(session: ParkingSessionDto) {
+  if (session.reservationId) return "Xe đặt trước";
+  if (session.driverUserId) return "Khách thành viên";
+  return "Khách vãng lai";
+}
+
+function subscriptionForSession(
+  session: ParkingSessionDto,
+  subscriptions: MonthlySubscriptionDto[],
+) {
+  if (session.reservationId) return undefined;
+
+  const sessionPlate = normalizeLicensePlate(session.licensePlateIn);
+  const sessionVehicleType = session.vehicleTypeName?.trim().toLowerCase();
+  const coverageTime = session.exitTime
+    ? parseBackendUtcDate(session.exitTime).getTime()
+    : Date.now();
+
+  return subscriptions.find((subscription) => {
+    const status = subscription.status.toLowerCase();
+    const sameVehicleType =
+      !sessionVehicleType ||
+      !subscription.vehicleType ||
+      subscription.vehicleType.trim().toLowerCase() === sessionVehicleType;
+
+    return (
+      status !== "pendingpayment" &&
+      status !== "cancelled" &&
+      normalizeLicensePlate(subscription.licensePlate) === sessionPlate &&
+      sameVehicleType &&
+      parseBackendUtcDate(subscription.startDate).getTime() <= coverageTime &&
+      parseBackendUtcDate(subscription.endDate).getTime() >= coverageTime
+    );
+  });
+}
+
 function ParkingSessionsContent() {
   const [sessions, setSessions] = useState<ParkingSessionDto[]>([]);
+  const [subscriptions, setSubscriptions] = useState<MonthlySubscriptionDto[]>(
+    [],
+  );
+  const [ticketSession, setTicketSession] =
+    useState<ParkingSessionDto | null>(null);
   const [filter, setFilter] = useState<SessionFilter>("all");
   const [selected, setSelected] = useState<ParkingSessionDto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,7 +142,10 @@ function ParkingSessionsContent() {
     setLoading(true);
     setError("");
     try {
-      const res = await parkingSessionApi.getMy();
+      const [res, subscriptionResult] = await Promise.all([
+        parkingSessionApi.getMy(),
+        subscriptionApi.getMy().catch(() => null),
+      ]);
       if (res.isSuccess) {
         setSessions(
           [...(res.result || [])].sort(
@@ -88,6 +153,12 @@ function ParkingSessionsContent() {
               parseBackendUtcDate(right.entryTime).getTime() -
               parseBackendUtcDate(left.entryTime).getTime(),
           ),
+        );
+        setSubscriptions(
+          subscriptionResult?.isSuccess &&
+            Array.isArray(subscriptionResult.result)
+            ? subscriptionResult.result
+            : [],
         );
       } else {
         setError(res.message || "Không thể tải danh sách phiên gửi xe.");
@@ -122,6 +193,11 @@ function ParkingSessionsContent() {
       );
     return sessions;
   }, [filter, sessions]);
+  const selectedSubscription = useMemo(
+    () =>
+      selected ? subscriptionForSession(selected, subscriptions) : undefined,
+    [selected, subscriptions],
+  );
 
   return (
     <section className="parking-sessions-page">
@@ -244,10 +320,10 @@ function ParkingSessionsContent() {
                 {session.ticket?.qrCodeDataUrl && (
                   <button
                     type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={() => setSelected(session)}
+                    className="btn btn-outline btn-sm staff-ticket-button"
+                    onClick={() => setTicketSession(session)}
                   >
-                    <QrCode size={15} /> Xem mã vé
+                    <QrCode size={16} aria-hidden /> Xem mã vé
                   </button>
                 )}
                 <button
@@ -255,7 +331,7 @@ function ParkingSessionsContent() {
                   className="btn btn-outline btn-sm"
                   onClick={() => setSelected(session)}
                 >
-                  Chi tiết <ChevronRight size={15} />
+                  <Eye size={15} aria-hidden /> Chi tiết
                 </button>
                 <Link
                   className="btn btn-outline btn-sm"
@@ -278,19 +354,17 @@ function ParkingSessionsContent() {
           }}
         >
           <div
-            className="modal-panel parking-session-modal"
+            className="modal-panel manager-session-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="parking-session-detail-title"
           >
-            <div className="parking-session-modal-head">
+            <div className="manager-modal-header">
               <div>
                 <h3 id="parking-session-detail-title" className="modal-title">
                   Chi tiết phiên gửi xe
                 </h3>
-                <span className={`badge ${statusClass(selected.status)}`}>
-                  {statusLabel(selected.status)}
-                </span>
+                <p>Toàn bộ thông tin phiên gửi xe của bạn.</p>
               </div>
               <button
                 type="button"
@@ -302,169 +376,278 @@ function ParkingSessionsContent() {
               </button>
             </div>
 
-            {selected.ticket?.qrCodeDataUrl && (
-              <div className="parking-session-ticket">
-                <QrCode size={20} />
-                <div>
-                  <strong>Vé xe đang sử dụng</strong>
-                  <small>Xuất trình mã này khi làm thủ tục ra bãi.</small>
-                </div>
-                <img
-                  src={selected.ticket.qrCodeDataUrl}
-                  alt={`Mã QR vé xe ${selected.licensePlateIn}`}
-                />
-                <code>{selected.ticket.qrPayload}</code>
-              </div>
-            )}
-
-            <div className="parking-session-detail-grid">
-              <div className="parking-session-detail-full">
-                <span>Mã phiên gửi xe</span>
-                <strong>{selected.sessionId}</strong>
-              </div>
-              {selected.reservationId && (
-                <div className="parking-session-detail-full">
-                  <span>Mã đặt chỗ</span>
-                  <strong>{selected.reservationId}</strong>
-                </div>
-              )}
-              <div>
-                <span>Khách gửi xe</span>
-                <strong>{selected.driverFullName || "Khách vãng lai"}</strong>
-              </div>
-              <div>
-                <span>Trạng thái</span>
-                <strong>{statusLabel(selected.status)}</strong>
-              </div>
-              <div>
-                <span>Biển số vào</span>
+            <div className="manager-session-modal-hero">
+              <div className="manager-session-plate">
+                <small>VIỆT NAM</small>
                 <strong>{selected.licensePlateIn}</strong>
+                {selected.licensePlateOut &&
+                  selected.licensePlateOut !== selected.licensePlateIn && (
+                    <span>Ra: {selected.licensePlateOut}</span>
+                  )}
               </div>
               <div>
-                <span>Biển số ra</span>
-                <strong>{selected.licensePlateOut || "Chưa ghi nhận"}</strong>
-              </div>
-              <div>
-                <span>Loại xe</span>
-                <strong>{selected.vehicleTypeName || "—"}</strong>
-              </div>
-              <div>
-                <span>Thời gian vào</span>
-                <strong>
-                  {formatUtcToVietnamDateTime(selected.entryTime)}
-                </strong>
-              </div>
-              <div>
-                <span>Thời gian ra</span>
-                <strong>
-                  {selected.exitTime
-                    ? formatUtcToVietnamDateTime(selected.exitTime)
-                    : "Chưa ra bãi"}
-                </strong>
-              </div>
-              <div>
-                <span>Cổng vào</span>
-                <strong>{selected.entryGateName || "—"}</strong>
-              </div>
-              <div>
-                <span>Cổng ra</span>
-                <strong>{selected.exitGateName || "—"}</strong>
-              </div>
-              <div>
-                <span>Vị trí được xếp</span>
-                <strong>{selected.assignedSlotCode || "Chưa xếp chỗ"}</strong>
-              </div>
-              <div>
-                <span>Vị trí đỗ thực tế</span>
-                <strong>{selected.actualSlotCode || "Chưa ghi nhận"}</strong>
-              </div>
-              <div>
-                <span>Tổng thời gian</span>
-                <strong>{durationLabel(selected)}</strong>
+                <strong>{selected.driverFullName || "Khách vãng lai"}</strong>
+                <span>
+                  {selected.vehicleTypeName || "Chưa rõ loại xe"} ·{" "}
+                  {customerLabel(selected)}
+                </span>
+                <span
+                  className={`manager-session-status status-${selected.status.toLowerCase()}`}
+                >
+                  <i />
+                  {statusLabel(selected.status)}
+                </span>
               </div>
             </div>
 
-            <section className="parking-session-payment-section">
-              <h4>Thông tin thanh toán</h4>
-              <div className="parking-session-detail-grid">
+            <section className="manager-session-detail-section">
+              <div className="manager-session-section-heading">
+                <Hash size={17} aria-hidden />
                 <div>
-                  <span>Phí gửi xe</span>
+                  <h4>Thông tin định danh</h4>
+                  <p>Các mã liên kết của phiên gửi xe trong hệ thống.</p>
+                </div>
+              </div>
+              <div className="manager-session-detail-grid manager-session-detail-grid--ids">
+                <div>
+                  <Fingerprint size={17} aria-hidden />
+                  <span>Mã phiên</span>
+                  <code>{selected.sessionId}</code>
+                </div>
+                <div>
+                  <QrCode size={17} aria-hidden />
+                  <span>Mã đặt chỗ</span>
+                  <code>{selected.reservationId || "Không có"}</code>
+                </div>
+                <div>
+                  <UserRound size={17} aria-hidden />
+                  <span>Mã người lái</span>
+                  <code>{selected.driverUserId || "Khách vãng lai"}</code>
+                </div>
+                <div>
+                  <CarFront size={17} aria-hidden />
+                  <span>Mã loại phương tiện</span>
+                  <code>{selected.vehicleTypeId || "—"}</code>
+                </div>
+              </div>
+            </section>
+
+            <section className="manager-session-detail-section">
+              <div className="manager-session-section-heading">
+                <CalendarDays size={17} aria-hidden />
+                <div>
+                  <h4>Thời gian và biển số</h4>
+                  <p>Thông tin check-in, checkout và thời lượng gửi xe.</p>
+                </div>
+              </div>
+              <div className="manager-session-detail-grid">
+                <div>
+                  <CalendarDays size={17} aria-hidden />
+                  <span>Thời gian vào</span>
+                  <strong>{formatUtcToVietnamDateTime(selected.entryTime)}</strong>
+                </div>
+                <div>
+                  <CalendarDays size={17} aria-hidden />
+                  <span>Thời gian ra</span>
                   <strong>
-                    {typeof selected.paymentAmount === "number"
-                      ? `${selected.paymentAmount.toLocaleString("vi-VN")} đ`
-                      : "Chưa tính phí"}
+                    {selected.exitTime
+                      ? formatUtcToVietnamDateTime(selected.exitTime)
+                      : "Chưa checkout"}
                   </strong>
                 </div>
                 <div>
-                  <span>Trạng thái thanh toán</span>
-                  <strong>{selected.paymentStatus || "Chưa thanh toán"}</strong>
+                  <Clock3 size={17} aria-hidden />
+                  <span>Tổng thời lượng</span>
+                  <strong>{durationLabel(selected)}</strong>
                 </div>
                 <div>
-                  <span>Phương thức</span>
-                  <strong>{selected.paymentMethod || "Chưa có"}</strong>
-                </div>
-                <div>
-                  <span>Thời gian thanh toán</span>
+                  <CarFront size={17} aria-hidden />
+                  <span>Biển số vào → ra</span>
                   <strong>
-                    {selected.paymentTime
-                      ? formatUtcToVietnamDateTime(selected.paymentTime)
-                      : "Chưa thanh toán"}
+                    {selected.licensePlateIn || "—"} →{" "}
+                    {selected.licensePlateOut || "Chưa ghi nhận"}
                   </strong>
                 </div>
               </div>
             </section>
 
-            <section className="parking-session-image-section">
-              <h4>Hình ảnh phương tiện</h4>
-              {selected.entryImageUrl || selected.exitImageUrl ? (
-                <div className="parking-session-images">
-                  {selected.entryImageUrl && (
-                    <a
-                      href={selected.entryImageUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <img
-                        src={selected.entryImageUrl}
-                        alt={`Ảnh xe vào ${selected.licensePlateIn}`}
-                      />
-                      <span>
-                        <Image size={16} />
-                        Ảnh xe vào · Mở đầy đủ
-                      </span>
-                    </a>
-                  )}
-                  {selected.exitImageUrl && (
-                    <a
-                      href={selected.exitImageUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <img
-                        src={selected.exitImageUrl}
-                        alt={`Ảnh xe ra ${selected.licensePlateOut || selected.licensePlateIn}`}
-                      />
-                      <span>
-                        <Image size={16} />
-                        Ảnh xe ra · Mở đầy đủ
-                      </span>
-                    </a>
-                  )}
+            <section className="manager-session-detail-section">
+              <div className="manager-session-section-heading">
+                <CreditCard size={17} aria-hidden />
+                <div>
+                  <h4>Thanh toán</h4>
+                  <p>Khoản phí checkout được liên kết với phiên gửi xe.</p>
                 </div>
-              ) : (
-                <div className="manager-incident-no-proof">
-                  <Image size={26} />
-                  <div>
-                    <strong>Chưa có hình ảnh phương tiện</strong>
-                    <span>Phiên này chưa ghi nhận ảnh xe vào hoặc xe ra.</span>
-                  </div>
+              </div>
+              <div className="manager-session-detail-grid">
+                <div>
+                  <CreditCard size={17} aria-hidden />
+                  <span>
+                    {selectedSubscription
+                      ? "Quyền lợi gói tháng"
+                      : "Phí gửi xe"}
+                  </span>
+                  <strong>
+                    {selectedSubscription
+                      ? `Đã bao gồm trong ${selectedSubscription.packageName || "gói tháng"} · 0 ₫`
+                      : typeof selected.paymentAmount === "number"
+                      ? formatCurrency(selected.paymentAmount)
+                      : selected.status.toLowerCase() === "active"
+                        ? "Sẽ được tính khi checkout"
+                        : "Chưa có thanh toán"}
+                  </strong>
                 </div>
-              )}
+                <div>
+                  <Activity size={17} aria-hidden />
+                  <span>Trạng thái</span>
+                  <strong>
+                    {selectedSubscription
+                      ? "Không cần thanh toán riêng"
+                      : paymentStatusLabel(selected.paymentStatus)}
+                  </strong>
+                </div>
+                <div>
+                  <CreditCard size={17} aria-hidden />
+                  <span>Phương thức</span>
+                  <strong>
+                    {selectedSubscription
+                      ? "Gói tháng"
+                      : selected.paymentMethod || "Chưa ghi nhận"}
+                  </strong>
+                </div>
+                <div>
+                  <CalendarDays size={17} aria-hidden />
+                  <span>Thời gian thanh toán</span>
+                  <strong>
+                    {selectedSubscription
+                      ? "Đã thanh toán khi đăng ký gói"
+                      : selected.paymentTime
+                      ? formatUtcToVietnamDateTime(selected.paymentTime)
+                      : "Chưa ghi nhận"}
+                  </strong>
+                </div>
+              </div>
             </section>
 
-            <div className="parking-session-report-action">
+            <section className="manager-session-detail-section">
+              <div className="manager-session-section-heading">
+                <MapPin size={17} aria-hidden />
+                <div>
+                  <h4>Cổng và vị trí đỗ</h4>
+                  <p>Đối chiếu vị trí được phân bổ với vị trí đỗ thực tế.</p>
+                </div>
+              </div>
+              <div className="manager-session-detail-grid manager-session-detail-grid--route">
+                <div>
+                  <MapPin size={17} aria-hidden />
+                  <span>Cổng vào</span>
+                  <strong>{selected.entryGateName || "Chưa xác định"}</strong>
+                  <code>{selected.entryGateId}</code>
+                </div>
+                <div>
+                  <MapPin size={17} aria-hidden />
+                  <span>Cổng ra</span>
+                  <strong>{selected.exitGateName || "Chưa checkout"}</strong>
+                  <code>{selected.exitGateId || "Chưa có"}</code>
+                </div>
+                <div>
+                  <ParkingSquare size={17} aria-hidden />
+                  <span>Slot được xếp</span>
+                  <strong>{selected.assignedSlotCode || "Chưa xếp slot"}</strong>
+                  <code>{selected.assignedSlotId || "Chưa có"}</code>
+                </div>
+                <div>
+                  <ParkingSquare size={17} aria-hidden />
+                  <span>Slot thực tế</span>
+                  <strong>{selected.actualSlotCode || "Chưa ghi nhận"}</strong>
+                  <code>{selected.actualSlotId || "Chưa có"}</code>
+                </div>
+              </div>
+            </section>
+
+            <section className="manager-session-detail-section">
+              <div className="manager-session-section-heading">
+                <ImageIcon size={17} aria-hidden />
+                <div>
+                  <h4>Ảnh phương tiện vào / ra</h4>
+                  <p>Ảnh được nhân viên ghi nhận khi check-in và checkout.</p>
+                </div>
+              </div>
+              <div className="manager-session-image-grid">
+                <article>
+                  <div>
+                    {selected.entryImageUrl ? (
+                      <a
+                        href={selected.entryImageUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label="Mở ảnh xe lúc vào"
+                      >
+                        <img
+                          src={selected.entryImageUrl}
+                          alt={`Xe ${selected.licensePlateIn} lúc vào`}
+                          loading="lazy"
+                        />
+                      </a>
+                    ) : (
+                      <span className="manager-session-image-empty">
+                        <ImageIcon size={28} aria-hidden />
+                        Chưa có ảnh lúc vào
+                      </span>
+                    )}
+                  </div>
+                  <strong>Ảnh lúc vào</strong>
+                  <small>{formatUtcToVietnamDateTime(selected.entryTime)}</small>
+                </article>
+                <article>
+                  <div>
+                    {selected.exitImageUrl ? (
+                      <a
+                        href={selected.exitImageUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label="Mở ảnh xe lúc ra"
+                      >
+                        <img
+                          src={selected.exitImageUrl}
+                          alt={`Xe ${selected.licensePlateOut || selected.licensePlateIn} lúc ra`}
+                          loading="lazy"
+                        />
+                      </a>
+                    ) : (
+                      <span className="manager-session-image-empty">
+                        <ImageIcon size={28} aria-hidden />
+                        Chưa có ảnh lúc ra
+                      </span>
+                    )}
+                  </div>
+                  <strong>Ảnh lúc ra</strong>
+                  <small>
+                    {selected.exitTime
+                      ? formatUtcToVietnamDateTime(selected.exitTime)
+                      : "Xe chưa checkout"}
+                  </small>
+                </article>
+              </div>
+            </section>
+
+            {selected.ticket?.qrCodeDataUrl && (
+              <div className="manager-session-ticket">
+                <QrCode size={21} aria-hidden />
+                <div>
+                  <strong>Mã vé phiên đang hoạt động</strong>
+                  <code>{selected.ticket.qrPayload}</code>
+                </div>
+                <img
+                  src={selected.ticket.qrCodeDataUrl}
+                  alt={`QR vé xe ${selected.licensePlateIn}`}
+                />
+              </div>
+            )}
+
+            <div className="form-actions manager-session-modal-actions">
               <Link
-                className="btn btn-outline"
+                className="btn btn-outline manager-session-report-button"
                 to="/bao-cao-su-co"
                 state={{ sessionId: selected.sessionId }}
                 onClick={() => setSelected(null)}
@@ -475,6 +658,11 @@ function ParkingSessionsContent() {
           </div>
         </div>
       )}
+      <ParkingTicketModal
+        session={ticketSession}
+        allowPrint={false}
+        onClose={() => setTicketSession(null)}
+      />
     </section>
   );
 }

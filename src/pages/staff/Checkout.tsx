@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
+  AlertCircle,
   Camera,
   CarFront,
   CheckCircle2,
@@ -31,6 +32,7 @@ import {
 } from '../../utils/apiServices'
 import { formatNowInVietnamTime } from '../../utils/dateTime'
 import { formatCurrency } from '../../utils/pricing'
+import { normalizeLicensePlate } from '../../utils/licensePlate'
 import { readStaffGateContext, staffGateSelectionPath } from '../../utils/staffGateContext'
 
 function getOnlinePaymentUrl(payment: ParkingOnlinePayment | null) {
@@ -76,7 +78,9 @@ export default function Checkout() {
   const [qrDecode, setQrDecode] = useState<ParkingQrDecodeResult | null>(null)
   const [qrPayload, setQrPayload] = useState(initialState?.qrPayload ?? '')
   const [sessionId, setSessionId] = useState(initialState?.sessionId ?? '')
-  const [licensePlate, setLicensePlate] = useState(initialState?.licensePlate ?? '')
+  const [licensePlate, setLicensePlate] = useState(
+    normalizeLicensePlate(initialState?.licensePlate ?? ''),
+  )
   const [exitTimePreview, setExitTimePreview] = useState(() => initialState?.licensePlate ? formatNowInVietnamTime() : '')
   const [gateId, setGateId] = useState(gateContext?.gateId ?? '')
   const exitGates: GateDto[] = gateContext
@@ -179,7 +183,7 @@ export default function Checkout() {
             gateContext.dedicatedVehicleTypeId !== session.vehicleTypeId
           ) {
             setFloorValidationError(
-              `Xe ${session.vehicleTypeName || ''} không đúng loại phương tiện của ${gateContext.floorName}.`,
+              `${gateContext.floorName} chỉ dành cho ${gateContext.dedicatedVehicleTypeName || 'loại xe đã cấu hình'}. Không thể checkout ${session.vehicleTypeName || 'loại xe của phiên'} tại tầng này.`,
             )
           }
 
@@ -249,7 +253,7 @@ export default function Checkout() {
   }, [checkoutPaymentId, checkoutPaymentMethod, checkoutPaymentStatus])
 
   const setPlateForCheckout = (plate: string) => {
-    const nextPlate = plate.toUpperCase()
+    const nextPlate = normalizeLicensePlate(plate)
     setLicensePlate(nextPlate)
     setExitTimePreview(nextPlate.trim() ? formatNowInVietnamTime() : '')
   }
@@ -275,7 +279,7 @@ export default function Checkout() {
       if (res?.imageUrl) {
         setExitImageUrl(res.imageUrl)
         if (res.licensePlate) {
-          const recognizedPlate = res.licensePlate.toUpperCase()
+          const recognizedPlate = normalizeLicensePlate(res.licensePlate)
           preparePlateForCheckout(recognizedPlate)
         } else {
           setMessage(res.message || 'Không nhận diện được biển số.')
@@ -342,13 +346,9 @@ export default function Checkout() {
       setMessage(feePreviewError || 'Vui lòng chờ tải thông tin xe và phí tạm tính trước khi checkout.')
       return
     }
-    if (!exitImageUrl) {
-      setMessage('Vui lòng tải ảnh xe tại cổng ra để đối chiếu với ảnh lúc vào.')
-      return
-    }
     if (
-      licensePlate.trim().toUpperCase() !==
-      sessionForCheckout.licensePlateIn.trim().toUpperCase()
+      normalizeLicensePlate(licensePlate) !==
+      normalizeLicensePlate(sessionForCheckout.licensePlateIn)
     ) {
       setMessage('Biển số xe ra không khớp biển số xe vào.')
       return
@@ -468,10 +468,12 @@ export default function Checkout() {
   const hasPendingCheckout = checkoutStatus === 'pending'
   const checkoutSucceeded = checkoutStatus === 'success'
   const checkoutFailed = checkoutStatus === 'failed'
+  const checkoutMessageIsSuccess = Boolean(checkoutResult && !checkoutFailed)
   const plateMismatch = Boolean(
     sessionForCheckout &&
     licensePlate.trim() &&
-    licensePlate.trim().toUpperCase() !== sessionForCheckout.licensePlateIn.trim().toUpperCase(),
+    normalizeLicensePlate(licensePlate) !==
+      normalizeLicensePlate(sessionForCheckout.licensePlateIn),
   )
   const plateMatched = Boolean(sessionForCheckout && licensePlate.trim() && !plateMismatch)
   const displayedFee = checkoutResult?.fee || checkoutResult?.Fee || feePreview
@@ -484,7 +486,6 @@ export default function Checkout() {
     !feePreviewError &&
     sessionForCheckout &&
     feePreview &&
-    exitImageUrl &&
     plateMatched &&
     gateId,
   )
@@ -544,14 +545,14 @@ export default function Checkout() {
                 <div><strong>Đọc vé xe</strong><small>Xác định phiên gửi xe</small></div>
               </div>
               <i />
-              <div className={exitImageUrl ? 'is-complete' : sessionForCheckout ? 'is-current' : ''}>
-                <span>{exitImageUrl ? <CheckCircle2 size={17} /> : '2'}</span>
-                <div><strong>Ảnh xe ra</strong><small>Nhận diện biển số</small></div>
+              <div className={licensePlate.trim() ? 'is-complete' : sessionForCheckout ? 'is-current' : ''}>
+                <span>{licensePlate.trim() ? <CheckCircle2 size={17} /> : '2'}</span>
+                <div><strong>Biển số xe ra</strong><small>Nhập trực tiếp hoặc nhận diện từ ảnh</small></div>
               </div>
               <i />
-              <div className={plateMatched ? 'is-complete' : exitImageUrl ? 'is-current' : ''}>
+              <div className={plateMatched ? 'is-complete' : licensePlate.trim() ? 'is-current' : ''}>
                 <span>{plateMatched ? <CheckCircle2 size={17} /> : '3'}</span>
-                <div><strong>Đối chiếu</strong><small>Ảnh, biển số và tầng</small></div>
+                <div><strong>Đối chiếu</strong><small>Biển số và tầng</small></div>
               </div>
               <i />
               <div className={checkoutSucceeded ? 'is-complete' : plateMatched && feePreview ? 'is-current' : ''}>
@@ -564,7 +565,7 @@ export default function Checkout() {
               <div className="camera-preview card-panel staff-checkout-camera-card">
                 <div className="scan-card-heading">
                   <span className="checkout-card-icon"><Camera size={19} /></span>
-                  <div><h3>Hình ảnh phương tiện</h3><p>Ghi nhận ảnh tại cổng ra và đối chiếu với lúc vào.</p></div>
+                  <div><h3>Hình ảnh phương tiện (không bắt buộc)</h3><p>Ảnh chỉ dùng để dự phòng và hỗ trợ nhận diện biển số.</p></div>
                 </div>
                 <div
                   className={`camera-frame clickable${hasPendingCheckout ? ' is-disabled' : ''}`}
@@ -580,7 +581,7 @@ export default function Checkout() {
                         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                         <circle cx="12" cy="13" r="4" />
                       </svg>
-                      <p>Tải ảnh xe ra bãi</p>
+                      <p>Tải ảnh xe ra bãi nếu cần</p>
                     </div>
                   )}
 
@@ -608,7 +609,7 @@ export default function Checkout() {
                       <ImageIcon size={18} aria-hidden />
                       <div>
                         <h3>Đối chiếu xe vào / ra</h3>
-                        <p>Kiểm tra ảnh và biển số trước khi tạo thanh toán.</p>
+                        <p>Kiểm tra biển số; đối chiếu thêm ảnh nếu có.</p>
                       </div>
                     </div>
                     <div className="manager-session-image-grid">
@@ -652,7 +653,8 @@ export default function Checkout() {
                       </article>
                     </div>
                     {plateMismatch ? (
-                      <p className="alert-inline" role="alert">
+                      <p className="alert-inline alert-error" role="alert">
+                        <AlertCircle size={18} aria-hidden />
                         Biển số ra không khớp biển số vào. Không thể checkout.
                       </p>
                     ) : licensePlate.trim() ? (
@@ -815,9 +817,33 @@ export default function Checkout() {
                 )}
 
                 {validatingFloor && <p className="alert-inline">Đang kiểm tra tầng và cổng checkout...</p>}
-                {floorValidationError && <p className="alert-inline" role="alert">{floorValidationError}</p>}
-                {feePreviewError && <p className="alert-inline" role="alert">{feePreviewError}</p>}
-                {message && message !== floorValidationError && <p className="alert-inline">{message}</p>}
+                {floorValidationError && (
+                  <p className="alert-inline alert-error" role="alert">
+                    <AlertCircle size={18} aria-hidden />
+                    {floorValidationError}
+                  </p>
+                )}
+                {feePreviewError && (
+                  <p className="alert-inline alert-error" role="alert">
+                    <AlertCircle size={18} aria-hidden />
+                    {feePreviewError}
+                  </p>
+                )}
+                {message &&
+                  message !== floorValidationError &&
+                  message !== feePreviewError && (
+                  <p
+                    className={`alert-inline ${checkoutMessageIsSuccess ? 'alert-success' : 'alert-error'}`}
+                    role={checkoutMessageIsSuccess ? 'status' : 'alert'}
+                  >
+                    {checkoutMessageIsSuccess ? (
+                      <CheckCircle2 size={18} aria-hidden />
+                    ) : (
+                      <AlertCircle size={18} aria-hidden />
+                    )}
+                    {message}
+                  </p>
+                  )}
 
                 {getOnlinePaymentUrl(onlinePayment) && (
                   <div className="scan-result checkout-online-payment">
@@ -861,7 +887,7 @@ export default function Checkout() {
                     {displayedFee ? (
                       <>
                         <div className="checkout-fee-hero">
-                          <span>Phí tạm tính</span>
+                          <span>{(displayedFee.depositAmount ?? 0) > 0 ? 'Còn phải thanh toán' : 'Phí tạm tính'}</span>
                           <strong>{formatCurrency(displayedFee.amount)}</strong>
                           <small>
                             <Clock3 size={14} />
@@ -872,6 +898,18 @@ export default function Checkout() {
                           <strong>Thời gian tính phí:</strong>{' '}
                           {displayedFee.billedHours} giờ
                         </p>
+                        {(displayedFee.depositAmount ?? 0) > 0 && (
+                          <>
+                            <p>
+                              <strong>Tổng phí gửi xe:</strong>{' '}
+                              {formatCurrency(displayedFee.grossAmount ?? displayedFee.amount + (displayedFee.depositAmount ?? 0))}
+                            </p>
+                            <p>
+                              <strong>Tiền cọc đã khấu trừ:</strong>{' '}
+                              -{formatCurrency(displayedFee.depositAmount ?? 0)}
+                            </p>
+                          </>
+                        )}
                         {displayedFee.isCoveredBySubscription && (
                           <p><strong>Gói tháng:</strong> Đã bao gồm phí gửi xe</p>
                         )}
@@ -893,7 +931,7 @@ export default function Checkout() {
                       {sessionForCheckout ? <CheckCircle2 size={15} /> : <QrCode size={15} />} Vé xe
                     </span>
                     <span className={exitImageUrl ? 'done' : ''}>
-                      {exitImageUrl ? <CheckCircle2 size={15} /> : <Camera size={15} />} Ảnh ra
+                      {exitImageUrl ? <CheckCircle2 size={15} /> : <Camera size={15} />} Ảnh ra vào
                     </span>
                     <span className={plateMatched && !floorValidationError ? 'done' : ''}>
                       {plateMatched && !floorValidationError ? <CheckCircle2 size={15} /> : <ShieldCheck size={15} />} Đối chiếu

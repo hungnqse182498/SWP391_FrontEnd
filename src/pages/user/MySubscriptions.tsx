@@ -5,6 +5,7 @@ import { CalendarClock, Car, ClipboardCheck, CreditCard, FilePenLine, History, P
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { formatUtcToVietnamDateTime, parseBackendUtcDate } from '../../utils/dateTime'
 import { formatCurrency } from '../../utils/pricing'
+import { normalizeLicensePlate } from '../../utils/licensePlate'
 import {
   type MonthlySubscriptionDto,
   type SubscriptionPackageDto,
@@ -185,7 +186,7 @@ function MySubscriptionsContent() {
     setChangeTarget(subscription)
     setEditingChangeRequest(pending)
     setChangeForm({
-      newLicensePlate: pending?.newLicensePlate ?? '',
+      newLicensePlate: normalizeLicensePlate(pending?.newLicensePlate ?? ''),
       reason: pending?.reason ?? '',
     })
     setChangeError('')
@@ -201,12 +202,12 @@ function MySubscriptionsContent() {
 
   const saveChangeRequest = async () => {
     if (!changeTarget) return
-    const newLicensePlate = changeForm.newLicensePlate.trim().toUpperCase()
-    if (!/^[A-Z0-9.-]{4,15}$/.test(newLicensePlate)) {
-      setChangeError('Biển số chỉ gồm 4-15 chữ cái, chữ số, dấu chấm hoặc dấu gạch ngang.')
+    const newLicensePlate = normalizeLicensePlate(changeForm.newLicensePlate)
+    if (!/^[A-Z0-9]{4,15}$/.test(newLicensePlate)) {
+      setChangeError('Biển số chỉ gồm 4-15 chữ cái và chữ số, không nhập dấu hoặc khoảng trắng.')
       return
     }
-    if (newLicensePlate === changeTarget.licensePlate.trim().toUpperCase()) {
+    if (newLicensePlate === normalizeLicensePlate(changeTarget.licensePlate)) {
       setChangeError('Biển số mới phải khác biển số hiện tại.')
       return
     }
@@ -492,8 +493,8 @@ function MySubscriptionsContent() {
                 autoFocus
                 maxLength={15}
                 value={changeForm.newLicensePlate}
-                onChange={(event) => setChangeForm({ ...changeForm, newLicensePlate: event.target.value.toUpperCase() })}
-                placeholder="Ví dụ: 51A-123.45"
+                onChange={(event) => setChangeForm({ ...changeForm, newLicensePlate: normalizeLicensePlate(event.target.value) })}
+                placeholder="Ví dụ: 51A12345"
               />
             </div>
             <div className="form-field">

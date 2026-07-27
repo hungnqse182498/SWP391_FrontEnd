@@ -208,6 +208,8 @@ export interface ParkingFeePreview {
   exitTime: string
   totalHours: number
   billedHours: number
+  grossAmount?: number
+  depositAmount?: number
   amount: number
   pricingPolicyId?: string
   basePrice?: number

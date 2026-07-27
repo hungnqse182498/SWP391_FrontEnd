@@ -31,6 +31,7 @@ import {
   X,
 } from "lucide-react";
 import StaffPageShell from "../../components/StaffPageShell";
+import ParkingTicketModal from "../../components/ParkingTicketModal";
 import { navigateStaffNav } from "../../config/staffNav";
 import { useParkingFeePreviews } from "../../hooks/useParkingFeePreviews";
 import {
@@ -52,7 +53,13 @@ import {
   parseBackendUtcDate,
 } from "../../utils/dateTime";
 import { formatCurrency } from "../../utils/pricing";
+import { normalizeLicensePlate } from "../../utils/licensePlate";
 import {
+  downloadParkingTicket,
+  printParkingTicket,
+} from "../../utils/parkingTicket";
+import {
+  isCarVehicleTypeName,
   readStaffGateContext,
   staffGateSelectionPath,
 } from "../../utils/staffGateContext";
@@ -73,107 +80,10 @@ interface CheckInTicketView {
   entryTime?: string;
 }
 
-interface PrintableParkingTicket {
-  qrCodeDataUrl: string;
-  sessionId: string;
-  licensePlate?: string;
-  vehicleTypeName?: string;
-  slotCode?: string;
-  floorName?: string;
-  gateName?: string;
-  entryTime?: string;
-}
-
 type LooseParkingSessionTicket = ParkingSessionTicket & {
   QrPayload?: string;
   QrCodeDataUrl?: string;
 };
-
-function ticketFileName(licensePlate?: string, sessionId?: string) {
-  const identity = (licensePlate || sessionId?.slice(0, 8) || "xe")
-    .replace(/[^a-zA-Z0-9-]/g, "-")
-    .replace(/-+/g, "-");
-  return `ve-xe-${identity}.png`;
-}
-
-function downloadParkingTicket(
-  qrCodeDataUrl: string,
-  licensePlate?: string,
-  sessionId?: string,
-) {
-  const anchor = document.createElement("a");
-  anchor.href = qrCodeDataUrl;
-  anchor.download = ticketFileName(licensePlate, sessionId);
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-}
-
-function escapeTicketText(value?: string) {
-  return (value || "—")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function printParkingTicket(ticket: PrintableParkingTicket) {
-  const printWindow = window.open("", "_blank", "width=520,height=760");
-  if (!printWindow) return;
-
-  const entryTime = ticket.entryTime
-    ? formatUtcToVietnamDateTime(ticket.entryTime)
-    : "—";
-  printWindow.document.write(`<!doctype html>
-    <html lang="vi">
-      <head>
-        <meta charset="utf-8" />
-        <title>Vé xe ${escapeTicketText(ticket.licensePlate)}</title>
-        <style>
-          @page { size: 80mm auto; margin: 5mm; }
-          * { box-sizing: border-box; }
-          body { margin: 0; color: #111827; font-family: Arial, sans-serif; }
-          .ticket { width: 70mm; margin: 0 auto; padding: 5mm; border: 1px dashed #64748b; text-align: center; }
-          h1 { margin: 0 0 2mm; font-size: 18px; }
-          .sub { margin: 0 0 4mm; color: #475569; font-size: 11px; }
-          img { width: 42mm; height: 42mm; object-fit: contain; }
-          .plate { margin: 3mm 0; padding: 2mm; border: 2px solid #111827; border-radius: 3px; font-size: 20px; font-weight: 800; letter-spacing: 1px; }
-          dl { display: grid; grid-template-columns: 24mm 1fr; gap: 1.5mm; margin: 4mm 0 0; text-align: left; font-size: 11px; }
-          dt { color: #64748b; } dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
-          .note { margin: 4mm 0 0; padding-top: 3mm; border-top: 1px dashed #cbd5e1; font-size: 10px; color: #475569; }
-        </style>
-      </head>
-      <body>
-        <section class="ticket">
-          <h1>VÉ GIỮ XE</h1>
-          <p class="sub">Xuất trình mã QR khi làm thủ tục ra bãi</p>
-          <img src="${ticket.qrCodeDataUrl}" alt="QR vé xe" />
-          <div class="plate">${escapeTicketText(ticket.licensePlate)}</div>
-          <dl>
-            <dt>Loại xe</dt><dd>${escapeTicketText(ticket.vehicleTypeName)}</dd>
-            <dt>Tầng</dt><dd>${escapeTicketText(ticket.floorName)}</dd>
-            <dt>Cổng vào</dt><dd>${escapeTicketText(ticket.gateName)}</dd>
-            <dt>Vị trí</dt><dd>${escapeTicketText(ticket.slotCode)}</dd>
-            <dt>Giờ vào</dt><dd>${escapeTicketText(entryTime)}</dd>
-            <dt>Session ID</dt><dd>${escapeTicketText(ticket.sessionId)}</dd>
-          </dl>
-          <p class="note">Không chia sẻ vé cho người khác. Báo ngay cho nhân viên nếu mất vé.</p>
-        </section>
-      </body>
-    </html>`);
-  printWindow.document.close();
-  const print = () => {
-    printWindow.focus();
-    printWindow.print();
-  };
-  const qrImage = printWindow.document.querySelector("img");
-  if (qrImage?.complete) {
-    window.setTimeout(print, 150);
-  } else {
-    qrImage?.addEventListener("load", print, { once: true });
-  }
-}
 
 type CheckInResult = Partial<ParkingSessionDto> & {
   licensePlate?: string;
@@ -310,6 +220,11 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
     gateAccessGranted?: boolean;
   } | null;
   const [gateContext] = useState(() => readStaffGateContext("checkin"));
+  const allowsReservationAtGate = Boolean(
+    gateContext &&
+      !gateContext.isResident &&
+      isCarVehicleTypeName(gateContext.dedicatedVehicleTypeName),
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const qrInputRef = useRef<HTMLInputElement>(null);
 
@@ -320,7 +235,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
   const [entryImageUrl, setEntryImageUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [licensePlate, setLicensePlate] = useState(
-    operationState?.licensePlate ?? "",
+    normalizeLicensePlate(operationState?.licensePlate ?? ""),
   );
   const [entryTimePreview, setEntryTimePreview] = useState("");
   const [vehicleTypeId, setVehicleTypeId] = useState(
@@ -331,14 +246,14 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
   const [checkInType, setCheckInType] = useState<
     "guest" | "resident" | "reservation"
   >(
-    operationState?.checkInType === "reservation"
+    operationState?.checkInType === "reservation" && allowsReservationAtGate
       ? "reservation"
       : gateContext?.isResident
         ? "resident"
         : "guest",
   );
   const [reservationId, setReservationId] = useState(
-    operationState?.reservationId ?? "",
+    allowsReservationAtGate ? operationState?.reservationId ?? "" : "",
   );
   const [qrPayload, setQrPayload] = useState("");
   const [qrDecode, setQrDecode] = useState<ParkingQrDecodeResult | null>(null);
@@ -474,18 +389,8 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
       .getAll()
       .then((res) => {
         if (res.isSuccess && res.result) {
-          const allowedTypes = gateContext?.dedicatedVehicleTypeId
-            ? res.result.filter(
-                (item) =>
-                  item.vehicleTypeId === gateContext.dedicatedVehicleTypeId,
-              )
-            : res.result;
-          setVehicleTypes(allowedTypes);
-          if (gateContext?.dedicatedVehicleTypeId) {
-            setVehicleTypeId(gateContext.dedicatedVehicleTypeId);
-          } else if (allowedTypes[0]) {
-            setVehicleTypeId(allowedTypes[0].vehicleTypeId);
-          }
+          setVehicleTypes(res.result);
+          setVehicleTypeId(gateContext?.dedicatedVehicleTypeId ?? "");
         }
       })
       .catch(console.error);
@@ -496,7 +401,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
   }, [gateContext]);
 
   const setPlateForConfirm = (plate: string) => {
-    const nextPlate = plate.toUpperCase();
+    const nextPlate = normalizeLicensePlate(plate);
     setLicensePlate(nextPlate);
     setEntryTimePreview(nextPlate.trim() ? formatNowInVietnamTime() : "");
   };
@@ -507,6 +412,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
     setReservationId("");
     setQrPayload("");
     setQrDecode(null);
+    setVehicleTypeId(gateContext?.dedicatedVehicleTypeId ?? "");
     setPlateForConfirm("");
     if (!options.keepResult) {
       setMessage("");
@@ -551,6 +457,19 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
   const handleConfirmCheckIn = async () => {
     if (!licensePlate.trim() || !gateId) return;
     if (checkInType !== "reservation" && !vehicleTypeId) return;
+    if (
+      checkInType !== "reservation" &&
+      gateContext?.dedicatedVehicleTypeId &&
+      vehicleTypeId !== gateContext.dedicatedVehicleTypeId
+    ) {
+      const selectedVehicleType = vehicleTypes.find(
+        (item) => item.vehicleTypeId === vehicleTypeId,
+      );
+      setMessage(
+        `${gateContext.floorName} chỉ dành cho ${gateContext.dedicatedVehicleTypeName || "loại xe đã cấu hình"}. Không thể check-in ${selectedVehicleType?.typeName || "loại xe đã chọn"} tại tầng này.`,
+      );
+      return;
+    }
     if (checkInType === "reservation" && !reservationId && !qrPayload.trim()) {
       setMessage("Vui lòng upload ảnh QR đặt chỗ hoặc nhập mã QR đặt chỗ");
       return;
@@ -647,6 +566,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
   const selectCheckInType = (type: "guest" | "resident" | "reservation") => {
     if (gateContext?.isResident && type !== "resident") return;
     if (!gateContext?.isResident && type === "resident") return;
+    if (type === "reservation" && !allowsReservationAtGate) return;
     setCheckInType(type);
     setMessage("");
     setCheckInTicket(null);
@@ -667,6 +587,11 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
           checkInType: "reservation",
         },
       });
+      return;
+    }
+    if (!allowsReservationAtGate) {
+      setMessage("Đặt trước chỉ áp dụng tại tầng ô tô vãng lai.");
+      setActivePanel("scan");
       return;
     }
     resetScan();
@@ -884,7 +809,11 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                 <span>
                   <strong>{gateContext.floorName} · {gateContext.gateName}</strong>
                   <small>
-                    {gateContext.isResident ? "Tầng cư dân" : "Tầng khách / đặt trước"}
+                    {gateContext.isResident
+                      ? "Tầng cư dân"
+                      : allowsReservationAtGate
+                        ? "Tầng khách / đặt trước"
+                        : "Tầng khách vãng lai"}
                     {" · "}
                     {gateContext.dedicatedVehicleTypeName || "Nhiều loại xe"}
                   </small>
@@ -906,10 +835,10 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                 <div className="scan-card-heading">
                   <span className="scan-step-badge">1</span>
                   <div>
-                    <h3>Nhận diện biển số</h3>
+                    <h3>Ảnh biển số</h3>
                     <p>
-                      Chụp rõ toàn bộ biển số hoặc nhập thủ công ở bước bên
-                      cạnh.
+                      Ảnh dùng để nhận diện, có thể nhập
+                      biển số trực tiếp ở bước bên cạnh.
                     </p>
                   </div>
                 </div>
@@ -936,7 +865,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                         <circle cx="12" cy="13" r="4" />
                       </svg>
-                      <p>Nhấn để chọn ảnh biển số</p>
+                      <p>Nhấn để chọn ảnh biển số nếu cần</p>
                       <small>Hỗ trợ JPG, PNG từ camera hoặc thiết bị</small>
                     </div>
                   )}
@@ -963,7 +892,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Upload size={17} aria-hidden />
-                  {imagePreviewUrl ? "Đổi ảnh khác" : "Chọn ảnh biển số"}
+                  {imagePreviewUrl ? "Đổi ảnh khác" : "Chọn ảnh"}
                 </button>
               </div>
 
@@ -1006,52 +935,54 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                       role="group"
                       aria-label="Chọn loại khách check-in"
                     >
-                      <button
-                        type="button"
-                        className={checkInType === "guest" ? "active" : ""}
-                        aria-pressed={checkInType === "guest"}
-                        disabled={Boolean(gateContext?.isResident)}
-                        onClick={() => selectCheckInType("guest")}
-                      >
-                        <UsersRound size={19} aria-hidden />
-                        <span>
-                          <strong>Vãng lai</strong>
-                          <small>Khách gửi xe thông thường</small>
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className={checkInType === "resident" ? "active" : ""}
-                        aria-pressed={checkInType === "resident"}
-                        disabled={!gateContext?.isResident}
-                        onClick={() => selectCheckInType("resident")}
-                      >
-                        <UserCheck size={19} aria-hidden />
-                        <span>
-                          <strong>Khách tháng</strong>
-                          <small>Đã có gói gửi xe</small>
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className={
-                          checkInType === "reservation" ? "active" : ""
-                        }
-                        aria-pressed={checkInType === "reservation"}
-                        disabled={Boolean(gateContext?.isResident)}
-                        onClick={() => selectCheckInType("reservation")}
-                      >
-                        <CalendarClock size={19} aria-hidden />
-                        <span>
-                          <strong>Đặt trước</strong>
-                          <small>Có mã QR hoặc mã đơn</small>
-                        </span>
-                      </button>
+                      {!gateContext?.isResident && (
+                        <button
+                          type="button"
+                          className={checkInType === "guest" ? "active" : ""}
+                          aria-pressed={checkInType === "guest"}
+                          onClick={() => selectCheckInType("guest")}
+                        >
+                          <UsersRound size={19} aria-hidden />
+                          <span>
+                            <strong>Vãng lai</strong>
+                            <small>Khách gửi xe thông thường</small>
+                          </span>
+                        </button>
+                      )}
+                      {gateContext?.isResident && (
+                        <button
+                          type="button"
+                          className={checkInType === "resident" ? "active" : ""}
+                          aria-pressed={checkInType === "resident"}
+                          onClick={() => selectCheckInType("resident")}
+                        >
+                          <UserCheck size={19} aria-hidden />
+                          <span>
+                            <strong>Khách tháng</strong>
+                            <small>Đã có gói gửi xe</small>
+                          </span>
+                        </button>
+                      )}
+                      {allowsReservationAtGate && (
+                        <button
+                          type="button"
+                          className={
+                            checkInType === "reservation" ? "active" : ""
+                          }
+                          aria-pressed={checkInType === "reservation"}
+                          onClick={() => selectCheckInType("reservation")}
+                        >
+                          <CalendarClock size={19} aria-hidden />
+                          <span>
+                            <strong>Đặt trước</strong>
+                            <small>Có mã QR hoặc mã đơn</small>
+                          </span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  {checkInType !== "reservation" &&
-                    !gateContext?.dedicatedVehicleTypeId && (
+                  {checkInType !== "reservation" && (
                     <div className="form-field">
                       <label htmlFor="vehicle-type">Loại phương tiện</label>
                       <select
@@ -1062,6 +993,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                           setVehicleTypeId(event.target.value)
                         }
                       >
+                        <option value="">Chọn loại phương tiện</option>
                         {vehicleTypes.map((vehicleType) => (
                           <option
                             key={vehicleType.vehicleTypeId}
@@ -1577,7 +1509,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                                       ?.isCoveredBySubscription
                                       ? "Đã gồm trong gói tháng"
                                       : feePreviews[session.sessionId]
-                                        ? `Tạm tính ${formatCurrency(feePreviews[session.sessionId].amount)}`
+                                        ? `Tạm tính ${formatCurrency(feePreviews[session.sessionId].amount)}${(feePreviews[session.sessionId].depositAmount ?? 0) > 0 ? ` · Đã trừ ${formatCurrency(feePreviews[session.sessionId].depositAmount ?? 0)} tiền cọc` : ""}`
                                         : feePreviewErrors[session.sessionId] ||
                                           "Đang tính phí..."}
                                   </span>
@@ -1844,7 +1776,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                           ?.isCoveredBySubscription
                           ? "Đã gồm trong gói tháng · 0 ₫"
                           : feePreviews[activeDetailSession.sessionId]
-                            ? `${formatCurrency(feePreviews[activeDetailSession.sessionId].amount)} (tạm tính)`
+                            ? `${formatCurrency(feePreviews[activeDetailSession.sessionId].amount)} (tạm tính)${(feePreviews[activeDetailSession.sessionId].depositAmount ?? 0) > 0 ? ` · Đã trừ ${formatCurrency(feePreviews[activeDetailSession.sessionId].depositAmount ?? 0)} tiền cọc` : ""}`
                         : typeof activeDetailSession.paymentAmount === "number"
                           ? formatCurrency(activeDetailSession.paymentAmount)
                           : feePreviewErrors[activeDetailSession.sessionId] ||
@@ -2043,96 +1975,11 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
             </div>
           )}
 
-          {ticketSession?.ticket && (
-            <div
-              className="modal-overlay"
-              role="presentation"
-              onClick={(event) => {
-                if (event.target === event.currentTarget)
-                  setTicketSession(null);
-              }}
-            >
-              <div
-                className="modal-panel staff-ticket-modal"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="staff-ticket-modal-title"
-              >
-                <div className="staff-ticket-modal-header">
-                  <div>
-                    <h3 id="staff-ticket-modal-title" className="modal-title">
-                      Mã vé giữ xe
-                    </h3>
-                    <p>
-                      {ticketSession.licensePlateIn} ·{" "}
-                      {ticketSession.vehicleTypeName || "Chưa rõ loại xe"}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    aria-label="Đóng mã vé"
-                    onClick={() => setTicketSession(null)}
-                  >
-                    <X size={20} aria-hidden />
-                  </button>
-                </div>
-                <div className="staff-ticket-modal-content">
-                  <img
-                    src={ticketSession.ticket.qrCodeDataUrl}
-                    alt={`Mã QR vé giữ xe ${ticketSession.licensePlateIn}`}
-                    className="staff-ticket-modal-qr"
-                  />
-                  <span>Mã vé</span>
-                  <code className="reservation-ticket-code">
-                    {ticketSession.ticket.qrPayload}
-                  </code>
-                  <p>Giờ vào: {formatDateTime(ticketSession.entryTime)}</p>
-                  <small>
-                    Dùng mã QR này để xác minh và làm thủ tục cho khách trong
-                    trường hợp mất vé.
-                  </small>
-                  <div className="staff-ticket-actions">
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={() =>
-                        downloadParkingTicket(
-                          ticketSession.ticket!.qrCodeDataUrl,
-                          ticketSession.licensePlateIn,
-                          ticketSession.sessionId,
-                        )
-                      }
-                    >
-                      <Download size={17} aria-hidden />
-                      Tải vé
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() =>
-                        printParkingTicket({
-                          qrCodeDataUrl: ticketSession.ticket!.qrCodeDataUrl,
-                          sessionId: ticketSession.sessionId,
-                          licensePlate: ticketSession.licensePlateIn,
-                          vehicleTypeName: ticketSession.vehicleTypeName,
-                          slotCode:
-                            ticketSession.actualSlotCode ||
-                            ticketSession.assignedSlotCode,
-                          floorName: gateContext?.floorName,
-                          gateName: ticketSession.entryGateName,
-                          entryTime: ticketSession.entryTime,
-                        })
-                      }
-                    >
-                      <Printer size={17} aria-hidden />
-                      In vé
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          <ParkingTicketModal
+            session={ticketSession}
+            floorName={gateContext?.floorName}
+            onClose={() => setTicketSession(null)}
+          />
         </div>
       </div>
     </StaffPageShell>

@@ -10,6 +10,7 @@ import { parkingFloors } from '../data/parkingFloors'
 import { formatCurrency } from '../utils/pricing'
 import { defaultBookingDatetimeLocal } from '../utils/bookingTime'
 import { vietnamDatetimeLocalToUtcIso } from '../utils/dateTime'
+import { normalizeLicensePlate } from '../utils/licensePlate'
 
 function BookingContent() {
   const navigate = useNavigate()
@@ -29,11 +30,13 @@ function BookingContent() {
     if (initialStartTime) return initialStartTime
     return defaultBookingDatetimeLocal()
   })
-  const [vehiclePlate, setVehiclePlate] = useState(profile?.vehiclePlate ?? '')
+  const [vehiclePlate, setVehiclePlate] = useState(
+    normalizeLicensePlate(profile?.vehiclePlate ?? ''),
+  )
 
   useEffect(() => {
     if (profile?.vehiclePlate && !vehiclePlate) {
-      setVehiclePlate(profile.vehiclePlate)
+      setVehiclePlate(normalizeLicensePlate(profile.vehiclePlate))
     }
   }, [profile])
 
@@ -63,7 +66,7 @@ function BookingContent() {
       ],
       startTime: vietnamDatetimeLocalToUtcIso(startTime),
       hours: 1, // Fixed 1 hour deposit
-      vehiclePlate: vehiclePlate.trim(),
+      vehiclePlate: normalizeLicensePlate(vehiclePlate),
       isPreRegistered: true,
       vehicleType: 'car',
       depositAmount,
@@ -162,9 +165,9 @@ function BookingContent() {
                       <Car size={18} />
                       <input
                         type="text"
-                        placeholder="Nhập biển số (VD: 51A-12345)"
+                        placeholder="Nhập biển số (VD: 51A12345)"
                         value={vehiclePlate}
-                        onChange={(e) => setVehiclePlate(e.target.value)}
+                        onChange={(e) => setVehiclePlate(normalizeLicensePlate(e.target.value))}
                         style={{ border: 'none', background: 'transparent', width: '100%', outline: 'none', fontWeight: 600 }}
                       />
                     </div>

@@ -9,6 +9,7 @@ import {
   type SubscriptionPackageDto,
 } from '../../utils/apiServices'
 import { formatCurrency } from '../../utils/pricing'
+import { normalizeLicensePlate } from '../../utils/licensePlate'
 
 type VehicleFilter = 'all' | 'car' | 'bike'
 
@@ -53,7 +54,9 @@ function SubscribeContent() {
   const [vehicle, setVehicle] = useState<VehicleFilter>('all')
   const [packages, setPackages] = useState<SubscriptionPackageDto[]>([])
   const [selectedPackageId, setSelectedPackageId] = useState('')
-  const [licensePlate, setLicensePlate] = useState(profile?.vehiclePlate ?? '')
+  const [licensePlate, setLicensePlate] = useState(
+    normalizeLicensePlate(profile?.vehiclePlate ?? ''),
+  )
   const [availableFixedSlots, setAvailableFixedSlots] = useState<ParkingSlotDto[]>([])
   const [selectedFixedSlotId, setSelectedFixedSlotId] = useState('')
   const [loadingSlots, setLoadingSlots] = useState(false)
@@ -88,7 +91,10 @@ function SubscribeContent() {
 
   useEffect(() => {
     if (!profile?.vehiclePlate) return undefined
-    const timer = window.setTimeout(() => setLicensePlate(profile.vehiclePlate), 0)
+    const timer = window.setTimeout(
+      () => setLicensePlate(normalizeLicensePlate(profile.vehiclePlate)),
+      0,
+    )
     return () => window.clearTimeout(timer)
   }, [profile])
 
@@ -192,11 +198,15 @@ function SubscribeContent() {
     try {
       const res = await subscriptionApi.register({
         packageId: selectedPackage.packageId,
-        licensePlate: licensePlate.trim(),
+        licensePlate: normalizeLicensePlate(licensePlate),
         fixedSlotId: requiresFixedSlot ? selectedFixedSlotId : undefined,
       })
 
       if (res.isSuccess && res.result?.paymentUrl) {
+        sessionStorage.setItem('payment_return_context', JSON.stringify({
+          type: 'subscription-registration',
+          subscriptionId: res.result.subscriptionId,
+        }))
         window.location.assign(res.result.paymentUrl)
         return
       }
@@ -245,8 +255,8 @@ function SubscribeContent() {
               <input
                 type="text"
                 value={licensePlate}
-                onChange={(event) => setLicensePlate(event.target.value.toUpperCase())}
-                placeholder="Ví dụ: 51A-12345"
+                onChange={(event) => setLicensePlate(normalizeLicensePlate(event.target.value))}
+                placeholder="Ví dụ: 51A12345"
                 aria-describedby="subscribe-plate-hint"
               />
             </div>

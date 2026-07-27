@@ -5,6 +5,7 @@ import ManagerPageShell from '../../components/ManagerPageShell'
 import { apiClient } from '../../config/api'
 import { formatUtcToVietnamDate, formatUtcToVietnamDateTime, toVietnamDateInput, vietnamDateBoundaryToUtcIso } from '../../utils/dateTime'
 import { formatCurrency } from '../../utils/pricing'
+import { normalizeLicensePlate } from '../../utils/licensePlate'
 import type { ApiResponse, SubscriptionPackageDto, UserDto } from '../../utils/apiServices'
 
 interface SubscriptionDto {
@@ -113,7 +114,7 @@ export default function ManagerMonthlySubscriptions() {
       const payload: Record<string, string> = {
         userId: createForm.userId,
         packageId: createForm.packageId,
-        licensePlate: createForm.licensePlate.trim().toUpperCase(),
+        licensePlate: normalizeLicensePlate(createForm.licensePlate),
       }
       if (requiresFixedSlot) payload.fixedSlotId = createForm.fixedSlotId
       const response = await apiClient.post<ApiResponse<unknown>>('/MonthlySubscription', payload)
@@ -203,7 +204,7 @@ export default function ManagerMonthlySubscriptions() {
               </div>
               <div className="form-field">
                 <label htmlFor="subscription-license-plate">Biển số *</label>
-                <input id="subscription-license-plate" required value={createForm.licensePlate} onChange={(e) => setCreateForm({...createForm, licensePlate: e.target.value})} placeholder="VD: 51A-123.45" />
+                <input id="subscription-license-plate" required value={createForm.licensePlate} onChange={(e) => setCreateForm({...createForm, licensePlate: normalizeLicensePlate(e.target.value)})} placeholder="VD: 51A12345" />
               </div>
               {requiresFixedSlot && <div className="form-field form-field--full">
                 <label htmlFor="subscription-slot">Slot cố định *</label>

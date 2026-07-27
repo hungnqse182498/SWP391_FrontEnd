@@ -12,6 +12,18 @@ export interface StaffGateContext {
   gateType: 'Entry' | 'Exit'
 }
 
+export function isCarVehicleTypeName(typeName?: string | null) {
+  if (!typeName) return false
+
+  const normalized = typeName
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .trim()
+    .toLowerCase()
+
+  return normalized === 'o to'
+}
+
 const LEGACY_STORAGE_KEY = 'pbms.staff-gate-context'
 
 function storageKey(operation: StaffGateOperation) {
