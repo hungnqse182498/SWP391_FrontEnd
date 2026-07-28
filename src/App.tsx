@@ -2,7 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
 import Layout from './components/Layout'
 
-import { AuthProvider } from './context/AuthContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
 
 import { BookingProvider } from './context/BookingContext'
 
@@ -29,7 +29,7 @@ import AdminDashboard from './pages/admin/Dashboard'
 
 import AdminUsers from './pages/admin/Users'
 
-import AdminSystemConfig from './pages/admin/SystemConfig'
+import AdminRoles from './pages/admin/Roles'
 
 import ManagerDashboard from './pages/manager/Dashboard'
 
@@ -72,7 +72,15 @@ import UserIncidentReports from './pages/user/IncidentReports'
 
 import LegalHub from './pages/user/LegalHub'
 
+function RoleAwareHome() {
+  const { user } = useAuth()
 
+  if (user?.role === 'staff') return <Navigate to="/staff/dashboard" replace />
+  if (user?.role === 'manager') return <Navigate to="/manager/dashboard" replace />
+  if (user?.role === 'admin') return <Navigate to="/admin/dashboard" replace />
+
+  return <Home />
+}
 
 export default function App() {
 
@@ -88,7 +96,7 @@ export default function App() {
 
             <Route element={<Layout />}>
 
-              <Route index element={<Home />} />
+              <Route index element={<RoleAwareHome />} />
 
               <Route path="dang-nhap" element={<Login />} />
 
@@ -138,7 +146,9 @@ export default function App() {
 
               <Route path="admin/users" element={<AdminUsers />} />
 
-              <Route path="admin/system-config" element={<AdminSystemConfig />} />
+              <Route path="admin/roles" element={<AdminRoles />} />
+
+              <Route path="admin/system-config" element={<Navigate to="/admin/roles" replace />} />
 
               <Route path="manager/dashboard" element={<ManagerDashboard />} />
 

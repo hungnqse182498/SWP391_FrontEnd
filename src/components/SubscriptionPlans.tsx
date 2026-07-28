@@ -1,69 +1,75 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { CheckCircle, XCircle } from "lucide-react";
-import { apiClient } from "../config/api";
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { CheckCircle, XCircle } from 'lucide-react'
+import { subscriptionApi, type SubscriptionPackageDto } from '../utils/apiServices'
+import { formatCurrency } from '../utils/pricing'
 
-const fallbackPrices = {
-  car: {
-    m1: "1.000.000 đ",
-    m3: "2.500.000 đ",
-    m12: "10.000.000 đ",
-  },
-  bike: {
-    m1: "200.000 đ",
-    m3: "500.000 đ",
-    m12: "1.000.000 đ",
-  },
-};
+type VehicleFilter = 'car' | 'bike'
+type DurationKey = 'm1' | 'm3' | 'm12'
+type PackageGroup = Record<DurationKey, SubscriptionPackageDto | null>
+
+const EMPTY_GROUP: PackageGroup = { m1: null, m3: null, m12: null }
+
+const getVehicleFilter = (pkg: SubscriptionPackageDto): VehicleFilter | 'all' => {
+  const name = (pkg.vehicleTypeName ?? '').toLocaleLowerCase('vi')
+  if (name.includes('car') || name.includes('oto') || name.includes('o to') || name.includes('ô tô')) return 'car'
+  if (name.includes('bike') || name.includes('motor') || name.includes('xe may') || name.includes('xe máy')) return 'bike'
+  return 'all'
+}
+
+const choosePackage = (
+  packages: SubscriptionPackageDto[],
+  vehicle: VehicleFilter,
+  durationMonths: number,
+) => packages
+  .filter((pkg) => getVehicleFilter(pkg) === vehicle && pkg.durationMonths === durationMonths)
+  .sort((a, b) => {
+    const score = (pkg: SubscriptionPackageDto) => {
+      const name = pkg.packageName.toLocaleLowerCase('vi')
+      return (name.includes('gói') ? 2 : 0) - (name.includes('test') ? 10 : 0)
+    }
+    return score(b) - score(a) || Number(b.price) - Number(a.price)
+  })[0] ?? null
 
 export default function SubscriptionPlans() {
-  const [isMotorbike, setIsMotorbike] = useState(false);
-  const [prices, setPrices] = useState(fallbackPrices);
+  const [isMotorbike, setIsMotorbike] = useState(false)
+  const [packages, setPackages] = useState<SubscriptionPackageDto[]>([])
 
   useEffect(() => {
-    async function loadPrices() {
+    let ignore = false
+
+    const loadPackages = async () => {
       try {
-        const res = await apiClient.get<any>('/SubscriptionPackage');
-        const packages = res?.isSuccess ? res.result : null;
-        if (!packages || !Array.isArray(packages)) {
-          throw new Error("Invalid response format");
+        const response = await subscriptionApi.getPackages()
+        if (!ignore && response.isSuccess && Array.isArray(response.result)) {
+          setPackages(response.result.filter((pkg) => pkg.status.toLowerCase() === 'active'))
         }
-
-        const activePkgs = packages.filter((p: any) => p.status?.toLowerCase() === 'active');
-
-        const carPrices = { ...fallbackPrices.car };
-        const bikePrices = { ...fallbackPrices.bike };
-
-        const formatPrice = (val: number) => val.toLocaleString('vi-VN') + ' đ';
-
-        activePkgs.forEach((p: any) => {
-          const typeName = (p.vehicleTypeName || '').toLowerCase();
-          const duration = p.durationMonths;
-          const formatted = formatPrice(p.price);
-
-          const isCar = typeName.includes('car') || typeName.includes('oto') || typeName.includes('o to') || typeName.includes('ô tô');
-          const isBike = typeName.includes('bike') || typeName.includes('motor') || typeName.includes('xe may') || typeName.includes('xe máy');
-
-          if (isCar) {
-            if (duration === 1) carPrices.m1 = formatted;
-            else if (duration === 3) carPrices.m3 = formatted;
-            else if (duration === 12) carPrices.m12 = formatted;
-          } else if (isBike) {
-            if (duration === 1) bikePrices.m1 = formatted;
-            else if (duration === 3) bikePrices.m3 = formatted;
-            else if (duration === 12) bikePrices.m12 = formatted;
-          }
-        });
-
-        setPrices({ car: carPrices, bike: bikePrices });
-      } catch (err) {
-        console.error("Failed to load real prices, using fallback:", err);
+      } catch (error) {
+        console.error('Không thể tải gói đăng ký:', error)
       }
     }
-    loadPrices();
-  }, []);
 
-  const current = isMotorbike ? prices.bike : prices.car;
+    void loadPackages()
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  const packageGroups = useMemo(() => {
+    const createGroup = (vehicle: VehicleFilter): PackageGroup => ({
+      m1: choosePackage(packages, vehicle, 1),
+      m3: choosePackage(packages, vehicle, 3),
+      m12: choosePackage(packages, vehicle, 12),
+    })
+
+    return {
+      car: packages.length ? createGroup('car') : EMPTY_GROUP,
+      bike: packages.length ? createGroup('bike') : EMPTY_GROUP,
+    }
+  }, [packages])
+
+  const vehicle: VehicleFilter = isMotorbike ? 'bike' : 'car'
+  const current = packageGroups[vehicle]
 
   return (
     <section id="subscriptions" className="plans-section">
@@ -81,7 +87,7 @@ export default function SubscriptionPlans() {
           <button
             type="button"
             onClick={() => setIsMotorbike(!isMotorbike)}
-            className={isMotorbike ? "active" : ""}
+            className={isMotorbike ? 'active' : ''}
             aria-label="Đổi bảng giá theo loại xe"
           >
             <span />
@@ -94,8 +100,9 @@ export default function SubscriptionPlans() {
             tag="Linh hoạt"
             title="1 Tháng"
             description="Phù hợp cho khách vãng lai thường xuyên"
-            price={current.m1}
-            features={["Truy cập 24/7 không giới hạn", "Nhận diện biển số tự động"]}
+            pkg={current.m1}
+            vehicle={vehicle}
+            features={['Truy cập 24/7 không giới hạn', 'Nhận diện biển số tự động']}
             disabledFeature="Vị trí đỗ cố định"
           />
 
@@ -103,11 +110,12 @@ export default function SubscriptionPlans() {
             tag="Tiết kiệm"
             title="3 Tháng"
             description="Lựa chọn tối ưu cho cư dân"
-            price={current.m3}
+            pkg={current.m3}
+            vehicle={vehicle}
             features={[
-              "Ưu tiên vị trí đỗ thuận tiện",
-              "Miễn phí sạc xe điện 5h/tuần",
-              "Giảm 10% phí rửa xe tại hầm",
+              'Ưu tiên vị trí đỗ thuận tiện',
+              'Miễn phí sạc xe điện 5h/tuần',
+              'Giảm 10% phí rửa xe tại hầm',
             ]}
             popular
           />
@@ -116,40 +124,43 @@ export default function SubscriptionPlans() {
             tag="Cao cấp"
             title="12 Tháng"
             description="Cam kết dài hạn, ưu đãi tối đa"
-            price={current.m12}
+            pkg={current.m12}
+            vehicle={vehicle}
             features={[
-              "Vị trí đỗ riêng biệt, cố định",
-              "Miễn phí rửa xe hằng tháng",
-              "Hỗ trợ kỹ thuật tận nơi",
+              'Vị trí đỗ riêng biệt, cố định',
+              'Miễn phí rửa xe hằng tháng',
+              'Hỗ trợ kỹ thuật tận nơi',
             ]}
           />
         </div>
       </div>
     </section>
-  );
+  )
 }
 
 interface PlanCardProps {
-  tag: string;
-  title: string;
-  description: string;
-  price: string;
-  features: string[];
-  disabledFeature?: string;
-  popular?: boolean;
+  tag: string
+  title: string
+  description: string
+  pkg: SubscriptionPackageDto | null
+  vehicle: VehicleFilter
+  features: string[]
+  disabledFeature?: string
+  popular?: boolean
 }
 
 function PlanCard({
   tag,
   title,
   description,
-  price,
+  pkg,
+  vehicle,
   features,
   disabledFeature,
   popular,
 }: PlanCardProps) {
   return (
-    <article className={`plan-card ${popular ? "plan-card--popular" : ""}`}>
+    <article className={`plan-card ${popular ? 'plan-card--popular' : ''}`}>
       {popular && <div className="popular-badge">Phổ biến nhất</div>}
 
       <span className="plan-tag">{tag}</span>
@@ -157,7 +168,7 @@ function PlanCard({
       <p>{description}</p>
 
       <div className="plan-price">
-        <strong>{price}</strong>
+        <strong>{pkg ? formatCurrency(pkg.price) : 'Đang cập nhật'}</strong>
       </div>
 
       <ul className="plan-features">
@@ -176,11 +187,14 @@ function PlanCard({
       </ul>
 
       <Link
-        to="/dang-ky-thang"
-        className={popular ? "btn btn-primary btn-block" : "btn btn-plan btn-block"}
+        to={pkg
+          ? `/dang-ky-thang?package=${encodeURIComponent(pkg.packageId)}&vehicle=${vehicle}`
+          : '/dang-ky-thang'}
+        className={popular ? 'btn btn-primary btn-block' : 'btn btn-plan btn-block'}
+        aria-disabled={!pkg}
       >
-        {popular ? "Chọn gói này" : "Đăng ký ngay"}
+        {popular ? 'Chọn gói này' : 'Đăng ký ngay'}
       </Link>
     </article>
-  );
+  )
 }

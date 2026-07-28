@@ -1,32 +1,80 @@
-import { Car, MapPin, Search } from "lucide-react";
-import { useState, type MouseEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import BookingDatetimeField from "./BookingDatetimeField";
-import { ToastContainer, useToast } from "./Toast";
+import { Car, MapPin, RefreshCw, Search } from 'lucide-react'
+import { useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import BookingDatetimeField from './BookingDatetimeField'
+import { ToastContainer, useToast } from './Toast'
 import {
   clampBookingDatetimeLocal,
   defaultBookingDatetimeLocal,
   isBookingDatetimeLocalValid,
-} from "../utils/bookingTime";
+} from '../utils/bookingTime'
+import { API_CONFIG } from '../config/api'
+import type { ApiResponse, ParkingAvailabilityDto } from '../utils/apiServices'
+
+const isCarAvailability = (item: ParkingAvailabilityDto) => {
+  const name = (item.vehicleTypeName ?? '').toLocaleLowerCase('vi')
+  return name.includes('car') || name.includes('oto') || name.includes('o to') || name.includes('ô tô')
+}
 
 export default function HeroSection() {
-  const navigate = useNavigate();
-  const [startTime, setStartTime] = useState(defaultBookingDatetimeLocal);
-  const toast = useToast();
+  const navigate = useNavigate()
+  const [startTime, setStartTime] = useState(defaultBookingDatetimeLocal)
+  const [availability, setAvailability] = useState<ParkingAvailabilityDto[]>([])
+  const [availabilityLoading, setAvailabilityLoading] = useState(true)
+  const toast = useToast()
 
-  const handleSearch = (event: MouseEvent<HTMLAnchorElement>) => {
-    event.preventDefault();
-    const normalized = startTime
-      ? clampBookingDatetimeLocal(startTime)
-      : defaultBookingDatetimeLocal();
+  useEffect(() => {
+    let ignore = false
 
-    if (!isBookingDatetimeLocalValid(normalized)) {
-      toast.warning("Thời gian dự kiến đến phải nằm trong vòng 5 giờ tính từ thời điểm hiện tại.");
-      return;
+    const loadAvailability = async () => {
+      try {
+        // Trang chủ là nội dung công khai. Không dùng apiClient ở đây vì cơ chế
+        // làm mới phiên của nó sẽ chuyển guest sang đăng nhập khi API trả 401.
+        const request = await fetch(`${API_CONFIG.BASE_URL}/ParkingOperation/availability`, {
+          headers: { Accept: 'application/json' },
+        })
+        if (!request.ok) return
+
+        const response = await request.json() as ApiResponse<ParkingAvailabilityDto[]>
+        if (!ignore && response.isSuccess && Array.isArray(response.result)) {
+          setAvailability(response.result)
+        }
+      } catch (error) {
+        console.error('Không thể tải tình trạng chỗ trống:', error)
+      } finally {
+        if (!ignore) setAvailabilityLoading(false)
+      }
     }
 
-    navigate("/dat-cho", { state: { vehicle: "car", startTime: normalized } });
-  };
+    void loadAvailability()
+    const timer = window.setInterval(loadAvailability, 60_000)
+    return () => {
+      ignore = true
+      window.clearInterval(timer)
+    }
+  }, [])
+
+  const carAvailability = useMemo(() => {
+    const carFloors = availability.filter(isCarAvailability)
+    return {
+      available: carFloors.reduce((sum, item) => sum + item.availableSlots, 0),
+      total: carFloors.reduce((sum, item) => sum + item.totalSlots, 0),
+    }
+  }, [availability])
+
+  const handleSearch = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault()
+    const normalized = startTime
+      ? clampBookingDatetimeLocal(startTime)
+      : defaultBookingDatetimeLocal()
+
+    if (!isBookingDatetimeLocalValid(normalized)) {
+      toast.warning('Thời gian dự kiến đến phải nằm trong vòng 5 giờ tính từ thời điểm hiện tại.')
+      return
+    }
+
+    navigate('/dat-cho', { state: { vehicle: 'car', startTime: normalized } })
+  }
 
   return (
     <section className="home-hero">
@@ -55,10 +103,24 @@ export default function HeroSection() {
 
           <div className="availability-card">
             <div className="availability-head">
-              <div className="availability-count">
-                <span className="live-dot" />
-                <strong>156/200</strong>
-                <span>Chỗ trống hiện có</span>
+              <div className="availability-count" aria-live="polite">
+                {availabilityLoading ? (
+                  <>
+                    <RefreshCw className="availability-loading-icon" size={20} aria-hidden />
+                    <strong className="availability-pending">Đang cập nhật</strong>
+                  </>
+                ) : carAvailability.total > 0 ? (
+                  <>
+                    <span className={`live-dot${carAvailability.available === 0 ? ' live-dot--full' : ''}`} />
+                    <strong>{carAvailability.available}/{carAvailability.total}</strong>
+                    <span>chỗ ô tô đang trống</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="live-dot live-dot--unknown" />
+                    <strong className="availability-pending">Chưa có dữ liệu</strong>
+                  </>
+                )}
               </div>
 
               <div className="vehicle-toggle vehicle-toggle--single" aria-label="Loại xe">
@@ -86,11 +148,7 @@ export default function HeroSection() {
               />
             </div>
 
-            <Link
-              to="/dat-cho"
-              onClick={handleSearch}
-              className="hero-search-btn"
-            >
+            <Link to="/dat-cho" onClick={handleSearch} className="hero-search-btn">
               Tìm chỗ ngay
               <Search size={20} strokeWidth={2.3} aria-hidden />
             </Link>
@@ -98,5 +156,5 @@ export default function HeroSection() {
         </div>
       </div>
     </section>
-  );
+  )
 }

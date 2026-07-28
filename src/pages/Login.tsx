@@ -1,6 +1,6 @@
 import { AlertCircle, ArrowLeft, LogIn, Eye, EyeOff } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const LOGO_SRC = '/image/logo.png'
@@ -8,6 +8,8 @@ const LOGO_SRC = '/image/logo.png'
 export default function Login() {
   const { login, isAuthenticated, user, isLoading } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const returnTo = (location.state as { from?: string } | null)?.from
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -17,7 +19,7 @@ export default function Login() {
     if (user?.role === 'staff') return <Navigate to="/staff/dashboard" replace />
     if (user?.role === 'manager') return <Navigate to="/manager/dashboard" replace />
     if (user?.role === 'admin') return <Navigate to="/admin/dashboard" replace />
-    return <Navigate to="/dat-cho" replace />
+    return <Navigate to={returnTo || '/dat-cho'} replace />
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -35,7 +37,7 @@ export default function Login() {
         } else if (lowerEmail === 'admin' || lowerEmail === 'admin@easyparking.vn') {
           navigate('/admin/dashboard')
         } else {
-          navigate('/dat-cho')
+          navigate(returnTo || '/dat-cho', { replace: true })
         }
       } else {
         setError('Email hoặc mật khẩu không đúng. Vui lòng thử lại.')

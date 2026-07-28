@@ -1,39 +1,40 @@
 import { useNavigate } from 'react-router-dom'
-import { Settings, Shield, Users } from 'lucide-react'
-import ProtectedRoute from '../../components/ProtectedRoute'
+import { ArrowRight, ShieldCheck } from 'lucide-react'
+import AdminPageShell from '../../components/AdminPageShell'
 import { ADMIN_NAV } from '../../config/adminNav'
-
-const hubIcons: Record<string, React.ReactNode> = {
-  users: <Users size={32} />,
-  permissions: <Shield size={32} />,
-  system: <Settings size={32} />,
-}
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
 
   return (
-    <ProtectedRoute allowedRoles={['admin']}>
-      <div className="staff-dashboard-home">
-        <header className="dashboard-header">
-          <h1>Quản trị hệ thống</h1>
-          <p>Quản lý tài khoản, phân quyền và cấu hình hệ thống.</p>
+    <AdminPageShell activeItem="dashboard">
+      <div className="manager-dashboard-home">
+        <header className="manager-dashboard-header">
+          <span><ShieldCheck size={27} aria-hidden /></span>
+          <div>
+            <p>TRUNG TÂM QUẢN TRỊ</p>
+            <h1>Quản trị hệ thống</h1>
+            <small>Quản lý tài khoản và các vai trò được phép sử dụng trong hệ thống.</small>
+          </div>
         </header>
-        <div className="dashboard-menu-grid">
-          {ADMIN_NAV.map((item) => (
+        <div className="manager-dashboard-grid">
+          {ADMIN_NAV.filter((item) => item.id !== 'dashboard').map((item) => (
             <button
               key={item.id}
               type="button"
-              className="dashboard-menu-card"
+              className="manager-dashboard-card"
               onClick={() => navigate(item.path)}
             >
-              <div className="menu-card-icon">{hubIcons[item.id]}</div>
+              <div className="menu-card-icon">{item.icon}</div>
               <h3>{item.label}</h3>
               <p>{item.desc}</p>
+              <span className="manager-dashboard-card-link">
+                Mở chức năng <ArrowRight size={15} aria-hidden />
+              </span>
             </button>
           ))}
         </div>
       </div>
-    </ProtectedRoute>
+    </AdminPageShell>
   )
 }

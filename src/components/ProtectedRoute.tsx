@@ -12,7 +12,7 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
 
 
   if (!isAuthenticated) {
-    return <Navigate to="/dang-nhap" replace state={{ from: location.pathname }} />
+    return <Navigate to="/dang-nhap" replace state={{ from: `${location.pathname}${location.search}` }} />
   }
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {

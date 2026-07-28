@@ -46,7 +46,13 @@ p { margin: 0; }
 ul, ol { margin: 0; padding: 0; }
 
 .app-shell { display: flex; flex-direction: column; min-height: 100dvh; }
-.app-main { flex: 1; width: 100%; max-width: 1200px; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 1.5rem clamp(1.25rem, 2vw, 2.25rem) 3rem;
+}
 .app-main--home { max-width: none; padding: 0; }
 .app-main--manager,
 .app-main--workspace { max-width: none; padding: 0; }
@@ -64,7 +70,8 @@ ul, ol { margin: 0; padding: 0; }
 
 
 .header-inner {
-  max-width: 1200px;
+  width: 100%;
+  max-width: none;
   margin: 0 auto;
   padding: 0 1.25rem;
   height: var(--header-h);
@@ -344,7 +351,7 @@ ul, ol { margin: 0; padding: 0; }
   margin-top: auto;
 }
 .footer-inner {
-  max-width: 1200px;
+  max-width: 1500px;
   margin: 0 auto;
   padding: 2.5rem 1.25rem 1.5rem;
   display: grid;
@@ -352,6 +359,12 @@ ul, ol { margin: 0; padding: 0; }
   gap: 2rem;
 }
 .footer-brand { display: flex; gap: 1rem; align-items: center; }
+.footer-columns {
+  display: grid;
+  grid-column: span 2;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2rem;
+}
 .footer-logo { height: 52px; width: auto; object-fit: contain; flex-shrink: 0; }
 .footer-brand strong { font-size: 1.15rem; display: block; }
 .footer-brand p { font-size: 0.875rem; margin-top: 0.25rem; color: #94a3b8; }
@@ -578,6 +591,29 @@ ul, ol { margin: 0; padding: 0; }
   box-shadow: 0 0 0 7px rgba(34, 197, 94, 0.16);
 }
 
+.live-dot--full {
+  background: #ef4444;
+  box-shadow: 0 0 0 7px rgba(239, 68, 68, 0.14);
+}
+
+.live-dot--unknown {
+  background: #94a3b8;
+  box-shadow: 0 0 0 7px rgba(148, 163, 184, 0.14);
+}
+
+.availability-loading-icon {
+  color: var(--blue-600);
+  animation: availability-spin 0.9s linear infinite;
+}
+
+.availability-count .availability-pending {
+  font-size: 1rem;
+}
+
+@keyframes availability-spin {
+  to { transform: rotate(360deg); }
+}
+
 .vehicle-toggle {
   display: flex;
   gap: 0.3rem;
@@ -618,8 +654,8 @@ ul, ol { margin: 0; padding: 0; }
 
 .search-grid {
   display: grid;
-  grid-template-columns: 1fr 2.5fr;
-  gap: 0.5rem;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(0, 2fr);
+  gap: 0.75rem;
 }
 
 .hero-field {
@@ -641,6 +677,15 @@ ul, ol { margin: 0; padding: 0; }
   border-radius: 12px;
   background: #fff;
   color: var(--blue-700);
+}
+
+.hero-field > .booking-datetime-picker {
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
 }
 
 .hero-field select,
@@ -1389,6 +1434,11 @@ ul, ol { margin: 0; padding: 0; }
 .selected-list li span { font-size: 0.75rem; color: var(--text-muted); }
 
 .main-nav { display: flex; min-width: 0; gap: 0.15rem; flex: 1; justify-content: center; flex-wrap: nowrap; }
+.main-nav--parking-user {
+  justify-content: center;
+  gap: clamp(0.75rem, 1.35vw, 1.6rem);
+  padding-inline: clamp(0.75rem, 1.5vw, 1.5rem);
+}
 .main-nav a {
   display: inline-flex;
   align-items: center;
@@ -1674,7 +1724,7 @@ ul, ol { margin: 0; padding: 0; }
 .empty-state svg { color: var(--blue-400); margin-bottom: 1rem; }
 
 /* User parking sessions */
-.parking-sessions-page { width: min(1080px, 100%); margin: 0 auto; }
+.parking-sessions-page { width: 100%; margin: 0; }
 .parking-sessions-heading { margin-bottom: 1.5rem; }
 .parking-session-summary {
   display: grid;
@@ -1768,7 +1818,7 @@ ul, ol { margin: 0; padding: 0; }
 .parking-session-report-action { display: flex; justify-content: flex-end; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
 
 /* User incident reports */
-.user-incident-page { width: min(1160px, 100%); margin: 0 auto; }
+.user-incident-page { width: 100%; margin: 0; }
 .user-incident-heading { margin-bottom: 1.5rem; }
 .user-incident-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
 .user-incident-summary .card-panel { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.75rem; padding: 1rem 1.15rem; }
@@ -1833,6 +1883,7 @@ ul, ol { margin: 0; padding: 0; }
   .brand-name,
   .user-menu-copy { display: none; }
   .main-nav { justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
+  .main-nav--parking-user { gap: 0.35rem; padding-inline: 0; }
   .main-nav::-webkit-scrollbar { display: none; }
 }
 
@@ -1871,6 +1922,8 @@ ul, ol { margin: 0; padding: 0; }
   .stats-grid { grid-template-columns: 1fr; max-width: 360px; margin: 0 auto; }
   .footer-inner { grid-template-columns: 1fr; text-align: center; }
   .footer-brand { flex-direction: column; }
+  .footer-columns { grid-column: auto; }
+  .footer-contact p { justify-content: center; }
   .parking-map {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto minmax(360px, auto);
@@ -1885,6 +1938,13 @@ ul, ol { margin: 0; padding: 0; }
     grid-row: 3;
   }
   .booking-datetime-picker { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .footer-columns {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
 }
 
 /* Staff Layout */
@@ -3600,6 +3660,24 @@ ul, ol { margin: 0; padding: 0; }
   font-size: 0.86rem;
 }
 
+.manager-inline-warning {
+  margin: 1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #fde68a;
+  border-radius: 9px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.86rem;
+}
+
+.parking-session-payment-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
 .manager-table-wrap {
   padding: 0 1rem 1rem;
 }
@@ -3624,6 +3702,20 @@ ul, ol { margin: 0; padding: 0; }
   border-radius: 9px;
   background: var(--blue-50);
   color: var(--blue-700);
+}
+
+.manager-name-cell > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.manager-name-cell > div small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
 }
 
 .manager-muted-value {
@@ -5629,8 +5721,8 @@ ul, ol { margin: 0; padding: 0; }
    ========================================================================== */
 
 .subscribe-page {
-  max-width: 1280px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   padding: 1.5rem 1.25rem 2rem;
   line-height: 1.5;
 }
@@ -6705,6 +6797,28 @@ ul, ol { margin: 0; padding: 0; }
   max-width: none;
 }
 
+.manager-resource-page .admin-user-toolbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 480px) minmax(190px, 220px) minmax(80px, 1fr);
+  align-items: center;
+  justify-content: initial;
+}
+
+.manager-resource-page .admin-user-toolbar > .manager-search-field {
+  width: 100%;
+  max-width: none;
+}
+
+.manager-resource-page .admin-user-toolbar > select {
+  width: 100%;
+  min-width: 0;
+}
+
+.manager-resource-page .admin-user-toolbar .manager-toolbar-meta {
+  justify-self: end;
+  text-align: right;
+}
+
 .manager-filter-controls {
   display: grid;
   grid-auto-flow: column;
@@ -7283,10 +7397,70 @@ ul, ol { margin: 0; padding: 0; }
 .staff-dashboard-action-grid .manager-dashboard-card { min-height: 180px; }
 
 .staff-checkout-layout {
-  align-items: stretch;
-  grid-template-columns: minmax(340px, 0.9fr) minmax(480px, 1.1fr);
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.15rem;
   margin-top: 1rem;
+}
+
+.badge-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.admin-system-badge {
+  margin-left: 0.45rem;
+}
+
+.admin-user-actions {
+  min-width: 390px;
+}
+
+.admin-user-table th:last-child,
+.admin-user-table td:last-child {
+  width: 410px;
+}
+
+.admin-status-select {
+  min-width: 9rem;
+  padding: 0.42rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-heading);
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: center;
+  text-align-last: center;
+}
+
+.admin-status-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.admin-protected-action {
+  min-width: 9rem;
+  justify-content: center;
+  border: 1px solid #bfdbfe;
+  background: var(--blue-50);
+  color: var(--blue-700);
+  white-space: nowrap;
+}
+
+.admin-protected-action:hover {
+  border-color: var(--blue-300);
+  background: var(--blue-100);
+}
+
+.admin-user-modal {
+  max-width: 680px;
+}
+
+.admin-user-modal .form-field input,
+.admin-user-modal .form-field select,
+.manager-form-modal textarea {
+  width: 100%;
 }
 
 .staff-checkout-camera-card,
@@ -7303,7 +7477,14 @@ ul, ol { margin: 0; padding: 0; }
   flex-direction: column;
 }
 
+.staff-checkout-camera-card.has-comparison {
+  display: flex;
+}
+
 .staff-checkout-camera-card .camera-frame {
+  width: 100%;
+  max-width: 420px;
+  align-self: center;
   aspect-ratio: 16 / 9;
   margin-top: 1rem;
   border: 1px dashed #94a3b8;
@@ -7492,31 +7673,117 @@ ul, ol { margin: 0; padding: 0; }
 
 .checkout-vehicle-comparison {
   display: flex;
-  flex: 1;
+  flex: none;
   flex-direction: column;
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border);
 }
 
-.checkout-vehicle-comparison .scan-card-heading {
-  align-items: flex-start;
+.staff-checkout-camera-card.has-comparison > .checkout-vehicle-comparison {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
 }
 
 .checkout-vehicle-comparison .manager-session-image-grid article > div {
-  flex: 1;
+  flex: none;
   height: auto;
-  min-height: 170px;
+  min-height: 0;
+  aspect-ratio: 4 / 3;
 }
 
 .checkout-vehicle-comparison .manager-session-image-grid {
-  flex: 1;
+  flex: none;
+  align-items: start;
 }
 
 .checkout-vehicle-comparison .manager-session-image-grid article {
   display: flex;
-  min-height: 245px;
+  min-height: 0;
   flex-direction: column;
+}
+
+.checkout-vehicle-comparison .manager-session-image-grid article > strong {
+  margin-top: 0.7rem;
+  font-size: 0.9rem;
+}
+
+.checkout-image-plate {
+  display: flex !important;
+  min-height: 30px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.3rem !important;
+  color: #64748b !important;
+  font-size: 0.78rem !important;
+}
+
+.checkout-image-plate b {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.45rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
+}
+
+.checkout-image-plate > span {
+  margin-left: auto;
+  color: #64748b;
+  font-size: 0.7rem;
+}
+
+.checkout-vehicle-comparison > .alert-inline {
+  display: flex;
+  width: 100%;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  gap: 0.5rem;
+  margin: 0.8rem 0 0;
+  padding: 0.65rem 0.9rem;
+  border-radius: 9px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.checkout-vehicle-comparison > .alert-inline svg {
+  flex: 0 0 auto;
+}
+
+.checkout-exit-image-upload {
+  position: relative;
+  cursor: pointer;
+  outline: 1px dashed transparent;
+  outline-offset: -4px;
+  transition: outline-color 0.2s, box-shadow 0.2s;
+}
+
+.checkout-exit-image-upload:hover,
+.checkout-exit-image-upload:focus-visible {
+  outline-color: #f59e0b;
+  box-shadow: inset 0 0 0 4px rgba(245, 158, 11, 0.08);
+}
+
+.checkout-exit-image-upload.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.checkout-exit-image-upload .ocr-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  justify-content: center;
+  color: #fff;
 }
 
 .checkout-comparison-ok {
@@ -7879,8 +8146,17 @@ ul, ol { margin: 0; padding: 0; }
 .manager-incident-detail-actions .btn { min-height: 42px; }
 
 @media (max-width: 1100px) {
+  .manager-resource-page .admin-user-toolbar {
+    grid-template-columns: minmax(0, 1fr) 210px auto;
+  }
+
   .staff-checkout-layout,
   .staff-manual-session-grid { grid-template-columns: 1fr; }
+  .staff-checkout-camera-card.has-comparison > .checkout-vehicle-comparison {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
   .staff-checkout-camera-card { position: static; }
 }
 
@@ -7899,6 +8175,15 @@ ul, ol { margin: 0; padding: 0; }
 }
 
 @media (max-width: 640px) {
+  .manager-resource-page .admin-user-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .manager-resource-page .admin-user-toolbar .manager-toolbar-meta {
+    justify-self: stretch;
+    text-align: left;
+  }
+
   .checkout-progress {
     align-items: stretch;
     flex-direction: column;

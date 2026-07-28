@@ -193,6 +193,17 @@ export interface ParkingSessionDto {
   ticket?: ParkingSessionTicket
 }
 
+export interface ParkingAvailabilityDto {
+  floorId: string
+  floorName: string
+  vehicleTypeId?: string
+  vehicleTypeName?: string
+  totalSlots: number
+  availableSlots: number
+  occupiedSlots: number
+  reservedSlots: number
+}
+
 export interface ParkingQrDecodeResult {
   qrPayload: string
   codeType: 'Session' | 'Reservation' | 'SessionAndReservation' | string
@@ -344,6 +355,8 @@ export const vehicleTypeApi = {
 
 export const parkingSlotApi = {
   getAll: () => apiClient.get<ApiResponse<ParkingSlotDto[]>>('/ParkingSlot'),
+  updateStatus: (slotId: string, status: string) =>
+    apiClient.patch<ApiResponse<ParkingSlotDto>>(`/ParkingSlot/${slotId}/status`, { status }),
 }
 
 export const subscriptionRenewalApi = {
@@ -449,17 +462,29 @@ export const parkingOperationApi = {
     if (vehicleTypeId) params.set('vehicleTypeId', vehicleTypeId)
     if (floorKeyword) params.set('floorKeyword', floorKeyword)
     const q = params.toString()
-    return apiClient.get<ApiResponse>(`/ParkingOperation/availability${q ? `?${q}` : ''}`)
+    return apiClient.get<ApiResponse<ParkingAvailabilityDto[]>>(
+      `/ParkingOperation/availability${q ? `?${q}` : ''}`,
+    )
   },
 }
 
 export const parkingSessionApi = {
   getAll: () => apiClient.get<ApiResponse<ParkingSessionDto[]>>('/ParkingSession'),
   getMy: () => apiClient.get<ApiResponse<ParkingSessionDto[]>>('/ParkingSession/my'),
+  getMyFeePreview: (sessionId: string) =>
+    apiClient.get<ApiResponse<ParkingFeePreview>>(
+      `/ParkingSession/my/${sessionId}/fee-preview`,
+    ),
+  getMyCheckoutPayment: (sessionId: string) =>
+    apiClient.get<ApiResponse<ParkingCheckOutResponse>>(
+      `/ParkingSession/my/${sessionId}/checkout-payment`,
+    ),
 }
 
 export const incidentReportApi = {
   getAll: () => apiClient.get<ApiResponse<IncidentReportDto[]>>('/IncidentReport'),
+  getAssignees: () =>
+    apiClient.get<ApiResponse<UserDto[]>>('/IncidentReport/assignees'),
   getById: (id: string) => apiClient.get<ApiResponse<IncidentReportDto>>(`/IncidentReport/${id}`),
   getMy: () => apiClient.get<ApiResponse<IncidentReportDto[]>>('/IncidentReport/my-reports'),
   uploadProof: (file: File) => {

@@ -20,7 +20,7 @@ export default function AdminPageShell({ activeItem, children }: AdminPageShellP
         activeItem={activeItem}
         onSelectItem={(id) => navigateAdminNav(id, navigate)}
       >
-        {children}
+        <div className="manager-page-canvas">{children}</div>
       </StaffLayout>
     </ProtectedRoute>
   )

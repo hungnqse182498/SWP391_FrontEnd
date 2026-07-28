@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  parkingOperationApi,
+  parkingSessionApi,
   type ParkingFeePreview,
   type ParkingSessionDto,
 } from '../utils/apiServices'
@@ -29,7 +29,7 @@ export function useParkingFeePreviews(sessions: ParkingSessionDto[]) {
     const responses = await Promise.allSettled(
       sessionIds.map(async (sessionId) => ({
         sessionId,
-        response: await parkingOperationApi.getFeePreview(sessionId),
+        response: await parkingSessionApi.getMyFeePreview(sessionId),
       })),
     )
 

@@ -562,38 +562,43 @@ export default function Checkout() {
             </div>
 
             <div className="scan-container staff-checkout-layout">
-              <div className="camera-preview card-panel staff-checkout-camera-card">
+              <div className={`camera-preview card-panel staff-checkout-camera-card${sessionForCheckout ? ' has-comparison' : ''}`}>
                 <div className="scan-card-heading">
                   <span className="checkout-card-icon"><Camera size={19} /></span>
-                  <div><h3>Hình ảnh phương tiện (không bắt buộc)</h3><p>Ảnh chỉ dùng để dự phòng và hỗ trợ nhận diện biển số.</p></div>
+                  <div>
+                    <h3>{sessionForCheckout ? 'Đối chiếu xe vào / ra' : 'Hình ảnh phương tiện'}</h3>
+                    <p>{sessionForCheckout ? 'Bấm vào ảnh lúc ra để tải hoặc thay ảnh đối chiếu.' : 'Ảnh chỉ dùng để dự phòng và hỗ trợ nhận diện biển số.'}</p>
+                  </div>
                 </div>
-                <div
-                  className={`camera-frame clickable${hasPendingCheckout ? ' is-disabled' : ''}`}
-                  onClick={() => {
-                    if (!hasPendingCheckout) fileInputRef.current?.click()
-                  }}
-                >
-                  {imagePreviewUrl ? (
-                    <img src={imagePreviewUrl} className="camera-preview-img" alt="Exit Plate Preview" />
-                  ) : (
-                    <div className="camera-placeholder">
-                      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                        <circle cx="12" cy="13" r="4" />
-                      </svg>
-                      <p>Tải ảnh xe ra bãi nếu cần</p>
-                    </div>
-                  )}
-
-                  {uploading && (
-                    <>
-                      <div className="ocr-scanning-line" />
-                      <div className="ocr-loading-overlay">
-                        <span>Đang nhận diện biển số...</span>
+                {!sessionForCheckout && (
+                  <div
+                    className={`camera-frame clickable${hasPendingCheckout ? ' is-disabled' : ''}`}
+                    onClick={() => {
+                      if (!hasPendingCheckout) fileInputRef.current?.click()
+                    }}
+                  >
+                    {imagePreviewUrl ? (
+                      <img src={imagePreviewUrl} className="camera-preview-img" alt="Exit Plate Preview" />
+                    ) : (
+                      <div className="camera-placeholder">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                          <circle cx="12" cy="13" r="4" />
+                        </svg>
+                        <p>Tải ảnh xe ra bãi</p>
                       </div>
-                    </>
-                  )}
-                </div>
+                    )}
+
+                    {uploading && (
+                      <>
+                        <div className="ocr-scanning-line" />
+                        <div className="ocr-loading-overlay">
+                          <span>Đang nhận diện biển số...</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -605,13 +610,6 @@ export default function Checkout() {
 
                 {sessionForCheckout && (
                   <section className="checkout-vehicle-comparison" aria-label="Đối chiếu xe vào và xe ra">
-                    <div className="scan-card-heading">
-                      <ImageIcon size={18} aria-hidden />
-                      <div>
-                        <h3>Đối chiếu xe vào / ra</h3>
-                        <p>Kiểm tra biển số; đối chiếu thêm ảnh nếu có.</p>
-                      </div>
-                    </div>
                     <div className="manager-session-image-grid">
                       <article>
                         <div>
@@ -630,26 +628,51 @@ export default function Checkout() {
                           )}
                         </div>
                         <strong>Ảnh lúc vào</strong>
-                        <small>Biển số: {sessionForCheckout.licensePlateIn}</small>
+                        <small className="checkout-image-plate">
+                          Biển số: <b>{sessionForCheckout.licensePlateIn}</b>
+                        </small>
                       </article>
                       <article>
-                        <div>
+                        <div
+                          className={`checkout-exit-image-upload${hasPendingCheckout ? ' is-disabled' : ''}`}
+                          role="button"
+                          tabIndex={hasPendingCheckout ? -1 : 0}
+                          aria-label={imagePreviewUrl || exitImageUrl ? 'Thay ảnh xe lúc ra' : 'Tải ảnh xe lúc ra'}
+                          onClick={() => {
+                            if (!hasPendingCheckout) fileInputRef.current?.click()
+                          }}
+                          onKeyDown={(event) => {
+                            if (!hasPendingCheckout && (event.key === 'Enter' || event.key === ' ')) {
+                              event.preventDefault()
+                              fileInputRef.current?.click()
+                            }
+                          }}
+                        >
                           {imagePreviewUrl || exitImageUrl ? (
-                            <a href={imagePreviewUrl || exitImageUrl} target="_blank" rel="noreferrer">
-                              <img
-                                src={imagePreviewUrl || exitImageUrl}
-                                alt={`Xe ${licensePlate || 'chưa nhận diện'} lúc ra`}
-                              />
-                            </a>
+                            <img
+                              src={imagePreviewUrl || exitImageUrl}
+                              alt={`Xe ${licensePlate || 'chưa nhận diện'} lúc ra`}
+                            />
                           ) : (
                             <span className="manager-session-image-empty">
                               <ImageIcon size={27} aria-hidden />
-                              Chưa tải ảnh lúc ra
+                              Nhấn để tải ảnh lúc ra
                             </span>
+                          )}
+                          {uploading && (
+                            <>
+                              <div className="ocr-scanning-line" />
+                              <div className="ocr-loading-overlay">
+                                <span>Đang nhận diện biển số...</span>
+                              </div>
+                            </>
                           )}
                         </div>
                         <strong>Ảnh lúc ra</strong>
-                        <small>Biển số: {licensePlate || 'Chưa nhận diện'}</small>
+                        <small className="checkout-image-plate">
+                          Biển số: <b>{licensePlate || 'Chưa nhận diện'}</b>
+                          <span>Nhấn ảnh để thay đổi</span>
+                        </small>
                       </article>
                     </div>
                     {plateMismatch ? (

@@ -19,6 +19,7 @@ import { useAuth } from "../../context/AuthContext";
 import { ApiRequestError } from "../../config/api";
 import {
   incidentReportApi,
+  parkingSlotApi,
   parkingSessionApi,
   type IncidentReportDto,
   type ParkingSessionDto,
@@ -85,6 +86,20 @@ export default function Exception() {
     null,
   );
   const [resolutionNotes, setResolutionNotes] = useState("");
+  const [slotStatus, setSlotStatus] = useState("");
+
+  const resolveSession = resolveTarget?.sessionId
+    ? sessions.find((session) => session.sessionId === resolveTarget.sessionId)
+    : undefined;
+  const resolveSlotId =
+    resolveSession?.actualSlotId || resolveSession?.assignedSlotId;
+  const resolveSlotCode =
+    resolveSession?.actualSlotCode || resolveSession?.assignedSlotCode;
+
+  const openResolve = (incident: IncidentReportDto) => {
+    setSlotStatus("");
+    setResolveTarget(incident);
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -238,6 +253,16 @@ export default function Exception() {
     setSaving(true);
     setActionError("");
     try {
+      if (resolveSlotId && slotStatus) {
+        const slotResponse = await parkingSlotApi.updateStatus(
+          resolveSlotId,
+          slotStatus,
+        );
+        if (!slotResponse.isSuccess)
+          throw new Error(
+            slotResponse.message || "Không thể cập nhật trạng thái slot.",
+          );
+      }
       const response = await incidentReportApi.resolve(
         resolveTarget.incidentId,
         user.userId,
@@ -247,6 +272,7 @@ export default function Exception() {
         throw new Error(response.message || "Không thể hoàn tất sự cố.");
       setResolveTarget(null);
       setResolutionNotes("");
+      setSlotStatus("");
       await loadData();
     } catch (requestError) {
       setActionError(
@@ -481,7 +507,7 @@ export default function Exception() {
                           onClick={() => {
                             setActionError("");
                             setResolutionNotes("");
-                            setResolveTarget(incident);
+                            openResolve(incident);
                           }}
                         >
                           <CheckCircle2 size={15} aria-hidden /> Hoàn tất
@@ -732,7 +758,7 @@ export default function Exception() {
                         setSelected(null);
                         setActionError("");
                         setResolutionNotes("");
-                        setResolveTarget(selected);
+                        openResolve(selected);
                       }}
                     >
                       <CheckCircle2 size={16} />
@@ -937,6 +963,26 @@ export default function Exception() {
             <div className="staff-incident-resolve-summary">
               {resolveTarget.description}
             </div>
+            {resolveSlotId && (
+              <div className="form-field">
+                <label htmlFor="incident-slot-status">
+                  Trạng thái slot {resolveSlotCode || ""}
+                </label>
+                <select
+                  id="incident-slot-status"
+                  value={slotStatus}
+                  onChange={(event) => setSlotStatus(event.target.value)}
+                >
+                  <option value="">Giữ nguyên trạng thái hiện tại</option>
+                  <option value="Available">Còn trống</option>
+                  <option value="Maintenance">Bảo trì</option>
+                  <option value="Locked">Tạm khóa</option>
+                </select>
+                <small className="field-hint">
+                  Chỉ cập nhật khi sự cố có ảnh hưởng đến vị trí đỗ xe.
+                </small>
+              </div>
+            )}
             <div className="form-field">
               <label htmlFor="resolution-notes">Kết quả xử lý *</label>
               <textarea

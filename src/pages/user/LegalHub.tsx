@@ -6,7 +6,7 @@ const NAV_ITEMS = [
   { id: "terms", label: "Điều khoản sử dụng", icon: FileText },
   { id: "privacy", label: "Chính sách bảo mật", icon: Shield },
   { id: "booking-rules", label: "Quy định đặt chỗ", icon: CalendarCheck },
-  { id: "cancellation", label: "Chính sách hủy & hoàn tiền", icon: RotateCcw },
+  { id: "cancellation", label: "Chính sách hủy đặt chỗ", icon: RotateCcw },
 ];
 
 export default function LegalHub() {
@@ -65,7 +65,7 @@ export default function LegalHub() {
           <FileText size={22} strokeWidth={2} aria-hidden />
           Điều khoản sử dụng
         </h2>
-        <p className="legal-updated">Cập nhật lần cuối: 01/06/2026</p>
+        <p className="legal-updated">Cập nhật lần cuối: 28/07/2026</p>
 
         <h3>1. Giới thiệu</h3>
         <p>
@@ -93,7 +93,7 @@ export default function LegalHub() {
 
         <h3>4. Dịch vụ cung cấp</h3>
         <ul>
-          <li><strong>Đặt chỗ ngắn hạn:</strong> Đặt trước vị trí đỗ xe theo giờ hoặc theo ngày, thanh toán trực tuyến qua ví điện tử hoặc chuyển khoản ngân hàng.</li>
+          <li><strong>Đặt chỗ ngắn hạn:</strong> Đặt trước chỗ đỗ ô tô, thanh toán tiền cọc trực tuyến qua cổng PayOS và được hệ thống tự động phân bổ vị trí khi vào bãi.</li>
           <li><strong>Đăng ký thẻ tháng:</strong> Gói thành viên 1 tháng, 3 tháng hoặc 12 tháng dành cho xe máy và ô tô, bao gồm quyền truy cập 24/7 và nhận diện biển số tự động (ANPR).</li>
           <li><strong>Thẻ RFID:</strong> Hỗ trợ phát hành thẻ RFID để ra vào tự động. Phí phát hành thẻ: 50.000đ/thẻ (không hoàn lại).</li>
           <li><strong>Sạc xe điện (EV Charging):</strong> Trạm sạc tại tầng B2, miễn phí 5 giờ/tuần cho gói 3 tháng trở lên.</li>
@@ -124,7 +124,7 @@ export default function LegalHub() {
           <Shield size={22} strokeWidth={2} aria-hidden />
           Chính sách bảo mật
         </h2>
-        <p className="legal-updated">Cập nhật lần cuối: 01/06/2026</p>
+        <p className="legal-updated">Cập nhật lần cuối: 28/07/2026</p>
 
         <h3>1. Thông tin chúng tôi thu thập</h3>
         <p>Khi sử dụng EasyParking, chúng tôi thu thập các loại thông tin sau:</p>
@@ -152,7 +152,7 @@ export default function LegalHub() {
         </p>
         <ul>
           <li>Với Ban Quản lý Tòa nhà để phối hợp quản lý an ninh.</li>
-          <li>Với đối tác cổng thanh toán (VNPay, MoMo) để xử lý giao dịch – chỉ truyền thông tin tối thiểu cần thiết.</li>
+          <li>Với đối tác cổng thanh toán PayOS để xử lý giao dịch – chỉ truyền thông tin tối thiểu cần thiết.</li>
           <li>Khi có yêu cầu bằng văn bản từ cơ quan công an hoặc tòa án.</li>
         </ul>
 
@@ -177,30 +177,29 @@ export default function LegalHub() {
           <CalendarCheck size={22} strokeWidth={2} aria-hidden />
           Quy định đặt chỗ
         </h2>
-        <p className="legal-updated">Cập nhật lần cuối: 01/06/2026</p>
+        <p className="legal-updated">Cập nhật lần cuối: 28/07/2026</p>
 
         <h3>1. Quy trình đặt chỗ</h3>
         <ul>
           <li>Đăng nhập tài khoản EasyParking trên website hoặc ứng dụng di động.</li>
-          <li>Chọn loại xe (xe máy hoặc ô tô), tầng đỗ và vị trí mong muốn trên bản đồ tương tác.</li>
-          <li>Chọn thời gian bắt đầu và kết thúc đỗ xe (tối thiểu 1 giờ, tối đa 72 giờ cho đặt chỗ ngắn hạn).</li>
-          <li>Xác nhận đơn và thanh toán trước qua cổng thanh toán trực tuyến.</li>
+          <li>Chọn thời gian dự kiến đưa ô tô vào bãi trong khung thời gian hệ thống cho phép.</li>
+          <li>Nhập biển số xe và xác nhận tiền cọc giữ chỗ.</li>
+          <li>Thanh toán tiền cọc trực tuyến qua cổng PayOS.</li>
           <li>Nhận mã QR xác nhận qua email và ứng dụng – xuất trình tại barrier để vào bãi.</li>
         </ul>
 
         <h3>2. Thời gian đặt chỗ</h3>
         <ul>
           <li>Bãi xe hoạt động 24/7, bao gồm ngày lễ và cuối tuần.</li>
-          <li>Đặt chỗ trước tối thiểu 30 phút và tối đa 5 giờ trước thời điểm sử dụng.</li>
-          <li>Phải đến đúng giờ đã đặt. Nếu đến trễ quá <strong>30 phút</strong> so với giờ bắt đầu, hệ thống tự động hủy đơn và tính phí hủy muộn 20% giá trị đơn.</li>
+          <li>Chỉ có thể chọn thời gian dự kiến đến trong vòng 5 giờ tính từ thời điểm hiện tại.</li>
+          <li>Xe được phép vào bãi từ <strong>30 phút trước</strong> đến <strong>30 phút sau</strong> giờ đã đặt. Đến quá thời hạn này, đơn có thể bị hủy do không đến và tiền cọc không được hoàn lại.</li>
         </ul>
 
         <h3>3. Tiền cọc & thanh toán</h3>
         <ul>
-          <li><strong>Đặt chỗ ngắn hạn:</strong> Thanh toán toàn bộ khi xác nhận đơn.</li>
+          <li><strong>Đặt chỗ ngắn hạn:</strong> Thanh toán tiền cọc giữ chỗ khi xác nhận đơn; phần phí còn lại được tính theo phiên gửi xe.</li>
           <li><strong>Gói thẻ tháng:</strong> Thanh toán toàn bộ giá trị gói khi đăng ký. Không áp dụng trả góp.</li>
-          <li>Phương thức chấp nhận: VNPay, MoMo, chuyển khoản ngân hàng nội địa, thẻ Visa/Mastercard.</li>
-          <li>Hóa đơn điện tử (VAT) được gửi qua email trong vòng 24 giờ sau khi thanh toán thành công.</li>
+          <li>Thanh toán trực tuyến được thực hiện qua cổng PayOS theo phương thức mà PayOS hỗ trợ tại thời điểm giao dịch.</li>
         </ul>
 
         <h3>4. Quy tắc tại bãi xe</h3>
@@ -229,49 +228,42 @@ export default function LegalHub() {
       <article id="cancellation" className="legal-section card-panel">
         <h2>
           <RotateCcw size={22} strokeWidth={2} aria-hidden />
-          Chính sách hủy &amp; hoàn tiền
+          Chính sách hủy đặt chỗ
         </h2>
-        <p className="legal-updated">Cập nhật lần cuối: 01/06/2026</p>
+        <p className="legal-updated">Cập nhật lần cuối: 28/07/2026</p>
 
         <h3>1. Hủy đặt chỗ ngắn hạn</h3>
         <ul>
-          <li>Hủy trước giờ bắt đầu <strong>≥ 2 giờ</strong>: hoàn 100% giá trị đơn.</li>
-          <li>Hủy trước giờ bắt đầu <strong>từ 30 phút đến dưới 2 giờ</strong>: hoàn 70% giá trị đơn.</li>
-          <li>Hủy trước giờ bắt đầu <strong>&lt; 30 phút</strong> hoặc không đến (no-show): không hoàn tiền.</li>
+          <li>Người dùng có thể hủy đơn còn đủ điều kiện hủy trong mục <strong>Lịch sử đặt chỗ</strong>.</li>
+          <li>Khi người dùng chủ động hủy đơn, <strong>tiền cọc không được hoàn lại</strong>, không phụ thuộc thời điểm hủy.</li>
+          <li>Đơn bị hủy do không đưa xe vào bãi đúng khung giờ quy định cũng không được hoàn tiền cọc.</li>
         </ul>
 
         <h3>2. Hủy gói thẻ tháng</h3>
         <ul>
-          <li>Hủy trong vòng <strong>3 ngày</strong> kể từ ngày kích hoạt và chưa sử dụng dịch vụ: hoàn 100% trừ phí xử lý 50.000đ.</li>
-          <li>Hủy sau 3 ngày nhưng trong tháng đầu tiên: hoàn 50% giá trị còn lại của gói (tính theo tháng).</li>
-          <li>Hủy sau tháng đầu tiên: không hoàn tiền. Quyền sử dụng còn hiệu lực đến hết chu kỳ hiện tại.</li>
-          <li>Thẻ RFID đã phát hành: không thu hồi, không hoàn phí thẻ (50.000đ).</li>
+          <li>Người dùng có thể gửi yêu cầu hủy gói đang hoạt động trong mục <strong>Gói đăng ký của tôi</strong>.</li>
+          <li>Gói đã thanh toán không được hoàn lại phần thời gian chưa sử dụng khi người dùng chủ động hủy.</li>
+          <li>Sau khi hủy, gói chuyển sang trạng thái đã hủy và không thể tiếp tục gia hạn.</li>
         </ul>
 
-        <h3>3. Phương thức hoàn tiền</h3>
-        <ul>
-          <li>Hoàn tiền về phương thức thanh toán ban đầu (ví MoMo, tài khoản ngân hàng, thẻ quốc tế).</li>
-          <li>Thời gian xử lý: 3 – 7 ngày làm việc kể từ khi yêu cầu hủy được duyệt.</li>
-          <li>Đối với thẻ quốc tế (Visa/Mastercard): thời gian hoàn có thể lên đến 14 ngày làm việc tùy ngân hàng phát hành.</li>
-        </ul>
-
-        <h3>4. Trường hợp đặc biệt</h3>
+        <h3>3. Trường hợp giao dịch hoặc hệ thống gặp lỗi</h3>
         <p>
-          EasyParking cam kết hoàn tiền 100% trong các trường hợp lỗi thuộc về hệ thống:
+          Chính sách không hoàn tiền nêu trên không loại trừ việc kiểm tra các giao dịch bất thường
+          do lỗi kỹ thuật. Người dùng có thể liên hệ hỗ trợ trong các trường hợp:
         </p>
         <ul>
-          <li>Hệ thống barrier lỗi khiến bạn không thể vào bãi trong khoảng thời gian đã đặt.</li>
-          <li>Vị trí đã đặt bị chiếm dụng bởi xe khác và không có vị trí thay thế tương đương.</li>
-          <li>Bãi xe tạm đóng cửa vì lý do bảo trì khẩn cấp hoặc sự cố kỹ thuật.</li>
           <li>Thanh toán bị trừ tiền nhưng đơn đặt chỗ không được tạo (lỗi giao dịch).</li>
+          <li>Giao dịch bị ghi nhận nhiều lần cho cùng một đơn.</li>
+          <li>Hệ thống không thể cung cấp dịch vụ do lỗi vận hành được EasyParking xác nhận.</li>
         </ul>
+        <p>Mỗi trường hợp sẽ được đối soát theo dữ liệu PayOS và trạng thái thực tế của đơn trước khi xử lý.</p>
 
-        <h3>5. Liên hệ yêu cầu hủy & hoàn tiền</h3>
+        <h3>4. Liên hệ hỗ trợ</h3>
         <p>
-          Để yêu cầu hủy đơn hoặc hoàn tiền, vui lòng thực hiện một trong các cách sau:
+          Để hủy đơn hoặc yêu cầu kiểm tra giao dịch bất thường, vui lòng thực hiện một trong các cách sau:
         </p>
         <ul>
-          <li>Nhấn nút <strong>"Hủy đơn"</strong> trực tiếp trong mục Lịch sử đặt chỗ trên ứng dụng.</li>
+          <li>Nhấn nút <strong>"Hủy đơn"</strong> trực tiếp trong mục Lịch sử đặt chỗ trên website.</li>
           <li>Gọi Hotline: <strong>1900 6868</strong> (08:00 – 22:00 hàng ngày).</li>
           <li>Gửi email: <strong>support@easyparking.vn</strong> kèm mã đơn hàng và lý do hủy.</li>
         </ul>

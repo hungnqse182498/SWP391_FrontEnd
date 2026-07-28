@@ -32,6 +32,12 @@ export const API_ENDPOINTS = {
   USER_DELETE: '/User',
   USER_STATUS: '/User',
 
+  // Role management (admin)
+  ROLES_GET_ALL: '/Role',
+  ROLES_CREATE: '/Role',
+  ROLES_UPDATE: '/Role',
+  ROLES_DELETE: '/Role',
+
   // Floors
   FLOORS_GET_ALL: '/floors',
   FLOORS_GET_BY_ID: '/floors/:id',

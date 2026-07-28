@@ -33,9 +33,9 @@ function getRoleLabel(role?: string) {
     case 'staff':
       return 'Nhân viên'
     case 'manager':
-      return 'Quản lý'
+      return 'Quản lý bãi xe'
     case 'admin':
-      return 'Quản trị'
+      return 'Quản trị viên'
     default:
       return 'Người dùng'
   }
@@ -49,6 +49,16 @@ export default function Header() {
 
   const isParkingUser = user?.role === 'user' || user?.role === 'customer'
   const isCustomer = user?.role === 'customer'
+  const isBackOffice =
+    user?.role === 'staff' || user?.role === 'manager' || user?.role === 'admin'
+  const brandDestination =
+    user?.role === 'staff'
+      ? '/staff/dashboard'
+      : user?.role === 'manager'
+        ? '/manager/dashboard'
+        : user?.role === 'admin'
+          ? '/admin/dashboard'
+          : '/'
   const roleLabel = getRoleLabel(user?.role)
 
   useEffect(() => {
@@ -73,7 +83,11 @@ export default function Header() {
   return (
     <header className="site-header">
       <div className="header-inner">
-        <Link to="/" className="brand" aria-label="EasyParking - về trang chủ">
+        <Link
+          to={brandDestination}
+          className="brand"
+          aria-label={isBackOffice ? 'EasyParking - về bảng điều khiển' : 'EasyParking - về trang chủ'}
+        >
           <img src={LOGO_SRC} alt="" className="brand-logo" />
           <span className="brand-name">
             <span className="brand-easy">Easy</span>
@@ -81,12 +95,12 @@ export default function Header() {
           </span>
         </Link>
 
-        <nav className="main-nav" aria-label={isAuthenticated ? 'Menu người dùng' : 'Menu chính'}>
+        <nav
+          className={`main-nav${isParkingUser ? ' main-nav--parking-user' : ''}`}
+          aria-label={isAuthenticated ? 'Menu người dùng' : 'Menu chính'}
+        >
           {isAuthenticated ? (
             <>
-              {user?.role === 'staff' && <NavLink to="/staff/dashboard">Menu</NavLink>}
-              {user?.role === 'manager' && <NavLink to="/manager/dashboard">Menu</NavLink>}
-              {user?.role === 'admin' && <NavLink to="/admin/dashboard">Menu</NavLink>}
               {isParkingUser && (
                 <>
                   <NavLink to="/dat-cho">

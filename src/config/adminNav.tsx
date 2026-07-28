@@ -1,4 +1,4 @@
-import { Settings, Users } from 'lucide-react'
+import { LayoutDashboard, Shield, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 export interface NavItem {
@@ -11,6 +11,13 @@ export interface NavItem {
 
 export const ADMIN_NAV: NavItem[] = [
   {
+    id: 'dashboard',
+    label: 'Tổng quan',
+    path: '/admin/dashboard',
+    icon: <LayoutDashboard size={18} />,
+    desc: 'Truy cập nhanh các chức năng quản trị hệ thống',
+  },
+  {
     id: 'users',
     label: 'Quản lý tài khoản',
     path: '/admin/users',
@@ -18,11 +25,11 @@ export const ADMIN_NAV: NavItem[] = [
     desc: 'Thêm, sửa, khóa tài khoản người dùng',
   },
   {
-    id: 'system',
-    label: 'Cấu hình hệ thống',
-    path: '/admin/system-config',
-    icon: <Settings size={18} />,
-    desc: 'Thông số vận hành và tích hợp',
+    id: 'roles',
+    label: 'Quản lý vai trò',
+    path: '/admin/roles',
+    icon: <Shield size={18} />,
+    desc: 'Tạo, sửa và xóa các vai trò có thể gán cho tài khoản',
   },
 ]
 

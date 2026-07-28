@@ -38,6 +38,7 @@ const STATUS_LABEL_MAP: Record<string, string> = {
   Available: 'Còn trống',
   Occupied: 'Đang sử dụng',
   Reserved: 'Đã đặt trước',
+  Assigned: 'Đã phân bổ',
   Maintenance: 'Bảo trì',
   Locked: 'Tạm khóa',
 }
@@ -46,6 +47,7 @@ const STATUS_BADGE_MAP: Record<string, string> = {
   Available: 'slot-badge--empty',
   Occupied: 'slot-badge--occupied',
   Reserved: 'slot-badge--reserved',
+  Assigned: 'slot-badge--reserved',
   Maintenance: 'slot-badge--maintenance',
   Locked: 'slot-badge--locked',
 }
@@ -54,6 +56,7 @@ const STATUS_TILE_MAP: Record<string, string> = {
   Available: 'slot-tile--empty',
   Occupied: 'slot-tile--occupied',
   Reserved: 'slot-tile--reserved',
+  Assigned: 'slot-tile--reserved',
   Maintenance: 'slot-tile--maintenance',
   Locked: 'slot-tile--locked',
 }
@@ -328,6 +331,7 @@ export default function ManagerSlots() {
                   <option value="Available">Còn trống</option>
                   <option value="Occupied">Đang sử dụng</option>
                   <option value="Reserved">Đã đặt trước</option>
+                  <option value="Assigned">Đã phân bổ</option>
                   <option value="Maintenance">Bảo trì</option>
                   <option value="Locked">Tạm khóa</option>
                 </select>

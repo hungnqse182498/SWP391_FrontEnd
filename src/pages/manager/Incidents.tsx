@@ -23,12 +23,11 @@ import {
 } from "lucide-react";
 import ManagerConfirmActionModal from "../../components/ManagerConfirmActionModal";
 import ManagerPageShell from "../../components/ManagerPageShell";
-import { apiClient, ApiRequestError } from "../../config/api";
+import { ApiRequestError } from "../../config/api";
 import { formatUtcToVietnamDateTime } from "../../utils/dateTime";
 import {
   incidentReportApi,
   parkingSessionApi,
-  type ApiResponse,
   type IncidentReportDto,
   type ParkingSessionDto,
   type UserDto,
@@ -68,6 +67,7 @@ export default function ManagerIncidents() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [staffError, setStaffError] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
@@ -94,12 +94,13 @@ export default function ManagerIncidents() {
   const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
+    setStaffError("");
     try {
       const [incidentResult, sessionResult, userResult] =
         await Promise.allSettled([
           incidentReportApi.getAll(),
           parkingSessionApi.getAll(),
-          apiClient.get<ApiResponse<UserDto[]>>("/User/all"),
+          incidentReportApi.getAssignees(),
         ]);
       if (
         incidentResult.status === "fulfilled" &&
@@ -125,6 +126,17 @@ export default function ManagerIncidents() {
         userResult.status === "fulfilled" && userResult.value.isSuccess
           ? userResult.value.result || []
           : [];
+      if (userResult.status === "rejected") {
+        setStaffError(
+          userResult.reason instanceof Error
+            ? userResult.reason.message
+            : "Không thể tải danh sách người xử lý.",
+        );
+      } else if (!userResult.value.isSuccess) {
+        setStaffError(
+          userResult.value.message || "Không thể tải danh sách người xử lý.",
+        );
+      }
       setUsers(loadedUsers);
       setStaff(
         loadedUsers.filter(
@@ -807,8 +819,15 @@ export default function ManagerIncidents() {
               <select
                 value={assigneeId}
                 onChange={(event) => setAssigneeId(event.target.value)}
+                disabled={saving || Boolean(staffError) || staff.length === 0}
               >
-                <option value="">Chọn nhân viên</option>
+                <option value="">
+                  {staffError
+                    ? "Không tải được danh sách nhân viên"
+                    : staff.length === 0
+                      ? "Không có nhân viên đang hoạt động"
+                      : "Chọn nhân viên"}
+                </option>
                 {staff.map((user) => (
                   <option key={user.userId} value={user.userId}>
                     {user.fullName} · {user.roleName}
@@ -816,6 +835,11 @@ export default function ManagerIncidents() {
                 ))}
               </select>
             </div>
+            {staffError && (
+              <div className="manager-inline-error" role="alert">
+                {staffError} Hãy làm mới trang sau khi kiểm tra kết nối.
+              </div>
+            )}
             <div className="form-actions">
               <button
                 className="btn btn-ghost"
@@ -829,8 +853,10 @@ export default function ManagerIncidents() {
                 onClick={() => void assignIncident()}
                 disabled={saving || !assigneeId}
               >
-                {saving && <Loader2 size={17} className="spin" />}Xác nhận phân
-                công
+                {saving && <Loader2 size={17} className="spin" />}
+                {assignTarget.handledByStaffId
+                  ? "Xác nhận chuyển giao"
+                  : "Xác nhận phân công"}
               </button>
             </div>
           </div>

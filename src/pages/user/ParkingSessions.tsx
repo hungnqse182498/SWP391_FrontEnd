@@ -23,6 +23,7 @@ import {
 import { Link } from "react-router-dom";
 import ParkingTicketModal from "../../components/ParkingTicketModal";
 import ProtectedRoute from "../../components/ProtectedRoute";
+import { useParkingFeePreviews } from "../../hooks/useParkingFeePreviews";
 import {
   formatUtcToVietnamDateTime,
   parseBackendUtcDate,
@@ -30,6 +31,7 @@ import {
 import {
   parkingSessionApi,
   subscriptionApi,
+  type ParkingCheckOutResponse,
   type MonthlySubscriptionDto,
   type ParkingSessionDto,
 } from "../../utils/apiServices";
@@ -137,6 +139,48 @@ function ParkingSessionsContent() {
   const [selected, setSelected] = useState<ParkingSessionDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [checkoutPayments, setCheckoutPayments] = useState<
+    Record<string, ParkingCheckOutResponse>
+  >({});
+  const { previews: feePreviews, errors: feeErrors } =
+    useParkingFeePreviews(sessions);
+
+  useEffect(() => {
+    const activeSessions = sessions.filter(
+      (session) => session.status.toLowerCase() === "active",
+    );
+    if (activeSessions.length === 0) {
+      const clearTimer = window.setTimeout(() => setCheckoutPayments({}), 0);
+      return () => window.clearTimeout(clearTimer);
+    }
+
+    let cancelled = false;
+    void Promise.allSettled(
+      activeSessions.map(async (session) => ({
+        sessionId: session.sessionId,
+        response: await parkingSessionApi.getMyCheckoutPayment(
+          session.sessionId,
+        ),
+      })),
+    ).then((results) => {
+      if (cancelled) return;
+      const next: Record<string, ParkingCheckOutResponse> = {};
+      results.forEach((result) => {
+        if (
+          result.status === "fulfilled" &&
+          result.value.response.isSuccess &&
+          result.value.response.result
+        ) {
+          next[result.value.sessionId] = result.value.response.result;
+        }
+      });
+      setCheckoutPayments(next);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sessions]);
 
   const loadSessions = async () => {
     setLoading(true);
@@ -198,6 +242,15 @@ function ParkingSessionsContent() {
       selected ? subscriptionForSession(selected, subscriptions) : undefined,
     [selected, subscriptions],
   );
+  const selectedCheckout = selected
+    ? checkoutPayments[selected.sessionId]
+    : undefined;
+  const selectedPayment =
+    selectedCheckout?.payment || selectedCheckout?.Payment;
+  const selectedOnlinePayment =
+    selectedCheckout?.onlinePayment || selectedCheckout?.OnlinePayment;
+  const selectedPaymentUrl =
+    selectedOnlinePayment?.paymentUrl || selectedOnlinePayment?.PaymentUrl;
 
   return (
     <section className="parking-sessions-page">
@@ -280,7 +333,14 @@ function ParkingSessionsContent() {
         </div>
       ) : (
         <div className="parking-session-list">
-          {filteredSessions.map((session) => (
+          {filteredSessions.map((session) => {
+            const feePreview = feePreviews[session.sessionId];
+            const checkout = checkoutPayments[session.sessionId];
+            const onlinePayment =
+              checkout?.onlinePayment || checkout?.OnlinePayment;
+            const paymentUrl =
+              onlinePayment?.paymentUrl || onlinePayment?.PaymentUrl;
+            return (
             <article
               key={session.sessionId}
               className="parking-session-card card-panel"
@@ -314,9 +374,30 @@ function ParkingSessionsContent() {
                     <DoorOpen size={15} />
                     Cổng vào: {session.entryGateName || "—"}
                   </span>
+                  {session.status.toLowerCase() === "active" && (
+                    <span>
+                      <CreditCard size={15} />
+                      Phí tạm tính:{" "}
+                      {feePreview
+                        ? feePreview.isCoveredBySubscription
+                          ? "Đã gồm trong gói tháng"
+                          : formatCurrency(feePreview.amount)
+                        : feeErrors[session.sessionId] || "Đang tính..."}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="parking-session-actions">
+                {paymentUrl && (
+                  <a
+                    className="btn btn-primary btn-sm"
+                    href={paymentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <CreditCard size={16} aria-hidden /> Thanh toán ngay
+                  </a>
+                )}
                 {session.ticket?.qrCodeDataUrl && (
                   <button
                     type="button"
@@ -342,7 +423,8 @@ function ParkingSessionsContent() {
                 </Link>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -490,6 +572,10 @@ function ParkingSessionsContent() {
                   <strong>
                     {selectedSubscription
                       ? `Đã bao gồm trong ${selectedSubscription.packageName || "gói tháng"} · 0 ₫`
+                      : feePreviews[selected.sessionId]
+                        ? feePreviews[selected.sessionId].isCoveredBySubscription
+                          ? "Đã bao gồm trong gói tháng · 0 ₫"
+                          : `${formatCurrency(feePreviews[selected.sessionId].amount)} (tạm tính)`
                       : typeof selected.paymentAmount === "number"
                       ? formatCurrency(selected.paymentAmount)
                       : selected.status.toLowerCase() === "active"
@@ -528,6 +614,38 @@ function ParkingSessionsContent() {
                 </div>
               </div>
             </section>
+
+            {selectedPayment ? (
+              <div
+                className="manager-inline-warning parking-session-payment-notice"
+                role="status"
+              >
+                <strong>
+                  Yêu cầu thanh toán{" "}
+                  {formatCurrency(selectedPayment.amount)} đang chờ xử lý.
+                </strong>
+                {selectedPaymentUrl ? (
+                  <a
+                    className="btn btn-primary btn-sm"
+                    href={selectedPaymentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <CreditCard size={16} aria-hidden /> Thanh toán PayOS
+                  </a>
+                ) : (
+                  <span> Thanh toán tiền mặt tại quầy nhân viên.</span>
+                )}
+              </div>
+            ) : selected.status.toLowerCase() === "active" ? (
+              <div
+                className="manager-inline-warning parking-session-payment-notice"
+                role="status"
+              >
+                Chưa có yêu cầu thanh toán. Vui lòng thực hiện thủ tục ra bãi
+                với nhân viên trước khi thanh toán.
+              </div>
+            ) : null}
 
             <section className="manager-session-detail-section">
               <div className="manager-session-section-heading">

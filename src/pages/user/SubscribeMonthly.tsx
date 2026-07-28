@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Bike, CalendarDays, Car, CreditCard, MapPin } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import { useAuth } from '../../context/AuthContext'
 import {
@@ -51,7 +52,12 @@ const getApiErrorMessage = (err: unknown) => {
 
 function SubscribeContent() {
   const { profile } = useAuth()
-  const [vehicle, setVehicle] = useState<VehicleFilter>('all')
+  const [searchParams] = useSearchParams()
+  const requestedPackageId = searchParams.get('package') ?? ''
+  const requestedVehicle = searchParams.get('vehicle')
+  const [vehicle, setVehicle] = useState<VehicleFilter>(
+    requestedVehicle === 'car' || requestedVehicle === 'bike' ? requestedVehicle : 'all',
+  )
   const [packages, setPackages] = useState<SubscriptionPackageDto[]>([])
   const [selectedPackageId, setSelectedPackageId] = useState('')
   const [licensePlate, setLicensePlate] = useState(
@@ -110,7 +116,13 @@ function SubscribeContent() {
 
         if (res.isSuccess && Array.isArray(res.result)) {
           setPackages(res.result)
-          setSelectedPackageId(res.result.find(isActivePackage)?.packageId ?? '')
+          const requestedPackage = res.result.find(
+            (pkg) => pkg.packageId === requestedPackageId && isActivePackage(pkg),
+          )
+          setSelectedPackageId(requestedPackage?.packageId ?? res.result.find(isActivePackage)?.packageId ?? '')
+          if (requestedPackage && requestedVehicle !== 'car' && requestedVehicle !== 'bike') {
+            setVehicle(getVehicleFilter(requestedPackage))
+          }
         } else {
           setError(res.message || 'Không thể tải danh sách gói thuê bao.')
         }
@@ -126,7 +138,7 @@ function SubscribeContent() {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [requestedPackageId, requestedVehicle])
 
   useEffect(() => {
     const nextPackageId = selectedPackage?.packageId ?? ''
