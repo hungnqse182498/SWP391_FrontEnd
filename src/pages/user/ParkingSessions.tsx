@@ -37,6 +37,7 @@ import {
 } from "../../utils/apiServices";
 import { normalizeLicensePlate } from "../../utils/licensePlate";
 import { formatCurrency } from "../../utils/pricing";
+import { savePaymentReturnContext } from "../../utils/paymentReturnContext";
 
 type SessionFilter = "all" | "active" | "completed";
 
@@ -394,6 +395,11 @@ function ParkingSessionsContent() {
                     href={paymentUrl}
                     target="_blank"
                     rel="noreferrer"
+                    onClick={() => savePaymentReturnContext({
+                      type: "checkout-fee",
+                      successPath: "/phien-gui-xe",
+                      cancelPath: "/phien-gui-xe",
+                    }, onlinePayment?.orderCode || onlinePayment?.OrderCode)}
                   >
                     <CreditCard size={16} aria-hidden /> Thanh toán ngay
                   </a>
@@ -630,6 +636,11 @@ function ParkingSessionsContent() {
                     href={selectedPaymentUrl}
                     target="_blank"
                     rel="noreferrer"
+                    onClick={() => savePaymentReturnContext({
+                      type: "checkout-fee",
+                      successPath: "/phien-gui-xe",
+                      cancelPath: "/phien-gui-xe",
+                    }, selectedOnlinePayment?.orderCode || selectedOnlinePayment?.OrderCode)}
                   >
                     <CreditCard size={16} aria-hidden /> Thanh toán PayOS
                   </a>

@@ -11,6 +11,7 @@ import {
 } from '../../utils/apiServices'
 import { formatCurrency } from '../../utils/pricing'
 import { normalizeLicensePlate } from '../../utils/licensePlate'
+import { savePaymentReturnContext } from '../../utils/paymentReturnContext'
 
 type VehicleFilter = 'all' | 'car' | 'bike'
 
@@ -215,10 +216,12 @@ function SubscribeContent() {
       })
 
       if (res.isSuccess && res.result?.paymentUrl) {
-        sessionStorage.setItem('payment_return_context', JSON.stringify({
+        savePaymentReturnContext({
           type: 'subscription-registration',
           subscriptionId: res.result.subscriptionId,
-        }))
+          successPath: '/my-subscriptions',
+          cancelPath: '/dang-ky-thang',
+        }, res.result.orderCode)
         window.location.assign(res.result.paymentUrl)
         return
       }

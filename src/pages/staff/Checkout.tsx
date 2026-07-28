@@ -34,6 +34,7 @@ import { formatNowInVietnamTime } from '../../utils/dateTime'
 import { formatCurrency } from '../../utils/pricing'
 import { normalizeLicensePlate } from '../../utils/licensePlate'
 import { readStaffGateContext, staffGateSelectionPath } from '../../utils/staffGateContext'
+import { savePaymentReturnContext } from '../../utils/paymentReturnContext'
 
 function getOnlinePaymentUrl(payment: ParkingOnlinePayment | null) {
   return payment?.paymentUrl || payment?.PaymentUrl || ''
@@ -63,6 +64,8 @@ export default function Checkout() {
     sessionId?: string
     licensePlate?: string
     qrPayload?: string
+    exitImageUrl?: string
+    paymentMethod?: string
     gateAccessGranted?: boolean
   } | null
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -72,7 +75,7 @@ export default function Checkout() {
     gateContext?.isResident ? 'resident' : 'auto',
   )
   const [imagePreviewUrl, setImagePreviewUrl] = useState('')
-  const [exitImageUrl, setExitImageUrl] = useState('')
+  const [exitImageUrl, setExitImageUrl] = useState(initialState?.exitImageUrl ?? '')
   const [uploading, setUploading] = useState(false)
   const [qrUploading, setQrUploading] = useState(false)
   const [qrDecode, setQrDecode] = useState<ParkingQrDecodeResult | null>(null)
@@ -92,7 +95,7 @@ export default function Checkout() {
         floorName: gateContext.floorName,
       }]
     : []
-  const [paymentMethod, setPaymentMethod] = useState('Cash')
+  const [paymentMethod, setPaymentMethod] = useState(initialState?.paymentMethod ?? 'Cash')
   const [loading, setLoading] = useState(false)
   const [validatingFloor, setValidatingFloor] = useState(false)
   const [floorValidationError, setFloorValidationError] = useState('')
@@ -887,8 +890,23 @@ export default function Checkout() {
                       <a
                         className="btn btn-primary btn-block"
                         href={getOnlinePaymentUrl(onlinePayment)}
-                        target="_blank"
-                        rel="noreferrer"
+                        onClick={() => {
+                          const returnState = {
+                            sessionId: sessionForCheckout?.sessionId || sessionId,
+                            licensePlate,
+                            qrPayload,
+                            exitImageUrl,
+                            paymentMethod: 'PayOS',
+                            gateAccessGranted: true,
+                          }
+                          savePaymentReturnContext({
+                            type: 'checkout-fee',
+                            successPath: '/staff/checkout',
+                            cancelPath: '/staff/checkout',
+                            successState: returnState,
+                            cancelState: returnState,
+                          }, getOnlinePaymentOrderCode(onlinePayment))
+                        }}
                       >
                         <ExternalLink size={16} aria-hidden />
                         Mở trang thanh toán PayOS

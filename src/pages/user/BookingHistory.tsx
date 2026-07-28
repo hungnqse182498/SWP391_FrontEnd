@@ -8,6 +8,7 @@ import { reservationApi, type ReservationDto } from '../../utils/apiServices'
 import { bookingTimeBoundsLocal, parseDatetimeLocal } from '../../utils/bookingTime'
 import { parseBackendUtcDate, vietnamDatetimeLocalToUtcIso } from '../../utils/dateTime'
 import { formatDateTime } from '../../utils/pricing'
+import { savePaymentReturnContext } from '../../utils/paymentReturnContext'
 
 const statusLabel: Record<string, string> = {
   Pending: 'Chờ thanh toán',
@@ -101,7 +102,12 @@ function HistoryContent() {
     try {
       const res = await reservationApi.recreatePayment(id)
       if (res.isSuccess && res.result?.paymentUrl) {
-        window.location.href = res.result.paymentUrl
+        savePaymentReturnContext({
+          type: 'reservation',
+          successPath: '/lich-su',
+          cancelPath: '/lich-su',
+        }, res.result.orderCode)
+        window.location.assign(res.result.paymentUrl)
       } else {
         toast.error(res.message || 'Lỗi khi tạo lại link thanh toán.')
       }

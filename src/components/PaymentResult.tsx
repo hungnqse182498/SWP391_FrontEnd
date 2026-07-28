@@ -13,6 +13,11 @@ import {
 } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { reservationApi, type ParkingSessionTicket } from '../utils/apiServices'
+import {
+  clearPaymentReturnContext,
+  readPaymentReturnContext,
+  type PaymentReturnContext,
+} from '../utils/paymentReturnContext'
 
 export type PaymentResultStatus = 'success' | 'cancel'
 
@@ -20,36 +25,23 @@ interface PaymentResultProps {
   status: PaymentResultStatus
 }
 
-interface PaymentReturnContext {
-  type?: 'subscription-registration' | 'subscription-renewal' | string
-  subscriptionId?: string
-}
-
-function readPaymentContext() {
-  const raw = sessionStorage.getItem('payment_return_context')
-  if (!raw) return null
-
-  try {
-    return JSON.parse(raw) as PaymentReturnContext
-  } catch {
-    return null
-  }
-}
-
 export default function PaymentResult({ status: resultStatus }: PaymentResultProps) {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const orderCode = searchParams.get('orderCode')
   const [loading, setLoading] = useState(resultStatus === 'success')
   const [ticket, setTicket] = useState<ParkingSessionTicket | null>(null)
   const [reservationId, setReservationId] = useState('')
-  const [paymentContext] = useState<PaymentReturnContext | null>(readPaymentContext)
+  const [paymentContext] = useState<PaymentReturnContext | null>(() =>
+    readPaymentReturnContext(orderCode ?? undefined),
+  )
 
   const code = searchParams.get('code')
   const paymentStatus = searchParams.get('status')
-  const orderCode = searchParams.get('orderCode')
   const isCancelledCallback = searchParams.get('cancel') === 'true'
   const isSubscription = paymentContext?.type?.startsWith('subscription-') ?? false
   const isRenewal = paymentContext?.type === 'subscription-renewal'
+  const isCheckout = paymentContext?.type === 'checkout-fee'
   const isSuccess =
     resultStatus === 'success' &&
     !isCancelledCallback &&
@@ -59,7 +51,7 @@ export default function PaymentResult({ status: resultStatus }: PaymentResultPro
     let ignore = false
 
     if (resultStatus === 'cancel') {
-      sessionStorage.removeItem('payment_return_context')
+      clearPaymentReturnContext(orderCode ?? undefined)
       return
     }
 
@@ -72,9 +64,9 @@ export default function PaymentResult({ status: resultStatus }: PaymentResultPro
       return
     }
 
-    sessionStorage.removeItem('payment_return_context')
+    clearPaymentReturnContext(orderCode ?? undefined)
 
-    if (isSubscription || !orderCode) {
+    if (isSubscription || isCheckout || !orderCode) {
       const timer = window.setTimeout(() => setLoading(false), 0)
       return () => window.clearTimeout(timer)
     }
@@ -104,9 +96,22 @@ export default function PaymentResult({ status: resultStatus }: PaymentResultPro
     return () => {
       ignore = true
     }
-  }, [isSubscription, isSuccess, navigate, orderCode, resultStatus])
+  }, [isCheckout, isSubscription, isSuccess, navigate, orderCode, resultStatus])
 
   const goToPrimaryAction = () => {
+    const contextPath =
+      resultStatus === 'success'
+        ? paymentContext?.successPath
+        : paymentContext?.cancelPath
+    const contextState =
+      resultStatus === 'success'
+        ? paymentContext?.successState
+        : paymentContext?.cancelState
+    if (contextPath) {
+      navigate(contextPath, { state: contextState })
+      return
+    }
+
     if (resultStatus === 'success') {
       navigate(isSubscription ? '/my-subscriptions' : '/lich-su')
       return
@@ -138,26 +143,42 @@ export default function PaymentResult({ status: resultStatus }: PaymentResultPro
       ? 'Gia hạn thành công'
       : isSubscription
         ? 'Đăng ký gói thành công'
-        : 'Thanh toán thành công'
+        : isCheckout
+          ? 'Thanh toán phí gửi xe thành công'
+          : 'Thanh toán thành công'
     : 'Thanh toán chưa hoàn tất'
   const description = success
     ? isRenewal
       ? 'Giao dịch gia hạn đã được ghi nhận. Thời hạn mới sẽ được cập nhật sau khi PayOS xác nhận.'
       : isSubscription
         ? 'Gói gửi xe tháng của bạn đã được ghi nhận và sẽ sẵn sàng sau khi hệ thống hoàn tất xác nhận.'
+        : isCheckout
+          ? 'Phí gửi xe đã được thanh toán và hệ thống đang hoàn tất thủ tục checkout.'
         : 'Đặt chỗ của bạn đã được thanh toán và xác nhận trên hệ thống.'
     : isSubscription
       ? 'Giao dịch gói tháng đã bị hủy hoặc chưa thể hoàn tất. Bạn có thể thực hiện lại khi sẵn sàng.'
+      : isCheckout
+        ? 'Giao dịch phí gửi xe đã bị hủy hoặc chưa thể hoàn tất. Phiên gửi xe vẫn được giữ nguyên.'
       : 'Giao dịch đặt chỗ đã bị hủy hoặc chưa thể hoàn tất. Không có khoản thanh toán mới nào được ghi nhận.'
   const primaryLabel = success
-    ? isSubscription
-      ? 'Xem gói tháng của tôi'
-      : 'Xem lịch sử đặt chỗ'
-    : isRenewal
-      ? 'Quay lại gói của tôi'
-      : isSubscription
-        ? 'Đăng ký lại gói tháng'
-        : 'Thử đặt chỗ lại'
+    ? paymentContext?.successPath === '/staff/checkout'
+      ? 'Quay lại trang checkout'
+      : paymentContext?.successPath === '/phien-gui-xe'
+        ? 'Quay lại phiên gửi xe'
+        : isSubscription
+          ? 'Xem gói tháng của tôi'
+          : 'Xem lịch sử đặt chỗ'
+    : paymentContext?.cancelPath === '/staff/checkout'
+      ? 'Quay lại trang checkout'
+      : paymentContext?.cancelPath === '/phien-gui-xe'
+        ? 'Quay lại phiên gửi xe'
+      : paymentContext?.cancelPath === '/lich-su'
+        ? 'Quay lại lịch sử đặt chỗ'
+        : paymentContext?.cancelPath === '/my-subscriptions' || isRenewal
+          ? 'Quay lại gói của tôi'
+          : isSubscription
+            ? 'Đăng ký lại gói tháng'
+            : 'Thử đặt chỗ lại'
 
   return (
     <section className={`payment-result-page payment-result-page--${resultStatus}`}>

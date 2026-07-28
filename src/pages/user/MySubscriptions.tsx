@@ -16,6 +16,7 @@ import {
   vehicleChangeRequestApi,
 } from '../../utils/apiServices'
 import { ToastContainer, useToast } from '../../components/Toast'
+import { savePaymentReturnContext } from '../../utils/paymentReturnContext'
 
 function getStatusBadgeClass(status: string) {
   const normalized = status.toLowerCase()
@@ -143,10 +144,12 @@ function MySubscriptionsContent() {
     try {
       const res = await subscriptionRenewalApi.renew(renewTarget.subscriptionId, selectedPackageId)
       if (res.isSuccess && res.result?.paymentUrl) {
-        sessionStorage.setItem('payment_return_context', JSON.stringify({
+        savePaymentReturnContext({
           type: 'subscription-renewal',
           subscriptionId: renewTarget.subscriptionId,
-        }))
+          successPath: '/my-subscriptions',
+          cancelPath: '/my-subscriptions',
+        }, res.result.orderCode)
         window.location.assign(res.result.paymentUrl)
         return
       }
@@ -265,6 +268,12 @@ function MySubscriptionsContent() {
     try {
       const res = await subscriptionApi.createPayment(id)
       if (res.isSuccess && res.result?.paymentUrl) {
+        savePaymentReturnContext({
+          type: 'subscription-registration',
+          subscriptionId: id,
+          successPath: '/my-subscriptions',
+          cancelPath: '/my-subscriptions',
+        }, res.result.orderCode)
         window.location.assign(res.result.paymentUrl)
       } else {
         toast.error(res.message || 'Lỗi khi tạo lại link thanh toán.')

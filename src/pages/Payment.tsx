@@ -10,6 +10,7 @@ import { reservationApi } from '../utils/apiServices'
 import { vehicleTypeLabel } from '../utils/bookingPricing'
 import { formatCurrency } from '../utils/pricing'
 import { normalizeLicensePlate } from '../utils/licensePlate'
+import { savePaymentReturnContext } from '../utils/paymentReturnContext'
 
 const methods: { id: PaymentMethod; label: string; icon: typeof Wallet }[] = [
   { id: 'momo', label: 'Ví MoMo / PayOS', icon: Smartphone },
@@ -63,6 +64,11 @@ function PaymentContent() {
           })
 
           if (paymentUrl && method !== 'card') {
+            savePaymentReturnContext({
+              type: 'reservation',
+              successPath: '/lich-su',
+              cancelPath: '/dat-cho',
+            }, orderCode)
             window.location.href = paymentUrl
             return
           }
