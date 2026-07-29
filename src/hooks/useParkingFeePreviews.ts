@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useAuth } from '../context/AuthContext'
 import {
+  parkingOperationApi,
   parkingSessionApi,
   type ParkingFeePreview,
   type ParkingSessionDto,
 } from '../utils/apiServices'
 
 export function useParkingFeePreviews(sessions: ParkingSessionDto[]) {
+  const { user } = useAuth()
   const [previews, setPreviews] = useState<Record<string, ParkingFeePreview>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const canManageParkingSessions = user?.role === 'manager' || user?.role === 'staff'
   const activeSessionIdsKey = useMemo(
     () =>
       sessions
@@ -29,7 +33,9 @@ export function useParkingFeePreviews(sessions: ParkingSessionDto[]) {
     const responses = await Promise.allSettled(
       sessionIds.map(async (sessionId) => ({
         sessionId,
-        response: await parkingSessionApi.getMyFeePreview(sessionId),
+        response: await (canManageParkingSessions
+          ? parkingOperationApi.getFeePreview(sessionId)
+          : parkingSessionApi.getMyFeePreview(sessionId)),
       })),
     )
 
@@ -49,7 +55,7 @@ export function useParkingFeePreviews(sessions: ParkingSessionDto[]) {
     })
     setPreviews(nextPreviews)
     setErrors(nextErrors)
-  }, [activeSessionIdsKey])
+  }, [activeSessionIdsKey, canManageParkingSessions])
 
   useEffect(() => {
     const initialTimer = window.setTimeout(() => void refresh(), 0)

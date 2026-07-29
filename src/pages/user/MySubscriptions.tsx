@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { CalendarClock, Car, ClipboardCheck, CreditCard, FilePenLine, History, Pencil, RefreshCw, ShieldAlert, Trash2, X } from 'lucide-react'
+import { CalendarClock, Car, ClipboardCheck, CreditCard, FilePenLine, History, MoreHorizontal, Pencil, RefreshCw, ShieldAlert, Trash2, X } from 'lucide-react'
 import ProtectedRoute from '../../components/ProtectedRoute'
+import ManagerConfirmActionModal from '../../components/ManagerConfirmActionModal'
 import { formatUtcToVietnamDateTime, parseBackendUtcDate } from '../../utils/dateTime'
 import { formatCurrency } from '../../utils/pricing'
 import { normalizeLicensePlate } from '../../utils/licensePlate'
@@ -26,7 +27,7 @@ function getStatusBadgeClass(status: string) {
   if (normalized === 'pendingpayment') {
     return 'badge-history-pending'
   }
-  if (normalized === 'expired') {
+  if (normalized === 'expired' || normalized === 'cancelled') {
     return 'badge-history-cancelled'
   }
   return 'badge-history-neutral'
@@ -40,6 +41,8 @@ function getStatusLabel(status: string) {
       return 'Chờ thanh toán'
     case 'expired':
       return 'Hết hạn'
+    case 'cancelled':
+      return 'Đã hủy'
     default:
       return status
   }
@@ -59,6 +62,9 @@ function MySubscriptionsContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [payingId, setPayingId] = useState<string | null>(null)
+  const [cancelTarget, setCancelTarget] = useState<MonthlySubscriptionDto | null>(null)
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [packages, setPackages] = useState<SubscriptionPackageDto[]>([])
   const [renewTarget, setRenewTarget] = useState<MonthlySubscriptionDto | null>(null)
   const [selectedPackageId, setSelectedPackageId] = useState('')
@@ -74,6 +80,19 @@ function MySubscriptionsContent() {
   const [changeError, setChangeError] = useState('')
   const [changeHistoryTarget, setChangeHistoryTarget] = useState<MonthlySubscriptionDto | null>(null)
   const toast = useToast()
+
+  const subscriptionCounts = useMemo(() => ({
+    active: subscriptions.filter((item) => item.status.toLowerCase() === 'active').length,
+    pending: subscriptions.filter((item) => item.status.toLowerCase() === 'pendingpayment').length,
+    ended: subscriptions.filter((item) => ['expired', 'cancelled'].includes(item.status.toLowerCase())).length,
+  }), [subscriptions])
+
+  const visibleSubscriptions = useMemo(
+    () => statusFilter === 'all'
+      ? subscriptions
+      : subscriptions.filter((item) => item.status.toLowerCase() === statusFilter),
+    [statusFilter, subscriptions],
+  )
 
   const loadSubscriptions = async () => {
     setLoading(true)
@@ -119,6 +138,27 @@ function MySubscriptionsContent() {
 
     return () => window.clearTimeout(loadTimer)
   }, [])
+
+  useEffect(() => {
+    if (!actionMenuId) return
+
+    const closeMenu = (event: MouseEvent) => {
+      const target = event.target
+      if (!(target instanceof Element) || target.closest('[data-subscription-actions]')?.getAttribute('data-subscription-actions') !== actionMenuId) {
+        setActionMenuId(null)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setActionMenuId(null)
+    }
+
+    document.addEventListener('mousedown', closeMenu)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeMenu)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [actionMenuId])
 
   const getRenewPackages = (subscription: MonthlySubscriptionDto) => {
     const vehicleType = subscription.vehicleType?.trim().toLowerCase()
@@ -293,15 +333,34 @@ function MySubscriptionsContent() {
     }
   }
 
+  const handleCancelSubscription = async () => {
+    if (!cancelTarget) return
+
+    const response = await subscriptionApi.cancel(cancelTarget.subscriptionId)
+    if (!response.isSuccess) {
+      throw new Error(response.message || 'Không thể hủy gói tháng.')
+    }
+
+    const cancelledId = cancelTarget.subscriptionId
+    setSubscriptions((current) => current.map((item) =>
+      item.subscriptionId === cancelledId ? { ...item, status: 'Cancelled', fixedSlot: undefined } : item,
+    ))
+    setCancelTarget(null)
+    toast.success('Đã hủy gói tháng và giải phóng chỗ đỗ cố định.')
+  }
+
   return (
     <section className="my-subscriptions-page">
       <ToastContainer toasts={toast.toasts} onClose={toast.close} />
 
-      <header className="page-header" style={{ marginBottom: '2rem' }}>
+      <header className="page-header my-subscriptions-header">
         <div>
           <h1>Gói đăng ký của tôi</h1>
-          <p>Danh sách lịch sử và các gói thuê bao tháng của bạn.</p>
+          <p>Theo dõi hiệu lực, thanh toán và quản lý từng gói gửi xe tháng.</p>
         </div>
+        <Link to="/dang-ky-thang" className="btn btn-primary">
+          <CreditCard size={17} aria-hidden /> Đăng ký gói mới
+        </Link>
       </header>
 
       {loading ? (
@@ -325,78 +384,82 @@ function MySubscriptionsContent() {
           </Link>
         </div>
       ) : (
-        <div
-          className="subscriptions-grid"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            gap: '1.25rem',
-            marginTop: '1.5rem',
-          }}
-        >
-          {subscriptions.map((sub, i) => (
+        <>
+          <section className="my-subscriptions-summary" aria-label="Tổng quan gói tháng">
+            <article><span>Tổng số gói</span><strong>{subscriptions.length}</strong></article>
+            <article className="is-active"><span>Đang hoạt động</span><strong>{subscriptionCounts.active}</strong></article>
+            <article className="is-pending"><span>Chờ thanh toán</span><strong>{subscriptionCounts.pending}</strong></article>
+            <article className="is-ended"><span>Đã kết thúc</span><strong>{subscriptionCounts.ended}</strong></article>
+          </section>
+
+          <div className="my-subscriptions-toolbar">
+            <div>
+              <strong>Danh sách gói</strong>
+              <span>{visibleSubscriptions.length}/{subscriptions.length} gói</span>
+            </div>
+            <div className="manager-segmented-filter my-subscriptions-status-filter" aria-label="Lọc trạng thái gói">
+              {([
+                ['all', 'Tất cả'],
+                ['active', 'Hoạt động'],
+                ['pendingpayment', 'Chờ thanh toán'],
+                ['expired', 'Hết hạn'],
+                ['cancelled', 'Đã hủy'],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={statusFilter === value ? 'active' : ''}
+                  aria-pressed={statusFilter === value}
+                  onClick={() => setStatusFilter(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {visibleSubscriptions.length === 0 ? (
+            <div className="empty-state card-panel my-subscriptions-filter-empty">
+              <p>Không có gói nào ở trạng thái đã chọn.</p>
+              <button type="button" className="btn btn-outline" onClick={() => setStatusFilter('all')}>Xem tất cả</button>
+            </div>
+          ) : <div className="subscriptions-grid my-subscriptions-grid">
+          {visibleSubscriptions.map((sub, i) => (
             <motion.div
               key={sub.subscriptionId}
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              className="card-panel"
-              style={{
-                borderRadius: '8px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                padding: '1.25rem',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                gap: '1rem',
-                border: '1px solid var(--border)',
-                background: 'var(--surface)',
-              }}
+              className={`card-panel my-subscription-card my-subscription-card--${sub.status.toLowerCase()}`}
             >
               <div>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'start',
-                    marginBottom: '0.75rem',
-                    gap: '0.5rem',
-                  }}
-                >
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0, color: 'var(--text-heading)' }}>
+                <div className="my-subscription-card-heading">
+                  <h3>
                     {sub.packageName || 'Gói thuê bao tháng'}
                   </h3>
-                  <span className={`badge ${getStatusBadgeClass(sub.status)}`} style={{ flexShrink: 0 }}>
+                  <span className={`badge ${getStatusBadgeClass(sub.status)}`}>
                     {getStatusLabel(sub.status)}
                   </span>
                 </div>
 
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.5rem',
-                    fontSize: '0.9rem',
-                    color: 'var(--text-muted)',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div className="my-subscription-details">
+                  <div>
                     <Car size={16} />
                     <span>
                       Biển số: <strong>{sub.licensePlate}</strong>
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div>
                     <span style={{ fontWeight: 500 }}>Loại xe:</span>
                     <span>{sub.vehicleType || 'Không rõ'}</span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div>
                     <span style={{ fontWeight: 500 }}>Chỗ đỗ:</span>
                     <span>
                       {sub.fixedSlot ? (
-                        <span style={{ color: 'var(--blue-600)', fontWeight: 600 }}>
+                        <span className="my-subscription-fixed-slot">
                           Chỗ cố định: {sub.fixedSlot}
                         </span>
                       ) : (
@@ -405,17 +468,7 @@ function MySubscriptionsContent() {
                     </span>
                   </div>
 
-                  <div
-                    style={{
-                      marginTop: '0.5rem',
-                      paddingTop: '0.5rem',
-                      borderTop: '1px dashed var(--border)',
-                      fontSize: '0.85rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.25rem',
-                    }}
-                  >
+                  <div className="my-subscription-dates">
                     <div>
                       Bắt đầu: <strong>{formatUtcToVietnamDateTime(sub.startDate)}</strong>
                     </div>
@@ -435,47 +488,90 @@ function MySubscriptionsContent() {
                 </div>
 
                 <div className="my-subscription-actions">
-                {sub.status.toLowerCase() === 'active' && (
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    onClick={() => openChangeModal(sub)}
-                  >
-                    <FilePenLine size={15} aria-hidden />
-                    {pendingRequestFor(sub.subscriptionId) ? 'Sửa yêu cầu đổi biển' : 'Đổi biển số'}
-                  </button>
-                )}
-                {requestsFor(sub.subscriptionId).length > 0 && (
-                  <button type="button" className="btn btn-outline btn-sm" onClick={() => setChangeHistoryTarget(sub)}>
-                    <ClipboardCheck size={15} aria-hidden />
-                    Lịch sử đổi biển
-                  </button>
-                )}
-                {sub.status.toLowerCase() === 'pendingpayment' ? (
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    disabled={payingId === sub.subscriptionId}
-                    onClick={() => handleRepayment(sub.subscriptionId)}
-                  >
-                    {payingId === sub.subscriptionId ? 'Đang xử lý...' : 'Thanh toán lại'}
-                  </button>
-                ) : sub.status.toLowerCase() !== 'cancelled' ? (
-                  <button type="button" className="btn btn-primary btn-sm" onClick={() => openRenewModal(sub)}>
-                    <RefreshCw size={15} aria-hidden />
-                    Gia hạn
-                  </button>
-                ) : null}
-                  <button type="button" className="btn btn-outline btn-sm" onClick={() => void openHistoryModal(sub)}>
-                    <History size={15} aria-hidden />
-                    Lịch sử gia hạn
-                  </button>
+                  <div className="my-subscription-main-actions">
+                    {sub.status.toLowerCase() === 'active' && (
+                      <button type="button" className="btn btn-outline btn-sm" onClick={() => openChangeModal(sub)}>
+                        <FilePenLine size={15} aria-hidden />
+                        {pendingRequestFor(sub.subscriptionId) ? 'Sửa đổi biển' : 'Đổi biển số'}
+                      </button>
+                    )}
+                    {sub.status.toLowerCase() === 'pendingpayment' ? (
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        disabled={payingId === sub.subscriptionId}
+                        onClick={() => handleRepayment(sub.subscriptionId)}
+                      >
+                        <CreditCard size={15} aria-hidden />
+                        {payingId === sub.subscriptionId ? 'Đang xử lý...' : 'Thanh toán lại'}
+                      </button>
+                    ) : sub.status.toLowerCase() !== 'cancelled' ? (
+                      <button type="button" className="btn btn-primary btn-sm" onClick={() => openRenewModal(sub)}>
+                        <RefreshCw size={15} aria-hidden />
+                        Gia hạn
+                      </button>
+                    ) : (
+                      <button type="button" className="btn btn-outline btn-sm" onClick={() => void openHistoryModal(sub)}>
+                        <History size={15} aria-hidden />
+                        Lịch sử gia hạn
+                      </button>
+                    )}
+                  </div>
+
+                  {sub.status.toLowerCase() !== 'cancelled' || requestsFor(sub.subscriptionId).length > 0 ? (
+                    <div className="my-subscription-more" data-subscription-actions={sub.subscriptionId}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm my-subscription-more-trigger"
+                        aria-expanded={actionMenuId === sub.subscriptionId}
+                        aria-haspopup="menu"
+                        aria-label="Mở thêm thao tác"
+                        title="Thêm thao tác"
+                        onClick={() => setActionMenuId((current) => current === sub.subscriptionId ? null : sub.subscriptionId)}
+                      >
+                        <MoreHorizontal size={19} aria-hidden />
+                      </button>
+                      {actionMenuId === sub.subscriptionId && (
+                        <div className="my-subscription-action-menu" role="menu">
+                          {requestsFor(sub.subscriptionId).length > 0 && (
+                            <button type="button" role="menuitem" onClick={() => { setActionMenuId(null); setChangeHistoryTarget(sub) }}>
+                              <ClipboardCheck size={16} aria-hidden /> Lịch sử đổi biển
+                            </button>
+                          )}
+                          <button type="button" role="menuitem" onClick={() => { setActionMenuId(null); void openHistoryModal(sub) }}>
+                            <History size={16} aria-hidden /> Lịch sử gia hạn
+                          </button>
+                          {['active', 'pendingpayment'].includes(sub.status.toLowerCase()) && (
+                            <button type="button" role="menuitem" className="is-danger" onClick={() => { setActionMenuId(null); setCancelTarget(sub) }}>
+                              <Trash2 size={16} aria-hidden /> Hủy gói
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </motion.div>
           ))}
-        </div>
+          </div>}
+        </>
       )}
+
+      <ManagerConfirmActionModal
+        open={Boolean(cancelTarget)}
+        title="Hủy gói gửi xe tháng?"
+        description={<>Gói sẽ ngừng hiệu lực ngay sau khi xác nhận. Bạn có chắc muốn hủy gói của biển số <strong>{cancelTarget?.licensePlate}</strong>?</>}
+        targetLabel={cancelTarget?.packageName || 'Gói thuê bao tháng'}
+        targetMeta={cancelTarget ? `${cancelTarget.licensePlate} · ${formatCurrency(cancelTarget.price)}` : undefined}
+        targetIcon={<CreditCard size={18} aria-hidden />}
+        note="Chỗ đỗ cố định (nếu có) sẽ được giải phóng. Thao tác này không hoàn lại khoản đã thanh toán."
+        confirmLabel="Xác nhận hủy gói"
+        loadingLabel="Đang hủy gói..."
+        errorFallback="Không thể hủy gói tháng."
+        onCancel={() => setCancelTarget(null)}
+        onConfirm={handleCancelSubscription}
+      />
 
       {changeTarget && (
         <div className="modal-overlay" onClick={(event) => { if (event.target === event.currentTarget) closeChangeModal() }}>
@@ -537,14 +633,14 @@ function MySubscriptionsContent() {
 
       {changeHistoryTarget && (
         <div className="modal-overlay" onClick={(event) => { if (event.target === event.currentTarget) setChangeHistoryTarget(null) }}>
-          <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="change-history-title">
+          <div className="modal-panel my-subscription-history-modal" role="dialog" aria-modal="true" aria-labelledby="change-history-title">
             <div className="manager-modal-header">
               <div><h3 id="change-history-title" className="modal-title">Lịch sử đổi biển số</h3><p>{changeHistoryTarget.packageName || changeHistoryTarget.licensePlate}</p></div>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setChangeHistoryTarget(null)} aria-label="Đóng"><X size={20} /></button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div className="my-subscription-history-list">
               {requestsFor(changeHistoryTarget.subscriptionId).map((request) => (
-                <div key={request.requestId} className="success-details" style={{ margin: 0 }}>
+                <div key={request.requestId} className="success-details my-subscription-history-item">
                   <p><strong>{request.oldLicensePlate}</strong> → <strong>{request.newLicensePlate}</strong></p>
                   <p><strong>Trạng thái:</strong> {getChangeStatusLabel(request.status)}</p>
                   <p><strong>Ngày gửi:</strong> {request.createdAt ? formatUtcToVietnamDateTime(request.createdAt) : '—'}</p>
@@ -560,7 +656,7 @@ function MySubscriptionsContent() {
                 </div>
               ))}
             </div>
-            <div className="form-actions"><button type="button" className="btn btn-primary" onClick={() => setChangeHistoryTarget(null)}>Đóng</button></div>
+            <div className="form-actions my-subscription-history-footer"><button type="button" className="btn btn-primary" onClick={() => setChangeHistoryTarget(null)}>Đóng</button></div>
           </div>
         </div>
       )}
@@ -603,17 +699,19 @@ function MySubscriptionsContent() {
 
       {historyTarget && (
         <div className="modal-overlay" onClick={(event) => { if (event.target === event.currentTarget) setHistoryTarget(null) }}>
-          <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="renewal-history-title">
-            <h3 id="renewal-history-title" className="modal-title">Lịch sử gia hạn</h3>
-            <p style={{ color: 'var(--text-muted)', marginTop: '-0.75rem' }}>{historyTarget.licensePlate}</p>
+          <div className="modal-panel my-subscription-history-modal" role="dialog" aria-modal="true" aria-labelledby="renewal-history-title">
+            <div className="manager-modal-header">
+              <div><h3 id="renewal-history-title" className="modal-title">Lịch sử gia hạn</h3><p>{historyTarget.licensePlate}</p></div>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setHistoryTarget(null)} aria-label="Đóng"><X size={20} /></button>
+            </div>
             {historyLoading ? (
               <p>Đang tải lịch sử...</p>
             ) : renewalHistory.length === 0 ? (
               <div className="empty-state"><CalendarClock size={36} aria-hidden /><p>Chưa có lần gia hạn nào.</p></div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div className="my-subscription-history-list">
                 {renewalHistory.map((item) => (
-                  <div key={item.renewalId} className="success-details" style={{ margin: 0 }}>
+                  <div key={item.renewalId} className="success-details my-subscription-history-item">
                     <p><strong>Ngày gia hạn:</strong> {formatUtcToVietnamDateTime(item.renewalDate || item.newEndDate)}</p>
                     <p><strong>Hạn cũ:</strong> {formatUtcToVietnamDateTime(item.oldEndDate)}</p>
                     <p><strong>Hạn mới:</strong> {formatUtcToVietnamDateTime(item.newEndDate)}</p>
@@ -622,7 +720,7 @@ function MySubscriptionsContent() {
                 ))}
               </div>
             )}
-            <div className="form-actions"><button type="button" className="btn btn-primary" onClick={() => setHistoryTarget(null)}>Đóng</button></div>
+            <div className="form-actions my-subscription-history-footer"><button type="button" className="btn btn-primary" onClick={() => setHistoryTarget(null)}>Đóng</button></div>
           </div>
         </div>
       )}
