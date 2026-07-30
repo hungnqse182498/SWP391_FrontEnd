@@ -201,7 +201,7 @@ export interface ParkingAvailabilityDto {
   totalSlots: number
   availableSlots: number
   occupiedSlots: number
-  reservedSlots: number
+  assignedSlots: number
 }
 
 export interface ParkingQrDecodeResult {

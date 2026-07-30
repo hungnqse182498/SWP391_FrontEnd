@@ -1,4 +1,4 @@
-export type SpotStatus = 'available' | 'occupied' | 'reserved' | 'selected' | 'disabled'
+export type SpotStatus = 'available' | 'occupied' | 'assigned' | 'selected' | 'disabled'
 
 export type SpotType = 'standard' | 'ev' | 'handicap'
 

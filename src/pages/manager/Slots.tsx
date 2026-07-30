@@ -37,7 +37,6 @@ interface ApiResponse<T> {
 const STATUS_LABEL_MAP: Record<string, string> = {
   Available: 'Còn trống',
   Occupied: 'Đang sử dụng',
-  Reserved: 'Đã đặt trước',
   Assigned: 'Đã phân bổ',
   Maintenance: 'Bảo trì',
   Locked: 'Tạm khóa',
@@ -46,8 +45,7 @@ const STATUS_LABEL_MAP: Record<string, string> = {
 const STATUS_BADGE_MAP: Record<string, string> = {
   Available: 'slot-badge--empty',
   Occupied: 'slot-badge--occupied',
-  Reserved: 'slot-badge--reserved',
-  Assigned: 'slot-badge--reserved',
+  Assigned: 'slot-badge--assigned',
   Maintenance: 'slot-badge--maintenance',
   Locked: 'slot-badge--locked',
 }
@@ -55,8 +53,7 @@ const STATUS_BADGE_MAP: Record<string, string> = {
 const STATUS_TILE_MAP: Record<string, string> = {
   Available: 'slot-tile--empty',
   Occupied: 'slot-tile--occupied',
-  Reserved: 'slot-tile--reserved',
-  Assigned: 'slot-tile--reserved',
+  Assigned: 'slot-tile--assigned',
   Maintenance: 'slot-tile--maintenance',
   Locked: 'slot-tile--locked',
 }
@@ -211,7 +208,7 @@ export default function ManagerSlots() {
           <article className="manager-summary-card"><span>Tổng số slot</span><strong>{slots.length}</strong><small>Trên {uniqueFloors.length} tầng</small></article>
           <article className="manager-summary-card manager-summary-card--green"><span>Còn trống</span><strong>{summaryCounts.Available ?? 0}</strong><small>Sẵn sàng tiếp nhận xe</small></article>
           <article className="manager-summary-card"><span>Đang sử dụng</span><strong>{summaryCounts.Occupied ?? 0}</strong><small>Đang có xe trong vị trí</small></article>
-          <article className="manager-summary-card manager-summary-card--orange"><span>Đặt trước / Hạn chế</span><strong>{(summaryCounts.Reserved ?? 0) + (summaryCounts.Maintenance ?? 0) + (summaryCounts.Locked ?? 0)}</strong><small>Chưa thể sử dụng ngay</small></article>
+          <article className="manager-summary-card manager-summary-card--orange"><span>Đã phân bổ / Hạn chế</span><strong>{(summaryCounts.Assigned ?? 0) + (summaryCounts.Maintenance ?? 0) + (summaryCounts.Locked ?? 0)}</strong><small>Chưa thể sử dụng ngay</small></article>
         </section>
 
         <section className="card-panel manager-resource-panel">
@@ -330,7 +327,6 @@ export default function ManagerSlots() {
                 >
                   <option value="Available">Còn trống</option>
                   <option value="Occupied">Đang sử dụng</option>
-                  <option value="Reserved">Đã đặt trước</option>
                   <option value="Assigned">Đã phân bổ</option>
                   <option value="Maintenance">Bảo trì</option>
                   <option value="Locked">Tạm khóa</option>

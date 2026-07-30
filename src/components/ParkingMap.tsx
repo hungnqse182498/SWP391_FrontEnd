@@ -11,7 +11,7 @@ interface ParkingMapProps {
 const STATUS_LABEL: Record<SpotStatus, string> = {
   available: 'Trống',
   occupied: 'Đã có xe',
-  reserved: 'Đã đặt',
+  assigned: 'Đã phân bổ',
   selected: 'Đang chọn',
   disabled: 'Không dùng',
 }
@@ -35,7 +35,7 @@ export default function ParkingMap({ floors, onSelect }: ParkingMapProps) {
   }, [floors, activeFloorId])
 
   const selectSpot = (spot: ParkingSpot) => {
-    if (spot.status === 'occupied' || spot.status === 'reserved' || spot.status === 'disabled') {
+    if (spot.status === 'occupied' || spot.status === 'assigned' || spot.status === 'disabled') {
       return
     }
     setSelectedId(spot.id)
@@ -70,7 +70,7 @@ export default function ParkingMap({ floors, onSelect }: ParkingMapProps) {
         <ul className="map-legend">
           <li><span className="dot available" /> Trống</li>
           <li><span className="dot selected" /> Đang chọn</li>
-          <li><span className="dot reserved" /> Đã đặt</li>
+          <li><span className="dot assigned" /> Đã phân bổ</li>
           <li><span className="dot occupied" /> Có xe</li>
         </ul>
       </div>
