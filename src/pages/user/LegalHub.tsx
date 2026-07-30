@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
-import { ArrowLeft, FileText, Shield, CalendarCheck, RotateCcw } from "lucide-react";
+import { ArrowLeft, FileText, Shield, DollarSign, CalendarCheck, RotateCcw } from "lucide-react";
 
 const NAV_ITEMS = [
   { id: "terms", label: "Điều khoản sử dụng", icon: FileText },
   { id: "privacy", label: "Chính sách bảo mật", icon: Shield },
+  { id: "pricing-policy", label: "Chính sách giá", icon: DollarSign },
   { id: "booking-rules", label: "Quy định đặt chỗ", icon: CalendarCheck },
   { id: "cancellation", label: "Chính sách hủy đặt chỗ", icon: RotateCcw },
 ];
@@ -171,7 +172,36 @@ export default function LegalHub() {
         </ul>
       </article>
 
-      {/* ─── 3. Quy định đặt chỗ ─── */}
+      {/* ─── 3. Chính sách giá ─── */}
+      <article id="pricing-policy" className="legal-section card-panel">
+        <h2>
+          <DollarSign size={22} strokeWidth={2} aria-hidden />
+          Chính sách giá
+        </h2>
+        <p className="legal-updated">Cập nhật lần cuối: 30/07/2026</p>
+
+        <h3>1. Bảng giá dịch vụ gửi xe theo giờ</h3>
+        <ul>
+          <li>
+            <strong>Ô tô:</strong> Giờ đầu: 30.000đ. Mỗi giờ tiếp theo: 10.000đ/giờ (ban ngày 6h-22h) hoặc 10.000đ + phụ thu đêm 20.000đ (ban đêm 22h-6h).
+          </li>
+          <li>
+            <strong>Xe máy:</strong> Giờ đầu: 5.000đ. Mỗi giờ tiếp theo: 2.000đ/giờ (ban ngày) hoặc 2.000đ + phụ thu đêm 5.000đ (ban đêm).
+          </li>
+        </ul>
+
+        <h3>2. Quy định phụ thu đêm</h3>
+        <p>
+          Phụ thu đêm áp dụng cho các khung giờ đỗ xe phát sinh từ <strong>22:00 đến 06:00</strong> sáng hôm sau.
+        </p>
+
+        <h3>3. Ghi chú</h3>
+        <p>
+          Thời gian đỗ xe được tính dựa trên lượt vào/ra thực tế ghi nhận bởi hệ thống camera ANPR hoặc thẻ RFID. Tiền cọc giữ chỗ khi đặt trước trực tuyến được khấu trừ trực tiếp vào chi phí phiên gửi.
+        </p>
+      </article>
+
+      {/* ─── 4. Quy định đặt chỗ ─── */}
       <article id="booking-rules" className="legal-section card-panel">
         <h2>
           <CalendarCheck size={22} strokeWidth={2} aria-hidden />
