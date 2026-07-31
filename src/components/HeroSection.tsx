@@ -1,7 +1,6 @@
-import { Car, MapPin, RefreshCw, Search } from 'lucide-react'
+import { CalendarDays, Car, MapPin, RefreshCw, Search } from 'lucide-react'
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import BookingDatetimeField from './BookingDatetimeField'
 import { ToastContainer, useToast } from './Toast'
 import {
   clampBookingDatetimeLocal,
@@ -140,12 +139,18 @@ export default function HeroSection() {
                 </div>
               </label>
 
-              <BookingDatetimeField
-                id="home-booking-time"
-                label="Thời gian đến"
-                value={startTime}
-                onChange={setStartTime}
-              />
+              <label className="hero-field">
+                <span>Thời gian đến</span>
+                <div className="datetime-input-wrapper">
+                  <CalendarDays size={18} className="calendar-icon" aria-hidden />
+                  <input
+                    id="home-booking-time"
+                    type="datetime-local"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
+                </div>
+              </label>
             </div>
 
             <Link to="/dat-cho" onClick={handleSearch} className="hero-search-btn">

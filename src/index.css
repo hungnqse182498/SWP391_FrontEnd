@@ -8877,3 +8877,202 @@ ul, ol { margin: 0; padding: 0; }
   .payment-result-ticket > div { justify-content: center; }
   .payment-result-ticket img { grid-row: auto; justify-self: center; }
 }
+
+/* Custom datetime picker & wrapper */
+input[type="datetime-local"] {
+  position: relative;
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: inherit;
+}
+
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.datetime-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.datetime-input-wrapper .calendar-icon {
+  position: absolute;
+  right: 12px;
+  color: var(--text-muted);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.datetime-input-wrapper input[type="datetime-local"] {
+  padding-right: 2rem;
+}
+
+/* Features Section layout & compact card styling */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(160px, auto));
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.features-grid .feature-card {
+  border-radius: 12px;
+  padding: 1.25rem;
+  background: #ffffff;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.features-grid .feature-card h3 {
+  color: var(--blue-900);
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0.4rem 0 0.25rem;
+}
+
+.features-grid .feature-card--hero {
+  grid-column: span 2;
+  grid-row: span 2;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  border-radius: 12px;
+  padding: 1.25rem;
+  color: #fff;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.2), rgba(15, 23, 42, 0.85)),
+    url("/image/banner.jpg") center / cover;
+}
+
+.features-grid .feature-card--floors {
+  grid-column: span 2;
+}
+
+.feature-icon--sm {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eff6ff;
+  color: var(--blue-700);
+  flex-shrink: 0;
+}
+
+.feature-price-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0.35rem 0 0.5rem;
+  font-size: 0.88rem;
+}
+
+.feature-price-rows .price-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.feature-price-rows .price-row span {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.feature-price-rows .price-row strong {
+  color: var(--blue-900);
+}
+
+.feature-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--blue-700);
+  margin-top: auto;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.feature-link:hover {
+  color: var(--blue-900);
+  transform: translateX(3px);
+}
+
+.feature-big-badge {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--blue-900);
+  margin: 0.2rem 0;
+}
+
+.feature-subtext {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.feature-floor-summary {
+  font-size: 0.95rem;
+  color: var(--blue-900);
+  margin: 0.2rem 0 0.35rem;
+}
+
+.feature-floor-summary strong {
+  font-weight: 800;
+}
+
+.feature-floor-summary .feature-floor-names {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.feature-floor-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+}
+
+.floor-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  background: var(--blue-50);
+  color: var(--blue-900);
+  border: 1px solid var(--blue-200);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+@media (max-width: 960px) {
+  .features-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+
+  .features-grid .feature-card--hero,
+  .features-grid .feature-card--floors {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
+
