@@ -3360,14 +3360,6 @@ ul, ol { margin: 0; padding: 0; }
   margin: 0;
 }
 
-.manager-report-toolbar-break {
-  display: none;
-}
-
-.manager-report-toolbar .manager-report-export-type-field {
-  grid-column: 1 / span 4;
-}
-
 .manager-report-toolbar .btn {
   min-height: 42px;
   white-space: nowrap;
@@ -3440,16 +3432,41 @@ ul, ol { margin: 0; padding: 0; }
 }
 
 .manager-report-comparison-card {
-  padding: 1.15rem;
+  position: relative;
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 1.4rem;
   border-left: 4px solid var(--border);
+}
+
+.manager-report-comparison-card::after {
+  content: "";
+  position: absolute;
+  right: -36px;
+  top: -36px;
+  width: 120px;
+  height: 120px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  pointer-events: none;
 }
 
 .manager-report-comparison-card--positive {
   border-left-color: #16a34a;
 }
 
+.manager-report-comparison-card--positive::after {
+  background: rgba(22, 163, 74, 0.1);
+}
+
 .manager-report-comparison-card--negative {
   border-left-color: #ef4444;
+}
+
+.manager-report-comparison-card--negative::after {
+  background: rgba(239, 68, 68, 0.1);
 }
 
 .manager-report-comparison-card--neutral {
@@ -3464,6 +3481,8 @@ ul, ol { margin: 0; padding: 0; }
 }
 
 .manager-report-comparison-header {
+  position: relative;
+  z-index: 1;
   align-items: center;
   justify-content: space-between;
   color: var(--text-muted);
@@ -3476,31 +3495,74 @@ ul, ol { margin: 0; padding: 0; }
   font-size: 1rem;
 }
 
-.manager-report-comparison-main {
+.manager-report-comparison-badge {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  width: fit-content;
   align-items: center;
+  gap: 0.4rem;
   margin-top: 0.85rem;
+  padding: 0.42rem 0.7rem;
+  border-radius: 999px;
+  background: #eff6ff;
   color: var(--blue-700);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.manager-report-comparison-card--positive .manager-report-comparison-badge {
+  background: #ecfdf5;
+  color: #15803d;
+}
+
+.manager-report-comparison-card--negative .manager-report-comparison-badge {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.manager-report-comparison-main {
+  position: relative;
+  z-index: 1;
+  align-items: center;
+  margin-top: 0.9rem;
+  padding-bottom: 0.95rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--blue-700);
+}
+
+.manager-report-comparison-main svg {
+  flex: 0 0 auto;
 }
 
 .manager-report-comparison-main strong {
   display: block;
   color: var(--text-heading);
-  font-size: 1.25rem;
+  font-size: 1.45rem;
+  line-height: 1.2;
 }
 
 .manager-report-comparison-main span,
 .manager-report-comparison-grid span,
-.manager-report-comparison-grid small {
+.manager-report-comparison-grid small,
+.manager-report-comparison-bars span {
   color: var(--text-muted);
   font-size: 0.78rem;
 }
 
+.manager-report-comparison-grid small {
+  display: block;
+}
+
 .manager-report-comparison-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 1rem;
 }
 
 .manager-report-comparison-grid > div {
-  flex: 1;
   min-width: 0;
   padding: 0.75rem;
   border: 1px solid var(--border);
@@ -3515,6 +3577,46 @@ ul, ol { margin: 0; padding: 0; }
   font-size: 0.92rem;
 }
 
+.manager-report-comparison-bars {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.manager-report-comparison-bars > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+}
+
+.manager-report-comparison-bars strong {
+  color: var(--text-heading);
+  font-size: 0.85rem;
+}
+
+.manager-report-comparison-track {
+  grid-column: 1 / -1;
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.manager-report-comparison-track i {
+  display: block;
+  height: 100%;
+  min-width: 5px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+}
+
+.manager-report-comparison-track--muted i {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
 .manager-report-message,
 .manager-report-table-panel { margin-top: 1.25rem; }
 .manager-report-message.manager-inline-error { margin-inline: 0; }
@@ -3522,10 +3624,6 @@ ul, ol { margin: 0; padding: 0; }
 @media (max-width: 900px) {
   .manager-report-toolbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .manager-report-toolbar .manager-report-export-type-field {
-    grid-column: auto;
   }
 
   .manager-report-toolbar .btn {

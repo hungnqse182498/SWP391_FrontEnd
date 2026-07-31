@@ -203,13 +203,6 @@ interface RevenueDTO {
   byVehicleType?: Breakdown[]
 }
 
-interface ReportTypeDTO {
-  key: string
-  name: string
-  description: string
-  supportedFormats: string[]
-}
-
 interface OperationsDTO {
   sessionsByVehicleType: Breakdown[]
   reservationsByStatus: Breakdown[]
@@ -374,9 +367,18 @@ function comparisonTone(value: number) {
   return 'neutral'
 }
 
+function clampPercent(value: number) {
+  if (!Number.isFinite(value)) return 0
+  return Math.min(100, Math.max(0, value))
+}
+
 function ComparisonCard({ item }: { item: RevenueComparisonItemDTO }) {
   const tone = comparisonTone(item.growthPercent)
   const TrendIcon = item.growthPercent < 0 ? TrendingDown : TrendingUp
+  const maxRevenue = Math.max(item.currentRevenue, item.comparisonRevenue, 1)
+  const currentWidth = clampPercent((item.currentRevenue / maxRevenue) * 100)
+  const comparisonWidth = clampPercent((item.comparisonRevenue / maxRevenue) * 100)
+  const toneLabel = item.growthPercent > 0 ? 'Tăng trưởng' : item.growthPercent < 0 ? 'Giảm so với cùng kỳ' : 'Ổn định'
 
   return (
     <article className={`card-panel manager-report-comparison-card manager-report-comparison-card--${tone}`}>
@@ -384,25 +386,42 @@ function ComparisonCard({ item }: { item: RevenueComparisonItemDTO }) {
         <span>{item.label}</span>
         <strong>{formatPercent(item.growthPercent)}</strong>
       </div>
+      <div className="manager-report-comparison-badge">
+        <TrendIcon size={16} />
+        <span>{toneLabel}</span>
+      </div>
       <div className="manager-report-comparison-main">
-        <TrendIcon size={22} />
+        <TrendIcon size={24} />
         <div>
           <strong>{formatSignedCurrency(item.differenceAmount)}</strong>
-          <span>
-            {dateOnly(item.currentFrom)} → {dateOnly(item.currentTo)}
-          </span>
         </div>
       </div>
       <div className="manager-report-comparison-grid">
         <div>
           <span>Kỳ hiện tại</span>
           <strong>{formatCurrency(item.currentRevenue)}</strong>
-          <small>{formatNumber(item.currentPaymentCount)} thanh toán</small>
+          <small>{dateOnly(item.currentFrom)} → {dateOnly(item.currentTo)}</small>
         </div>
         <div>
           <span>Kỳ so sánh</span>
           <strong>{formatCurrency(item.comparisonRevenue)}</strong>
           <small>{dateOnly(item.comparisonFrom)} → {dateOnly(item.comparisonTo)}</small>
+        </div>
+      </div>
+      <div className="manager-report-comparison-bars" aria-label="So sánh tỷ lệ doanh thu hai kỳ">
+        <div>
+          <span>Kỳ hiện tại</span>
+          <strong>{formatCurrency(item.currentRevenue)}</strong>
+          <div className="manager-report-comparison-track">
+            <i style={{ width: `${currentWidth}%` }} />
+          </div>
+        </div>
+        <div>
+          <span>Cùng kỳ năm trước</span>
+          <strong>{formatCurrency(item.comparisonRevenue)}</strong>
+          <div className="manager-report-comparison-track manager-report-comparison-track--muted">
+            <i style={{ width: `${comparisonWidth}%` }} />
+          </div>
         </div>
       </div>
     </article>
@@ -417,8 +436,8 @@ function renderPieLabel(props: PieLabelRenderProps) {
 }
 
 export default function ManagerReports() {
-  const defaults = presetDates('30d')
-  const [preset, setPreset] = useState<Preset>('30d')
+  const defaults = presetDates('7d')
+  const [preset, setPreset] = useState<Preset>('7d')
   const [fromDate, setFromDate] = useState(defaults.from)
   const [toDate, setToDate] = useState(defaults.to)
   const [groupBy, setGroupBy] = useState<GroupBy>('day')
@@ -429,8 +448,6 @@ export default function ManagerReports() {
   const [summary, setSummary] = useState<SummaryDTO | null>(null)
   const [revenue, setRevenue] = useState<RevenueDTO | null>(null)
   const [operations, setOperations] = useState<OperationsDTO | null>(null)
-  const [reportTypes, setReportTypes] = useState<ReportTypeDTO[]>([])
-  const [exportType, setExportType] = useState('summary')
   const [exporting, setExporting] = useState(false)
 
   const fetchReports = useCallback(async (from: string, to: string, selectedGroupBy: GroupBy) => {
@@ -467,11 +484,6 @@ export default function ManagerReports() {
 
   useEffect(() => {
     void fetchReports(fromDate, toDate, groupBy)
-    apiClient.get<ApiRes<ReportTypeDTO[]>>('/reports/types')
-      .then((response) => {
-        if (response.isSuccess) setReportTypes(response.result ?? [])
-      })
-      .catch(() => setError('Không thể tải danh sách loại báo cáo.'))
     // chỉ load lần đầu, các thay đổi filter sẽ gọi qua nút áp dụng hoặc select handler
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -504,7 +516,7 @@ export default function ManagerReports() {
         to: toDate,
         period: groupBy,
         groupBy,
-        reportType: exportType,
+        reportType: 'full',
         format: 'pdf',
       })
       const file = await apiClient.download(`/reports/export?${params}`)
@@ -539,9 +551,7 @@ export default function ManagerReports() {
   )
 
   const samePeriodDoubleBar = revenue?.charts?.doubleBarChart ?? summary?.revenueCharts?.doubleBarChart
-  const previousPeriodDoubleBar = revenue?.charts?.previousPeriodDoubleBarChart ?? summary?.revenueCharts?.previousPeriodDoubleBarChart
   const samePeriodDoubleBarPoints = samePeriodDoubleBar?.points ?? []
-  const previousPeriodDoubleBarPoints = previousPeriodDoubleBar?.points ?? []
   const comparison = revenue?.comparison ?? summary?.revenueComparison
 
   const overviewMetrics = useMemo(() => {
@@ -595,6 +605,9 @@ export default function ManagerReports() {
           <div className="manager-header-actions">
             <button type="button" className="btn btn-outline" onClick={handleApply} disabled={loading}>
               <RefreshCw size={17} className={loading ? 'spin' : ''} /> Làm mới
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => void handleExport()} disabled={exporting || loading}>
+              {exporting ? <><Loader2 size={16} className="spin" /> Đang xuất...</> : <><Download size={16} /> Xuất báo cáo</>}
             </button>
           </div>
         </header>
@@ -664,20 +677,6 @@ export default function ManagerReports() {
               {loading ? <><Loader2 size={16} className="spin" /> Đang tải...</> : <><TrendingUp size={16} /> Xem báo cáo</>}
             </button>
 
-            <span className="manager-report-toolbar-break" aria-hidden="true" />
-
-            <div className="form-field manager-report-export-type-field">
-              <label htmlFor="report-export-type">Loại xuất</label>
-              <select id="report-export-type" value={exportType} onChange={(event) => setExportType(event.target.value)}>
-                {(reportTypes.length ? reportTypes : [{ key: 'summary', name: 'Báo cáo tổng quan', description: '', supportedFormats: ['pdf'] }]).map((type) => (
-                  <option key={type.key} value={type.key}>{type.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <button type="button" className="btn btn-outline" onClick={() => void handleExport()} disabled={exporting || loading}>
-              {exporting ? <><Loader2 size={16} className="spin" /> Đang xuất...</> : <><Download size={16} /> Xuất báo cáo</>}
-            </button>
           </div>
 
           {error && (
@@ -702,13 +701,6 @@ export default function ManagerReports() {
                   <span>{localizeReportLabel(metric.label)}</span>
                 </article>
               ))}
-            </div>
-          )}
-
-          {comparison && (
-            <div className="manager-report-comparison-layout">
-              <ComparisonCard item={comparison.samePeriodLastYear} />
-              <ComparisonCard item={comparison.previousPeriod} />
             </div>
           )}
 
@@ -752,25 +744,8 @@ export default function ManagerReports() {
                 </div>
               )}
 
-              {previousPeriodDoubleBarPoints.length > 0 && (
-                <div className="card-panel manager-report-chart-card">
-                  <h3 className="panel-subtitle">So sánh doanh thu với kỳ trước</h3>
-                  <p className="manager-report-chart-note">Đối chiếu doanh thu kỳ hiện tại và kỳ liền trước {groupByLabel(groupBy)}.</p>
-                  <ResponsiveContainer width="100%" height={320}>
-                    <BarChart data={previousPeriodDoubleBarPoints}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border, #e2e8f0)" />
-                      <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                      <YAxis tickFormatter={currencyTick} tick={{ fontSize: 12 }} />
-                      <Tooltip
-                        formatter={(value: unknown, name: unknown) => [formatCurrency(Number(value)), String(name)]}
-                        labelFormatter={(label: unknown) => `Kỳ: ${String(label)}`}
-                      />
-                      <Legend />
-                      <Bar dataKey="currentValue" name={previousPeriodDoubleBar?.currentSeriesName || 'Kỳ này'} fill="#16a34a" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="comparisonValue" name={previousPeriodDoubleBar?.comparisonSeriesName || 'Kỳ trước'} fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+              {comparison && samePeriodDoubleBarPoints.length > 0 && (
+                <ComparisonCard item={comparison.samePeriodLastYear} />
               )}
             </div>
           )}
