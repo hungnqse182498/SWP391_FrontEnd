@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { CalendarClock, Car, ClipboardCheck, CreditCard, FilePenLine, History, MoreHorizontal, Pencil, RefreshCw, ShieldAlert, Trash2, X } from 'lucide-react'
 import ProtectedRoute from '../../components/ProtectedRoute'
-import ManagerConfirmActionModal from '../../components/ManagerConfirmActionModal'
 import { formatUtcToVietnamDateTime, parseBackendUtcDate } from '../../utils/dateTime'
 import { formatCurrency } from '../../utils/pricing'
 import { normalizeLicensePlate } from '../../utils/licensePlate'
@@ -62,7 +61,6 @@ function MySubscriptionsContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [payingId, setPayingId] = useState<string | null>(null)
-  const [cancelTarget, setCancelTarget] = useState<MonthlySubscriptionDto | null>(null)
   const [statusFilter, setStatusFilter] = useState('all')
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [packages, setPackages] = useState<SubscriptionPackageDto[]>([])
@@ -333,22 +331,6 @@ function MySubscriptionsContent() {
     }
   }
 
-  const handleCancelSubscription = async () => {
-    if (!cancelTarget) return
-
-    const response = await subscriptionApi.cancel(cancelTarget.subscriptionId)
-    if (!response.isSuccess) {
-      throw new Error(response.message || 'Không thể hủy gói tháng.')
-    }
-
-    const cancelledId = cancelTarget.subscriptionId
-    setSubscriptions((current) => current.map((item) =>
-      item.subscriptionId === cancelledId ? { ...item, status: 'Cancelled', fixedSlot: undefined } : item,
-    ))
-    setCancelTarget(null)
-    toast.success('Đã hủy gói tháng và giải phóng chỗ đỗ cố định.')
-  }
-
   return (
     <section className="my-subscriptions-page">
       <ToastContainer toasts={toast.toasts} onClose={toast.close} />
@@ -541,11 +523,6 @@ function MySubscriptionsContent() {
                           <button type="button" role="menuitem" onClick={() => { setActionMenuId(null); void openHistoryModal(sub) }}>
                             <History size={16} aria-hidden /> Lịch sử gia hạn
                           </button>
-                          {['active', 'pendingpayment'].includes(sub.status.toLowerCase()) && (
-                            <button type="button" role="menuitem" className="is-danger" onClick={() => { setActionMenuId(null); setCancelTarget(sub) }}>
-                              <Trash2 size={16} aria-hidden /> Hủy gói
-                            </button>
-                          )}
                         </div>
                       )}
                     </div>
@@ -557,21 +534,6 @@ function MySubscriptionsContent() {
           </div>}
         </>
       )}
-
-      <ManagerConfirmActionModal
-        open={Boolean(cancelTarget)}
-        title="Hủy gói gửi xe tháng?"
-        description={<>Gói sẽ ngừng hiệu lực ngay sau khi xác nhận. Bạn có chắc muốn hủy gói của biển số <strong>{cancelTarget?.licensePlate}</strong>?</>}
-        targetLabel={cancelTarget?.packageName || 'Gói thuê bao tháng'}
-        targetMeta={cancelTarget ? `${cancelTarget.licensePlate} · ${formatCurrency(cancelTarget.price)}` : undefined}
-        targetIcon={<CreditCard size={18} aria-hidden />}
-        note="Chỗ đỗ cố định (nếu có) sẽ được giải phóng. Thao tác này không hoàn lại khoản đã thanh toán."
-        confirmLabel="Xác nhận hủy gói"
-        loadingLabel="Đang hủy gói..."
-        errorFallback="Không thể hủy gói tháng."
-        onCancel={() => setCancelTarget(null)}
-        onConfirm={handleCancelSubscription}
-      />
 
       {changeTarget && (
         <div className="modal-overlay" onClick={(event) => { if (event.target === event.currentTarget) closeChangeModal() }}>

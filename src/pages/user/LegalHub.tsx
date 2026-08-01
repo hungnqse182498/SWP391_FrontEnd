@@ -1,6 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, Link } from "react-router-dom";
 import { ArrowLeft, FileText, Shield, DollarSign, CalendarCheck, RotateCcw } from "lucide-react";
+import { ApiRequestError, apiClient } from "../../config/api";
+import { formatUtcToVietnamDate, parseBackendUtcDate } from "../../utils/dateTime";
 
 const NAV_ITEMS = [
   { id: "terms", label: "Điều khoản sử dụng", icon: FileText },
@@ -10,8 +12,75 @@ const NAV_ITEMS = [
   { id: "cancellation", label: "Chính sách hủy đặt chỗ", icon: RotateCcw },
 ];
 
+interface PricingPolicy {
+  policyId: string;
+  vehicleTypeId: string;
+  vehicleTypeName?: string | null;
+  basePrice: number;
+  baseHours: number;
+  extraHourPrice: number;
+  nightSurcharge?: number | null;
+  effectiveDate: string;
+  status: string;
+}
+
+interface ApiResponse<T> {
+  isSuccess: boolean;
+  result: T;
+  message?: string;
+}
+
+function formatVnd(value: number) {
+  return `${value.toLocaleString("vi-VN")}đ`;
+}
+
 export default function LegalHub() {
   const { hash } = useLocation();
+  const [pricingPolicies, setPricingPolicies] = useState<PricingPolicy[]>([]);
+  const [pricingLoading, setPricingLoading] = useState(true);
+  const [pricingError, setPricingError] = useState("");
+
+  useEffect(() => {
+    apiClient.get<ApiResponse<PricingPolicy[]>>("/PricingPolicy")
+      .then((response) => {
+        if (!response.isSuccess || !Array.isArray(response.result)) {
+          throw new Error(response.message || "Không thể tải chính sách giá.");
+        }
+        setPricingPolicies(response.result);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof ApiRequestError && error.statusCode === 404) {
+          setPricingPolicies([]);
+          return;
+        }
+        setPricingError(error instanceof Error ? error.message : "Không thể tải chính sách giá.");
+      })
+      .finally(() => setPricingLoading(false));
+  }, []);
+
+  const activePricingPolicies = useMemo(() => {
+    const now = Date.now();
+    const latestByVehicleType = new Map<string, PricingPolicy>();
+
+    pricingPolicies
+      .filter((policy) =>
+        policy.status.toLowerCase() === "active" &&
+        parseBackendUtcDate(policy.effectiveDate).getTime() <= now)
+      .sort((a, b) =>
+        parseBackendUtcDate(b.effectiveDate).getTime() - parseBackendUtcDate(a.effectiveDate).getTime())
+      .forEach((policy) => {
+        if (!latestByVehicleType.has(policy.vehicleTypeId)) {
+          latestByVehicleType.set(policy.vehicleTypeId, policy);
+        }
+      });
+
+    return Array.from(latestByVehicleType.values());
+  }, [pricingPolicies]);
+
+  const latestPricingDate = activePricingPolicies.reduce<PricingPolicy | null>((latest, policy) =>
+    !latest || parseBackendUtcDate(policy.effectiveDate) > parseBackendUtcDate(latest.effectiveDate)
+      ? policy
+      : latest, null);
 
   useEffect(() => {
     if (hash) {
@@ -178,17 +247,32 @@ export default function LegalHub() {
           <DollarSign size={22} strokeWidth={2} aria-hidden />
           Chính sách giá
         </h2>
-        <p className="legal-updated">Cập nhật lần cuối: 30/07/2026</p>
+        <p className="legal-updated">
+          {latestPricingDate
+            ? `Áp dụng từ: ${formatUtcToVietnamDate(latestPricingDate.effectiveDate)}`
+            : "Bảng giá được cập nhật theo cấu hình hệ thống"}
+        </p>
 
         <h3>1. Bảng giá dịch vụ gửi xe theo giờ</h3>
-        <ul>
-          <li>
-            <strong>Ô tô:</strong> Giờ đầu: 30.000đ. Mỗi giờ tiếp theo: 10.000đ/giờ (ban ngày 6h-22h) hoặc 10.000đ + phụ thu đêm 20.000đ (ban đêm 22h-6h).
-          </li>
-          <li>
-            <strong>Xe máy:</strong> Giờ đầu: 5.000đ. Mỗi giờ tiếp theo: 2.000đ/giờ (ban ngày) hoặc 2.000đ + phụ thu đêm 5.000đ (ban đêm).
-          </li>
-        </ul>
+        {pricingLoading ? (
+          <p>Đang tải bảng giá...</p>
+        ) : pricingError ? (
+          <p role="alert">{pricingError}</p>
+        ) : activePricingPolicies.length === 0 ? (
+          <p>Hiện chưa có chính sách giá đang áp dụng.</p>
+        ) : (
+          <ul>
+            {activePricingPolicies.map((policy) => (
+              <li key={policy.policyId}>
+                <strong>{policy.vehicleTypeName || "Loại phương tiện"}:</strong>{" "}
+                {formatVnd(policy.basePrice)} cho {policy.baseHours} giờ đầu; mỗi giờ tiếp theo {formatVnd(policy.extraHourPrice)}
+                {(policy.nightSurcharge ?? 0) > 0
+                  ? `; phụ thu đêm ${formatVnd(policy.nightSurcharge ?? 0)}`
+                  : "; không có phụ thu đêm"}.
+              </li>
+            ))}
+          </ul>
+        )}
 
         <h3>2. Quy định phụ thu đêm</h3>
         <p>

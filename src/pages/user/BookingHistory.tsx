@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion'
-import { Ban, Calendar, Car, MapPin } from 'lucide-react'
+import { Calendar, Car, MapPin } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import ProtectedRoute from '../../components/ProtectedRoute'
-import { ConfirmDialog, ToastContainer, useToast } from '../../components/Toast'
+import { ToastContainer, useToast } from '../../components/Toast'
+import { ApiRequestError } from '../../config/api'
 import { reservationApi, type ReservationDto } from '../../utils/apiServices'
 import { bookingTimeBoundsLocal, parseDatetimeLocal } from '../../utils/bookingTime'
 import { parseBackendUtcDate, vietnamDatetimeLocalToUtcIso } from '../../utils/dateTime'
@@ -52,7 +53,6 @@ function HistoryContent() {
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [newTime, setNewTime] = useState('')
-  const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
   const toast = useToast()
 
   const load = async () => {
@@ -64,6 +64,10 @@ function HistoryContent() {
       }
     } catch (err) {
       console.error(err)
+      if (err instanceof ApiRequestError && err.statusCode === 404) {
+        setList([])
+        return
+      }
       toast.error('Không thể tải danh sách đặt chỗ.')
     } finally {
       setLoading(false)
@@ -73,30 +77,6 @@ function HistoryContent() {
   useEffect(() => {
     load()
   }, [])
-
-  const handleCancel = async (id: string) => {
-    try {
-      const res = await reservationApi.cancel(id)
-      if (res.isSuccess) {
-        toast.success('Đã hủy đặt chỗ thành công.')
-        setConfirmCancel(null)
-        load()
-      } else {
-        toast.error(res.message || 'Hủy đặt chỗ thất bại.')
-      }
-    } catch (err: unknown) {
-      console.error(err)
-      // parse message từ error nếu có
-      let msg = 'Đã xảy ra lỗi, vui lòng thử lại sau.'
-      if (err instanceof Error) {
-        try {
-          const body = JSON.parse(err.message.replace(/^HTTP \d+: /, ''))
-          if (body?.message) msg = body.message
-        } catch { /* ignore */ }
-      }
-      toast.error(msg)
-    }
-  }
 
   const handleRepayment = async (id: string) => {
     try {
@@ -174,18 +154,6 @@ function HistoryContent() {
       {/* Toast notifications */}
       <ToastContainer toasts={toast.toasts} onClose={toast.close} />
 
-      {/* Confirm dialog */}
-      <ConfirmDialog
-        open={!!confirmCancel}
-        title="Hủy đặt chỗ"
-        message="Bạn chắc chắn muốn hủy đặt chỗ này? Tiền cọc sẽ không được hoàn lại."
-        confirmLabel="Xác nhận hủy"
-        cancelLabel="Quay lại"
-        danger
-        onConfirm={() => confirmCancel && handleCancel(confirmCancel)}
-        onCancel={() => setConfirmCancel(null)}
-      />
-
       <header className="page-header">
         <div>
           <h1>Lịch sử đặt chỗ</h1>
@@ -259,7 +227,7 @@ function HistoryContent() {
                     </button>
                   )}
 
-                  {/* Đổi giờ + Hủy cho đơn Confirmed / Modified */}
+                  {/* Đổi giờ cho đơn Confirmed / Modified */}
                   {(b.status === 'Confirmed' || b.status === 'Modified' || paymentStatus === 'Success') && (
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                       <button
@@ -276,14 +244,6 @@ function HistoryContent() {
                         title={alreadyChanged ? 'Bạn đã dùng lượt đổi giờ (tối đa 1 lần)' : 'Đổi giờ check-in'}
                       >
                         {alreadyChanged ? 'Đã đổi giờ (Hết lượt)' : 'Đổi giờ check-in'}
-                      </button>
-
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => setConfirmCancel(b.reservationId)}
-                      >
-                        <Ban size={14} /> Hủy (không hoàn tiền)
                       </button>
                     </div>
                   )}

@@ -38,14 +38,12 @@ import {
   parkingOperationApi,
   parkingSessionApi,
   reservationApi,
-  vehicleTypeApi,
   gateApi,
   type ParkingSessionTicket,
   type ParkingQrDecodeResult,
   type ParkingSessionDto,
   type ReservationDto,
   type GateDto,
-  type VehicleTypeDto,
 } from "../../utils/apiServices";
 import {
   formatNowInVietnamTime,
@@ -238,10 +236,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
     normalizeLicensePlate(operationState?.licensePlate ?? ""),
   );
   const [entryTimePreview, setEntryTimePreview] = useState("");
-  const [vehicleTypeId, setVehicleTypeId] = useState(
-    gateContext?.dedicatedVehicleTypeId ?? "",
-  );
-  const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeDto[]>([]);
+  const vehicleTypeId = gateContext?.dedicatedVehicleTypeId ?? "";
   const gateId = gateContext?.gateId ?? "";
   const [checkInType, setCheckInType] = useState<
     "guest" | "resident" | "reservation"
@@ -385,16 +380,6 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
   };
 
   useEffect(() => {
-    vehicleTypeApi
-      .getAll()
-      .then((res) => {
-        if (res.isSuccess && res.result) {
-          setVehicleTypes(res.result);
-          setVehicleTypeId(gateContext?.dedicatedVehicleTypeId ?? "");
-        }
-      })
-      .catch(console.error);
-
     queueMicrotask(() => {
       void loadGateLists();
     });
@@ -412,7 +397,6 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
     setReservationId("");
     setQrPayload("");
     setQrDecode(null);
-    setVehicleTypeId(gateContext?.dedicatedVehicleTypeId ?? "");
     setPlateForConfirm("");
     if (!options.keepResult) {
       setMessage("");
@@ -457,19 +441,6 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
   const handleConfirmCheckIn = async () => {
     if (!licensePlate.trim() || !gateId) return;
     if (checkInType !== "reservation" && !vehicleTypeId) return;
-    if (
-      checkInType !== "reservation" &&
-      gateContext?.dedicatedVehicleTypeId &&
-      vehicleTypeId !== gateContext.dedicatedVehicleTypeId
-    ) {
-      const selectedVehicleType = vehicleTypes.find(
-        (item) => item.vehicleTypeId === vehicleTypeId,
-      );
-      setMessage(
-        `${gateContext.floorName} chỉ dành cho ${gateContext.dedicatedVehicleTypeName || "loại xe đã cấu hình"}. Không thể check-in ${selectedVehicleType?.typeName || "loại xe đã chọn"} tại tầng này.`,
-      );
-      return;
-    }
     if (checkInType === "reservation" && !reservationId && !qrPayload.trim()) {
       setMessage("Vui lòng upload ảnh QR đặt chỗ hoặc nhập mã QR đặt chỗ");
       return;
@@ -984,25 +955,11 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
 
                   {checkInType !== "reservation" && (
                     <div className="form-field">
-                      <label htmlFor="vehicle-type">Loại phương tiện</label>
-                      <select
-                        id="vehicle-type"
-                        className="input-standalone select"
-                        value={vehicleTypeId}
-                        onChange={(event) =>
-                          setVehicleTypeId(event.target.value)
-                        }
-                      >
-                        <option value="">Chọn loại phương tiện</option>
-                        {vehicleTypes.map((vehicleType) => (
-                          <option
-                            key={vehicleType.vehicleTypeId}
-                            value={vehicleType.vehicleTypeId}
-                          >
-                            {vehicleType.typeName}
-                          </option>
-                        ))}
-                      </select>
+                      <label>Loại phương tiện</label>
+                      <div className="input-readonly">
+                        {gateContext?.dedicatedVehicleTypeName ||
+                          "Tầng chưa cấu hình loại phương tiện"}
+                      </div>
                     </div>
                   )}
 
