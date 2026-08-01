@@ -69,7 +69,7 @@ function PriceTable({ basePrice, baseHours, extraHourPrice, nightSurcharge }: Pr
 function BookingContent() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { setDraft, getPolicy } = useBooking()
+  const { setDraft, getPolicy, pricingLoading } = useBooking()
   const carPolicy = getPolicy('car')
   const toast = useToast()
 
@@ -82,6 +82,10 @@ function BookingContent() {
   })
 
   const handlePreRegisterSubmit = () => {
+    if (!carPolicy) {
+      toast.warning(pricingLoading ? 'Bảng giá đang tải. Vui lòng chờ trong giây lát.' : 'Chưa có bảng giá ô tô đang áp dụng.')
+      return
+    }
     if (!startTime) {
       toast.warning('Bạn chưa chọn thời gian dự kiến đến bãi.')
       return
@@ -106,8 +110,7 @@ function BookingContent() {
       return
     }
 
-    const policy = getPolicy('car')
-    const deposit = policy.basePrice
+    const deposit = carPolicy.basePrice
 
     setDraft({
       floorId: 0,
@@ -194,7 +197,16 @@ function BookingContent() {
                   </div>
 
                   {/* Bảng giá chuyển sang bên trái */}
-                  <PriceTable {...carPolicy} />
+                  {carPolicy ? (
+                    <PriceTable {...carPolicy} />
+                  ) : (
+                    <div className="booking-price-table">
+                      <h3>Bảng giá giữ xe ô tô</h3>
+                      <p className="booking-price-note">
+                        {pricingLoading ? 'Đang tải bảng giá...' : 'Chưa có bảng giá ô tô đang áp dụng.'}
+                      </p>
+                    </div>
+                  )}
                 </section>
 
                 {/* Bên phải: Chỉ thông tin thanh toán */}
@@ -212,7 +224,7 @@ function BookingContent() {
 
                     <div className="booking-payment-item booking-payment-item--total">
                       <span>Số tiền thanh toán</span>
-                      <strong>{formatCurrency(carPolicy.basePrice)}</strong>
+                      <strong>{carPolicy ? formatCurrency(carPolicy.basePrice) : pricingLoading ? 'Đang tải...' : 'Chưa có giá'}</strong>
                     </div>
                   </div>
 
@@ -222,6 +234,7 @@ function BookingContent() {
                     type="button"
                     onClick={handlePreRegisterSubmit}
                     className="hero-search-btn booking-continue-btn"
+                    disabled={!carPolicy}
                   >
                     Tiếp tục thanh toán
                   </button>

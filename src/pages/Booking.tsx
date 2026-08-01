@@ -16,7 +16,7 @@ function BookingContent() {
   const navigate = useNavigate()
   const location = useLocation()
   const { profile } = useAuth()
-  const { setDraft, getPolicy } = useBooking()
+  const { setDraft, getPolicy, pricingLoading } = useBooking()
   const carPolicy = getPolicy('car')
 
   // Read initial states passed from Home Page
@@ -41,6 +41,10 @@ function BookingContent() {
   }, [profile])
 
   const handlePreRegisterSubmit = () => {
+    if (!carPolicy) {
+      alert(pricingLoading ? 'Bảng giá đang tải. Vui lòng chờ trong giây lát.' : 'Chưa có bảng giá ô tô đang áp dụng.')
+      return
+    }
     if (!vehiclePlate.trim()) {
       alert('Vui lòng nhập biển số xe')
       return
@@ -212,8 +216,8 @@ function BookingContent() {
                               Ô tô
                             </div>
                           </td>
-                          <td style={{ textAlign: 'center', padding: '0.75rem 0.25rem', color: 'var(--text)' }}>{formatCurrency(carPolicy.basePrice)}</td>
-                          <td style={{ textAlign: 'center', padding: '0.75rem 0.25rem', color: 'var(--text)' }}>{formatCurrency(carPolicy.nightSurcharge)}</td>
+                          <td style={{ textAlign: 'center', padding: '0.75rem 0.25rem', color: 'var(--text)' }}>{carPolicy ? formatCurrency(carPolicy.basePrice) : pricingLoading ? 'Đang tải...' : 'Chưa có giá'}</td>
+                          <td style={{ textAlign: 'center', padding: '0.75rem 0.25rem', color: 'var(--text)' }}>{carPolicy ? formatCurrency(carPolicy.nightSurcharge) : pricingLoading ? 'Đang tải...' : 'Chưa có giá'}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -227,7 +231,7 @@ function BookingContent() {
                       Tiền cọc cần thanh toán (cố định 1h)
                     </span>
                     <strong style={{ fontSize: '1.65rem', color: 'var(--blue-700)', fontWeight: 800 }}>
-                      {formatCurrency(carPolicy.basePrice)}
+                      {carPolicy ? formatCurrency(carPolicy.basePrice) : pricingLoading ? 'Đang tải...' : 'Chưa có giá'}
                     </strong>
                   </div>
 
@@ -235,6 +239,7 @@ function BookingContent() {
                     type="button"
                     onClick={handlePreRegisterSubmit}
                     className="btn btn-primary"
+                    disabled={!carPolicy}
                     style={{ height: '48px', padding: '0 2rem', borderRadius: '12px', fontSize: '0.95rem' }}
                   >
                     Tiếp tục thanh toán

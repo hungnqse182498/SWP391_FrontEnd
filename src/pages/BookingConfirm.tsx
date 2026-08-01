@@ -14,7 +14,7 @@ import { normalizeLicensePlate } from '../utils/licensePlate'
 function ConfirmContent() {
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { draft, setDraft, getPolicy } = useBooking()
+  const { draft, setDraft, getPolicy, pricingLoading } = useBooking()
   const [hours, setHours] = useState(draft?.hours ?? 2)
   const [startLocal, setStartLocal] = useState('')
   const [plate, setPlate] = useState(
@@ -34,9 +34,11 @@ function ConfirmContent() {
 
   const isPreRegistered = (draft as any).isPreRegistered
   const policy = getPolicy(draft.vehicleType ?? 'car')
-  const total = isPreRegistered
-    ? ((draft as any).depositAmount ?? policy.basePrice)
-    : draft.spots.length * hours * policy.basePrice
+  const total = policy
+    ? isPreRegistered
+      ? ((draft as any).depositAmount ?? policy.basePrice)
+      : draft.spots.length * hours * policy.basePrice
+    : null
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -139,12 +141,12 @@ function ConfirmContent() {
             </div>
             <div>
               <span>{isPreRegistered ? 'Tiền cọc cần thanh toán' : 'Tổng thanh toán'}</span>
-              <strong className="price-total">{formatCurrency(total)}</strong>
+              <strong className="price-total">{total !== null ? formatCurrency(total) : pricingLoading ? 'Đang tải...' : 'Chưa có giá'}</strong>
             </div>
           </div>
 
-          <button type="submit" className="btn btn-primary btn-block">
-            Tiếp tục thanh toán
+          <button type="submit" className="btn btn-primary btn-block" disabled={!policy}>
+            {policy ? 'Tiếp tục thanh toán' : pricingLoading ? 'Đang tải bảng giá...' : 'Chưa có bảng giá áp dụng'}
           </button>
         </form>
       </motion.div>

@@ -20,7 +20,7 @@ const methods: { id: PaymentMethod; label: string; icon: typeof Wallet }[] = [
 
 function PaymentContent() {
   const navigate = useNavigate()
-  const { draft, setDraft, completePayment, getPolicy } = useBooking()
+  const { draft, setDraft, completePayment, getPolicy, pricingLoading } = useBooking()
   const [method, setMethod] = useState<PaymentMethod>('momo')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -32,11 +32,14 @@ function PaymentContent() {
   const isPreRegistered = draft.isPreRegistered
   const isMonthly = draft.isMonthlyCustomer
   const policy = getPolicy(draft.vehicleType ?? 'car')
-  const total = isPreRegistered
-    ? (draft.depositAmount ?? policy.basePrice)
-    : draft.spots.length * draft.hours * policy.basePrice
+  const total = policy
+    ? isPreRegistered
+      ? (draft.depositAmount ?? policy.basePrice)
+      : draft.spots.length * draft.hours * policy.basePrice
+    : null
 
   const handlePay = async () => {
+    if (!isMonthly && !policy) return
     setLoading(true)
     setError('')
 
@@ -142,16 +145,16 @@ function PaymentContent() {
           <p className="muted-text">Xe: {draft.vehiclePlate}</p>
           <div className="payment-total">
             <span>{isPreRegistered ? 'Tiền cọc cần thanh toán' : isMonthly ? 'Phí' : 'Tổng cộng'}</span>
-            <strong>{isMonthly ? '0 ₫' : formatCurrency(total)}</strong>
+            <strong>{isMonthly ? '0 ₫' : total !== null ? formatCurrency(total) : pricingLoading ? 'Đang tải...' : 'Chưa có giá'}</strong>
           </div>
           {error && <p className="alert-inline alert-error">{error}</p>}
           <button
             type="button"
             className="btn btn-primary btn-block"
-            disabled={loading}
+            disabled={loading || (!isMonthly && !policy)}
             onClick={handlePay}
           >
-            {loading ? 'Đang xử lý...' : isMonthly ? 'Hoàn tất' : 'Thanh toán ngay'}
+            {loading ? 'Đang xử lý...' : !isMonthly && !policy ? (pricingLoading ? 'Đang tải bảng giá...' : 'Chưa có bảng giá áp dụng') : isMonthly ? 'Hoàn tất' : 'Thanh toán ngay'}
           </button>
         </div>
       </motion.div>

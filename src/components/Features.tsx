@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiClient, API_CONFIG } from "../config/api";
 import type { ApiResponse } from "../utils/apiServices";
+import { useBooking } from "../context/BookingContext";
+import { formatCurrency } from "../utils/pricing";
 
 interface FloorDto {
   floorId: string;
@@ -13,6 +15,9 @@ interface FloorDto {
 }
 
 export default function Features() {
+  const { getPolicy, pricingLoading } = useBooking();
+  const carPolicy = getPolicy("car");
+  const bikePolicy = getPolicy("bike");
   const [floors, setFloors] = useState<FloorDto[]>([]);
   const [loadingFloors, setLoadingFloors] = useState(true);
 
@@ -91,12 +96,18 @@ export default function Features() {
               </span>
               <h3>Chính sách giá</h3>
               <div className="feature-price-rows">
-                <div className="price-row">
-                  <span>Ô tô:</span> <strong>30.000đ/giờ đầu</strong>
-                </div>
-                <div className="price-row">
-                  <span>Xe máy:</span> <strong>5.000đ/giờ đầu</strong>
-                </div>
+                {pricingLoading ? (
+                  <p className="feature-subtext">Đang tải bảng giá...</p>
+                ) : (
+                  <>
+                    <div className="price-row">
+                      <span>Ô tô:</span> <strong>{carPolicy ? `${formatCurrency(carPolicy.basePrice)}/${carPolicy.baseHours} giờ đầu` : "Chưa có giá"}</strong>
+                    </div>
+                    <div className="price-row">
+                      <span>Xe máy:</span> <strong>{bikePolicy ? `${formatCurrency(bikePolicy.basePrice)}/${bikePolicy.baseHours} giờ đầu` : "Chưa có giá"}</strong>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
             <Link to="/legal#pricing-policy" className="feature-link">

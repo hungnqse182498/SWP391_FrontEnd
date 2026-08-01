@@ -24,6 +24,13 @@ interface PricingPolicyRaw {
   status: string
 }
 
+interface PricingPolicyDetails {
+  basePrice: number
+  baseHours: number
+  nightSurcharge: number
+  extraHourPrice: number
+}
+
 const BOOKINGS_KEY = 'pbms_bookings'
 
 function loadAllBookings(): BookingRecord[] {
@@ -53,13 +60,9 @@ interface BookingContextValue {
   completePayment: (method: PaymentMethod) => BookingRecord | null
   cancelBooking: (id: string) => void
   updateBookingStatus: (id: string, status: BookingRecord['status']) => void
-  getPolicy: (vehicle: 'car' | 'bike') => {
-    basePrice: number
-    baseHours: number
-    nightSurcharge: number
-    extraHourPrice: number
-  }
+  getPolicy: (vehicle: 'car' | 'bike') => PricingPolicyDetails | null
   getAllPolicies: () => PricingPolicyRaw[]
+  pricingLoading: boolean
 }
 
 const BookingContext = createContext<BookingContextValue | null>(null)
@@ -69,6 +72,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<BookingDraft | null>(null)
   const [bookings, setBookings] = useState<BookingRecord[]>(() => loadAllBookings())
   const [policies, setPolicies] = useState<PricingPolicyRaw[]>([])
+  const [pricingLoading, setPricingLoading] = useState(true)
 
   useEffect(() => {
     apiClient.get<{ isSuccess: boolean; result: PricingPolicyRaw[] }>('/PricingPolicy')
@@ -78,6 +82,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         }
       })
       .catch((err) => console.error('Failed to fetch pricing policies:', err))
+      .finally(() => setPricingLoading(false))
   }, [])
 
   const getPolicy = useCallback(
@@ -94,12 +99,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
           extraHourPrice: found.extraHourPrice,
         }
       }
-      return {
-        basePrice: vehicle === 'car' ? 25000 : 5000,
-        baseHours: 1,
-        nightSurcharge: vehicle === 'car' ? 20000 : 5000,
-        extraHourPrice: vehicle === 'car' ? 10000 : 2000,
-      }
+      return null
     },
     [policies],
   )
@@ -122,7 +122,8 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       const isPreRegistered = draft.isPreRegistered
       const isMonthly = draft.isMonthlyCustomer
       const policy = getPolicy(draft.vehicleType ?? 'car')
-      const hourlyRate = policy.basePrice
+      if (!isMonthly && !policy) return null
+      const hourlyRate = policy?.basePrice ?? 0
       const total = isPreRegistered
         ? (draft.depositAmount ?? hourlyRate)
         : isMonthly
@@ -193,8 +194,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       updateBookingStatus,
       getPolicy,
       getAllPolicies,
+      pricingLoading,
     }),
-    [draft, bookings, getAllBookings, getMyBookings, completePayment, cancelBooking, updateBookingStatus, getPolicy, getAllPolicies],
+    [draft, bookings, getAllBookings, getMyBookings, completePayment, cancelBooking, updateBookingStatus, getPolicy, getAllPolicies, pricingLoading],
   )
 
   return <BookingContext.Provider value={value}>{children}</BookingContext.Provider>

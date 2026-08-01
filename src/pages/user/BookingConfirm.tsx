@@ -7,7 +7,7 @@ import { formatUtcToVietnamDateTime } from '../../utils/dateTime'
 import { formatCurrency } from '../../utils/pricing'
 
 function ConfirmContent() {
-  const { draft, getPolicy } = useBooking()
+  const { draft, getPolicy, pricingLoading } = useBooking()
 
   if (!draft) {
     return (
@@ -21,9 +21,11 @@ function ConfirmContent() {
   const isPreRegistered = draft.isPreRegistered
   const isMonthly = draft.isMonthlyCustomer
   const policy = getPolicy(draft.vehicleType ?? 'car')
-  const total = isPreRegistered
-    ? (draft.depositAmount ?? policy.basePrice)
-    : draft.spots.length * draft.hours * policy.basePrice
+  const total = policy
+    ? isPreRegistered
+      ? (draft.depositAmount ?? policy.basePrice)
+      : draft.spots.length * draft.hours * policy.basePrice
+    : null
 
   return (
     <section className="booking-confirm-page">
@@ -54,7 +56,7 @@ function ConfirmContent() {
           )}
         </div>
         <div className="confirm-total">
-          <strong>{isMonthly ? 'Đã bao gồm gói tháng' : formatCurrency(total)}</strong>
+          <strong>{isMonthly ? 'Đã bao gồm gói tháng' : total !== null ? formatCurrency(total) : pricingLoading ? 'Đang tải...' : 'Chưa có giá'}</strong>
           <span>
             {isPreRegistered ? 'Tiền cọc cần thanh toán' : isMonthly ? 'Không cần cọc' : 'Tạm tính'}
           </span>
@@ -81,9 +83,15 @@ function ConfirmContent() {
         </>
       )}
 
-      <Link to="/thanh-toan" className="btn btn-primary btn-block">
-        {isMonthly ? 'Hoàn tất' : 'Tiếp tục thanh toán'}
-      </Link>
+      {isMonthly || policy ? (
+        <Link to="/thanh-toan" className="btn btn-primary btn-block">
+          {isMonthly ? 'Hoàn tất' : 'Tiếp tục thanh toán'}
+        </Link>
+      ) : (
+        <button type="button" className="btn btn-primary btn-block" disabled>
+          {pricingLoading ? 'Đang tải bảng giá...' : 'Chưa có bảng giá áp dụng'}
+        </button>
+      )}
     </section>
   )
 }
