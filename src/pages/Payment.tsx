@@ -1,27 +1,19 @@
 import { motion } from 'framer-motion'
-import { CreditCard, Smartphone, Wallet } from 'lucide-react'
+import { QrCode } from 'lucide-react'
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import BookingSteps from '../components/BookingSteps'
 import ProtectedRoute from '../components/ProtectedRoute'
 import { useBooking } from '../context/BookingContext'
-import type { PaymentMethod } from '../types/booking'
 import { reservationApi } from '../utils/apiServices'
 import { vehicleTypeLabel } from '../utils/bookingPricing'
 import { formatCurrency } from '../utils/pricing'
 import { normalizeLicensePlate } from '../utils/licensePlate'
 import { savePaymentReturnContext } from '../utils/paymentReturnContext'
 
-const methods: { id: PaymentMethod; label: string; icon: typeof Wallet }[] = [
-  { id: 'momo', label: 'Ví MoMo / PayOS', icon: Smartphone },
-  { id: 'vnpay', label: 'VNPay', icon: Wallet },
-  { id: 'card', label: 'Thẻ ngân hàng', icon: CreditCard },
-]
-
 function PaymentContent() {
   const navigate = useNavigate()
   const { draft, setDraft, completePayment, getPolicy, pricingLoading } = useBooking()
-  const [method, setMethod] = useState<PaymentMethod>('momo')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -40,12 +32,13 @@ function PaymentContent() {
 
   const handlePay = async () => {
     if (!isMonthly && !policy) return
+
     setLoading(true)
     setError('')
 
     try {
       if (isMonthly) {
-        const record = completePayment(method)
+        const record = completePayment('PayOS')
         if (record) navigate('/dat-cho/thanh-cong', { state: { bookingId: record.id } })
         return
       }
@@ -58,7 +51,7 @@ function PaymentContent() {
         })
 
         if (res.isSuccess && res.result) {
-          const { paymentUrl, orderCode, reservationId, ticket } = res.result
+          const { paymentUrl, orderCode, reservationId } = res.result
           setDraft({
             ...draft,
             reservationId,
@@ -66,7 +59,7 @@ function PaymentContent() {
             orderCode,
           })
 
-          if (paymentUrl && method !== 'card') {
+          if (paymentUrl) {
             savePaymentReturnContext({
               type: 'reservation',
               successPath: '/lich-su',
@@ -76,8 +69,7 @@ function PaymentContent() {
             return
           }
 
-          const record = completePayment(method)
-          if (record) navigate('/dat-cho/thanh-cong', { state: { bookingId: record.id, reservationId, ticket } })
+          setError('Không nhận được đường dẫn thanh toán PayOS. Vui lòng thử lại.')
           return
         }
 
@@ -86,7 +78,7 @@ function PaymentContent() {
       }
 
       await new Promise((r) => setTimeout(r, 600))
-      const record = completePayment(method)
+      const record = completePayment('PayOS')
       if (record) navigate('/dat-cho/thanh-cong', { state: { bookingId: record.id } })
     } catch (err) {
       console.error(err)
@@ -114,17 +106,10 @@ function PaymentContent() {
         <div className="card-panel payment-methods">
           <h2>Phương thức</h2>
           <div className="method-list">
-            {methods.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                className={`method-item${method === id ? ' active' : ''}`}
-                onClick={() => setMethod(id)}
-              >
-                <Icon size={22} strokeWidth={2} aria-hidden />
-                <span>{label}</span>
-              </button>
-            ))}
+            <div className="method-item active">
+              <QrCode size={22} strokeWidth={2} aria-hidden />
+              <span>PayOS</span>
+            </div>
           </div>
         </div>
 
@@ -154,7 +139,7 @@ function PaymentContent() {
             disabled={loading || (!isMonthly && !policy)}
             onClick={handlePay}
           >
-            {loading ? 'Đang xử lý...' : !isMonthly && !policy ? (pricingLoading ? 'Đang tải bảng giá...' : 'Chưa có bảng giá áp dụng') : isMonthly ? 'Hoàn tất' : 'Thanh toán ngay'}
+            {loading ? 'Đang xử lý...' : !isMonthly && !policy ? (pricingLoading ? 'Đang tải bảng giá...' : 'Chưa có bảng giá áp dụng') : 'Thanh toán qua PayOS'}
           </button>
         </div>
       </motion.div>

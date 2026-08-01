@@ -1,6 +1,6 @@
 export type BookingStatus = 'pending_payment' | 'paid' | 'cancelled' | 'completed'
 
-export type PaymentMethod = 'momo' | 'vnpay' | 'card'
+export type PaymentMethod = 'PayOS'
 
 export interface BookingSpot {
   id: string
