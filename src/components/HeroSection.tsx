@@ -29,7 +29,8 @@ export default function HeroSection() {
       try {
         // Trang chủ là nội dung công khai. Không dùng apiClient ở đây vì cơ chế
         // làm mới phiên của nó sẽ chuyển guest sang đăng nhập khi API trả 401.
-        const request = await fetch(`${API_CONFIG.BASE_URL}/ParkingOperation/availability`, {
+        const floorKeyword = encodeURIComponent('Vãng Lai')
+        const request = await fetch(`${API_CONFIG.BASE_URL}/ParkingOperation/availability?floorKeyword=${floorKeyword}`, {
           headers: { Accept: 'application/json' },
         })
         if (!request.ok) return
@@ -55,9 +56,13 @@ export default function HeroSection() {
 
   const carAvailability = useMemo(() => {
     const carFloors = availability.filter(isCarAvailability)
+    const total = carFloors.reduce((sum, item) => sum + item.totalSlots, 0)
+    const directCapacity = Math.floor(total * 0.8)
+
     return {
-      available: carFloors.reduce((sum, item) => sum + item.availableSlots, 0),
-      total: carFloors.reduce((sum, item) => sum + item.totalSlots, 0),
+      total,
+      directCapacity,
+      reservationCapacity: total - directCapacity,
     }
   }, [availability])
 
@@ -102,31 +107,35 @@ export default function HeroSection() {
 
           <div className="availability-card">
             <div className="availability-head">
-              <div className="availability-count" aria-live="polite">
+              <div className="availability-allocation" aria-live="polite">
                 {availabilityLoading ? (
-                  <>
+                  <div className="availability-count">
                     <RefreshCw className="availability-loading-icon" size={20} aria-hidden />
                     <strong className="availability-pending">Đang cập nhật</strong>
-                  </>
+                  </div>
                 ) : carAvailability.total > 0 ? (
                   <>
-                    <span className={`live-dot${carAvailability.available === 0 ? ' live-dot--full' : ''}`} />
-                    <strong>{carAvailability.available}/{carAvailability.total}</strong>
-                    <span>chỗ ô tô đang trống</span>
+                    <div className="availability-allocation-item availability-allocation-item--direct">
+                      <span className="live-dot" aria-hidden />
+                      <div>
+                        <strong>{carAvailability.directCapacity}</strong>
+                        <span>chỗ vào trực tiếp · 80%</span>
+                      </div>
+                    </div>
+                    <div className="availability-allocation-item availability-allocation-item--reservation">
+                      <CalendarDays size={22} aria-hidden />
+                      <div>
+                        <strong>{carAvailability.reservationCapacity}</strong>
+                        <span>chỗ đặt trước · 20%</span>
+                      </div>
+                    </div>
                   </>
                 ) : (
-                  <>
+                  <div className="availability-count">
                     <span className="live-dot live-dot--unknown" />
                     <strong className="availability-pending">Chưa có dữ liệu</strong>
-                  </>
+                  </div>
                 )}
-              </div>
-
-              <div className="vehicle-toggle vehicle-toggle--single" aria-label="Loại xe">
-                <button type="button" className="active" disabled>
-                  <Car size={18} strokeWidth={2.2} aria-hidden />
-                  Ô tô — đặt trước
-                </button>
               </div>
             </div>
 
