@@ -224,6 +224,10 @@ export interface PlateRecognitionResult {
   confidence?: number
   regionCode?: string
   provider?: string
+  providerStatusCode?: number
+  providerError?: string
+  providerResponse?: string
+  minimumConfidence?: number
   message?: string
   candidates?: PlateRecognitionCandidate[]
 }

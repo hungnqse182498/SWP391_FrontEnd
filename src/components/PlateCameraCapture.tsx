@@ -10,6 +10,29 @@ interface PlateCameraCaptureProps {
   onCapture: (file: File, previewUrl: string) => Promise<void> | void
 }
 
+const describeCameraError = (error: unknown) => {
+  if (error instanceof DOMException) {
+    const reason =
+      error.name === 'NotAllowedError'
+        ? 'trình duyệt đang chặn quyền camera'
+        : error.name === 'NotFoundError'
+          ? 'không tìm thấy camera trên thiết bị'
+          : error.name === 'NotReadableError'
+            ? 'camera đang bận hoặc bị ứng dụng khác sử dụng'
+            : error.name === 'OverconstrainedError'
+              ? 'camera không đáp ứng được cấu hình độ phân giải yêu cầu'
+              : 'trình duyệt không mở được camera'
+    const detail = error.message ? ` Chi tiết: ${error.message}` : ''
+    return `Không mở được camera (${error.name}): ${reason}.${detail}`
+  }
+
+  if (error instanceof Error) {
+    return `Không mở được camera: ${error.message}`
+  }
+
+  return 'Không mở được camera. Hãy cấp quyền camera rồi thử lại.'
+}
+
 export default function PlateCameraCapture({
   disabled = false,
   busy = false,
@@ -57,7 +80,7 @@ export default function PlateCameraCapture({
       setCameraOn(true)
     } catch (error) {
       console.error('Camera start failed:', error)
-      setCameraError('Không mở được camera. Hãy cấp quyền camera rồi thử lại.')
+      setCameraError(describeCameraError(error))
       stopCamera()
     }
   }
