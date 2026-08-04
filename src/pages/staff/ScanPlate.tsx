@@ -24,7 +24,6 @@ import {
   RotateCcw,
   Search,
   Smartphone,
-  Upload,
   UserCheck,
   UserRound,
   UsersRound,
@@ -32,6 +31,8 @@ import {
 } from "lucide-react";
 import StaffPageShell from "../../components/StaffPageShell";
 import ParkingTicketModal from "../../components/ParkingTicketModal";
+import PlateCameraCapture from "../../components/PlateCameraCapture";
+import QrCameraScanner from "../../components/QrCameraScanner";
 import { navigateStaffNav } from "../../config/staffNav";
 import { useParkingFeePreviews } from "../../hooks/useParkingFeePreviews";
 import {
@@ -223,7 +224,6 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
       !gateContext.isResident &&
       isCarVehicleTypeName(gateContext.dedicatedVehicleTypeName),
   );
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const qrInputRef = useRef<HTMLInputElement>(null);
 
   const [activePanel, setActivePanel] = useState<GatePanel>(
@@ -402,15 +402,11 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
       setMessage("");
       setCheckInTicket(null);
     }
-    if (fileInputRef.current) fileInputRef.current.value = "";
     if (qrInputRef.current) qrInputRef.current.value = "";
   };
 
-  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setImagePreviewUrl(URL.createObjectURL(file));
+  const handlePlateCameraCapture = async (file: File, previewUrl: string) => {
+    setImagePreviewUrl(previewUrl);
     setUploading(true);
     setMessage("");
     setCheckInTicket(null);
@@ -426,13 +422,11 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
           setMessage(res.message || "Không nhận diện được biển số.");
         }
       } else {
-        setMessage("Tải ảnh thất bại hoặc không nhận được đường dẫn ảnh.");
+        setMessage("Không lưu được ảnh biển số.");
       }
     } catch (err) {
       console.error(err);
-      setMessage(
-        err instanceof Error ? err.message : "Lỗi kết nối khi upload ảnh.",
-      );
+      setMessage(err instanceof Error ? err.message : "Lỗi kết nối khi chụp biển số.");
     } finally {
       setUploading(false);
     }
@@ -513,6 +507,36 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
       setMessage(
         err instanceof Error ? err.message : "Lỗi kết nối khi upload QR.",
       );
+    } finally {
+      setQrUploading(false);
+    }
+  };
+
+  const handleQrCameraDecoded = async (payload: string) => {
+    setQrUploading(true);
+    setMessage("");
+    setCheckInTicket(null);
+    setQrDecode(null);
+    setReservationId("");
+    setQrPayload(payload.trim());
+
+    try {
+      const res = await parkingOperationApi.resolveQrPayload(payload);
+      if (res.isSuccess && res.result) {
+        setQrDecode(res.result);
+        setQrPayload(res.result.qrPayload);
+        setReservationId(res.result.reservationId || "");
+        if (!res.result.reservationId) {
+          setMessage(
+            "QR da doc duoc nhung khong phai ma dat cho. Vui long dung QR reservation de check-in dat truoc.",
+          );
+        }
+      } else {
+        setMessage(res.message || "Không đọc được mã QR.");
+      }
+    } catch (err) {
+      console.error(err);
+      setMessage(err instanceof Error ? err.message : "Lỗi kết nối khi kiểm tra QR.");
     } finally {
       setQrUploading(false);
     }
@@ -804,7 +828,6 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
             <div className="scan-entry-layout">
               <div className="camera-preview scan-entry-camera card-panel">
                 <div className="scan-card-heading">
-                  <span className="scan-step-badge">1</span>
                   <div>
                     <h3>Ảnh biển số</h3>
                     <p>
@@ -813,63 +836,17 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                     </p>
                   </div>
                 </div>
-                <div
-                  className="camera-frame clickable camera-frame--compact"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {imagePreviewUrl ? (
-                    <img
-                      src={imagePreviewUrl}
-                      className="camera-preview-img"
-                      alt="Ảnh biển số xe"
-                    />
-                  ) : (
-                    <div className="camera-placeholder">
-                      <svg
-                        width="52"
-                        height="52"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                        <circle cx="12" cy="13" r="4" />
-                      </svg>
-                      <p>Nhấn để chọn ảnh biển số nếu cần</p>
-                      <small>Hỗ trợ JPG, PNG từ camera hoặc thiết bị</small>
-                    </div>
-                  )}
-
-                  {uploading && (
-                    <>
-                      <div className="ocr-scanning-line" />
-                      <div className="ocr-loading-overlay">
-                        <span>Đang nhận diện biển số...</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="upload-input-hidden"
-                  accept="image/*"
-                  onChange={handleImageUpload}
+                <PlateCameraCapture
+                  busy={uploading}
+                  previewUrl={imagePreviewUrl}
+                  previewAlt="Ảnh biển số xe"
+                  fileNamePrefix="checkin-plate"
+                  onCapture={handlePlateCameraCapture}
                 />
-                <button
-                  type="button"
-                  className="btn btn-outline btn-block"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload size={17} aria-hidden />
-                  {imagePreviewUrl ? "Đổi ảnh khác" : "Chọn ảnh"}
-                </button>
               </div>
 
               <div className="scan-entry-form card-panel">
                 <div className="scan-card-heading">
-                  <span className="scan-step-badge">2</span>
                   <div>
                     <h3>Xác nhận thông tin xe</h3>
                     <p>
@@ -971,7 +948,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                       >
                         {reservationId
                           ? `ReservationId: ${reservationId}`
-                          : "Upload QR hoặc nhập payload bên dưới"}
+                          : "Tải ảnh QR hoặc nhập payload bên dưới"}
                       </div>
                       <input
                         type="text"
@@ -984,16 +961,22 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                           setQrDecode(null);
                         }}
                       />
+                      <QrCameraScanner
+                        busy={qrUploading}
+                        onDecoded={handleQrCameraDecoded}
+                        actions={
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            disabled={qrUploading}
+                            onClick={() => qrInputRef.current?.click()}
+                          >
+                            <QrCode size={16} aria-hidden />
+                            {qrUploading ? "Đang đọc QR..." : "Tải ảnh QR"}
+                          </button>
+                        }
+                      />
                       <div className="reservation-code-actions">
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          disabled={qrUploading}
-                          onClick={() => qrInputRef.current?.click()}
-                        >
-                          <QrCode size={16} aria-hidden />
-                          {qrUploading ? "Đang đọc QR..." : "Quét QR từ ảnh"}
-                        </button>
                         {hasReservationCode && (
                           <span className="scan-ready-label">
                             <CheckCircle2 size={16} aria-hidden /> Đã nhận mã

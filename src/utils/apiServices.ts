@@ -212,6 +212,22 @@ export interface ParkingQrDecodeResult {
   imageUrl?: string
 }
 
+export interface PlateRecognitionCandidate {
+  licensePlate: string
+  confidence: number
+  regionCode?: string
+}
+
+export interface PlateRecognitionResult {
+  imageUrl: string
+  licensePlate?: string
+  confidence?: number
+  regionCode?: string
+  provider?: string
+  message?: string
+  candidates?: PlateRecognitionCandidate[]
+}
+
 export interface ParkingFeePreview {
   sessionId: string
   licensePlate: string
@@ -416,7 +432,7 @@ export const parkingOperationApi = {
   uploadAndRecognizePlate: (file: File) => {
     const formData = new FormData()
     formData.append('file', file)
-    return apiClient.post<{ imageUrl: string; licensePlate?: string; message?: string }>(
+    return apiClient.post<PlateRecognitionResult>(
       '/ParkingOperation/upload-and-recognize-plate',
       formData
     )
@@ -430,6 +446,12 @@ export const parkingOperationApi = {
       formData,
     )
   },
+
+  resolveQrPayload: (qrPayload: string) =>
+    apiClient.post<ApiResponse<ParkingQrDecodeResult>>(
+      '/ParkingOperation/resolve-qr-payload',
+      { qrPayload },
+    ),
 
   checkIn: (data: ParkingCheckInRequest) =>
     apiClient.post<ApiResponse<ParkingCheckInResponse>>('/ParkingOperation/check-in', data),

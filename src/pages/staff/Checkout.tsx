@@ -17,6 +17,8 @@ import {
   XCircle,
 } from 'lucide-react'
 import StaffPageShell from '../../components/StaffPageShell'
+import PlateCameraCapture from '../../components/PlateCameraCapture'
+import QrCameraScanner from '../../components/QrCameraScanner'
 import {
   parkingOperationApi,
   parkingSessionApi,
@@ -298,6 +300,35 @@ export default function Checkout() {
     }
   }
 
+  const handlePlateCameraCapture = async (file: File, previewUrl: string) => {
+    setImagePreviewUrl(previewUrl)
+    setUploading(true)
+    setMessage('')
+    setOnlinePayment(null)
+    setCheckoutResult(null)
+    setCheckoutPayment(null)
+    setPlateForCheckout('')
+
+    try {
+      const res = await parkingOperationApi.uploadAndRecognizePlate(file)
+      if (res?.imageUrl) {
+        setExitImageUrl(res.imageUrl)
+        if (res.licensePlate) {
+          preparePlateForCheckout(normalizeLicensePlate(res.licensePlate))
+        } else {
+          setMessage(res.message || 'Khong nhan dien duoc bien so.')
+        }
+      } else {
+        setMessage('Khong luu duoc anh bien so.')
+      }
+    } catch (err) {
+      console.error(err)
+      setMessage(err instanceof Error ? err.message : 'Loi ket noi khi chup bien so.')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const handleQrUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -331,6 +362,41 @@ export default function Checkout() {
     } catch (err) {
       console.error(err)
       setMessage(err instanceof Error ? err.message : 'Lỗi kết nối khi upload QR.')
+    } finally {
+      setQrUploading(false)
+    }
+  }
+
+  const handleQrCameraDecoded = async (payload: string) => {
+    setQrUploading(true)
+    setMessage('')
+    setOnlinePayment(null)
+    setCheckoutResult(null)
+    setCheckoutPayment(null)
+    setQrDecode(null)
+    setFloorValidationError('')
+    setValidatingFloor(false)
+    setSessionForCheckout(null)
+    setFeePreview(null)
+    setFeePreviewError('')
+    setQrPayload(payload.trim())
+    setSessionId('')
+
+    try {
+      const res = await parkingOperationApi.resolveQrPayload(payload)
+      if (res.isSuccess && res.result) {
+        setQrDecode(res.result)
+        setQrPayload(res.result.qrPayload)
+        setSessionId(res.result.sessionId || '')
+        if (!res.result.sessionId) {
+          setMessage('QR da doc duoc nhung khong phai ma ve xe/session. Vui long dung QR ve gui xe de checkout.')
+        }
+      } else {
+        setMessage(res.message || 'Khong doc duoc ma QR.')
+      }
+    } catch (err) {
+      console.error(err)
+      setMessage(err instanceof Error ? err.message : 'Loi ket noi khi resolve QR.')
     } finally {
       setQrUploading(false)
     }
@@ -573,6 +639,14 @@ export default function Checkout() {
                     <p>{sessionForCheckout ? 'Bấm vào ảnh lúc ra để tải hoặc thay ảnh đối chiếu.' : 'Ảnh chỉ dùng để dự phòng và hỗ trợ nhận diện biển số.'}</p>
                   </div>
                 </div>
+                <PlateCameraCapture
+                  disabled={hasPendingCheckout}
+                  busy={uploading}
+                  previewUrl={imagePreviewUrl || exitImageUrl}
+                  previewAlt="Exit plate preview"
+                  fileNamePrefix="checkout-plate"
+                  onCapture={handlePlateCameraCapture}
+                />
                 {!sessionForCheckout && (
                   <div
                     className={`camera-frame clickable${hasPendingCheckout ? ' is-disabled' : ''}`}
@@ -761,6 +835,11 @@ export default function Checkout() {
                       setOnlinePayment(null)
                       setCheckoutResult(null)
                     }}
+                  />
+                  <QrCameraScanner
+                    disabled={hasPendingCheckout}
+                    busy={qrUploading}
+                    onDecoded={handleQrCameraDecoded}
                   />
                   <button
                     type="button"
