@@ -127,6 +127,20 @@ export default function Checkout() {
   }
 
   useEffect(() => {
+    if (!sessionForCheckout || !licensePlate.trim()) {
+      return
+    }
+
+    if (
+      normalizeLicensePlate(licensePlate) !==
+      normalizeLicensePlate(sessionForCheckout.licensePlateIn)
+    ) {
+      setPlateRecognitionTone('error')
+      setPlateRecognitionNotice('Biển số xe ra không khớp biển số xe vào.')
+    }
+  }, [licensePlate, sessionForCheckout])
+
+  useEffect(() => {
     if (!gateContext || !initialState?.gateAccessGranted) {
       navigate(staffGateSelectionPath('checkout'), { replace: true })
     }
@@ -305,7 +319,21 @@ export default function Checkout() {
           feedback.ok ? 'Nhận diện biển số thành công.' : feedback.message,
         )
         if (res.licensePlate) {
-          preparePlateForCheckout(normalizeLicensePlate(res.licensePlate))
+          const recognizedPlate = normalizeLicensePlate(res.licensePlate)
+          preparePlateForCheckout(recognizedPlate)
+          if (
+            sessionForCheckout &&
+            normalizeLicensePlate(recognizedPlate) !==
+              normalizeLicensePlate(sessionForCheckout.licensePlateIn)
+          ) {
+            setPlateRecognitionTone('error')
+            setPlateRecognitionNotice('Biển số xe ra không khớp biển số xe vào.')
+          } else {
+            setPlateRecognitionTone(feedback.ok ? 'success' : 'error')
+            setPlateRecognitionNotice(
+              feedback.ok ? 'Nhận diện biển số thành công.' : feedback.message,
+            )
+          }
         }
       } else {
         setPlateRecognitionTone('error')
@@ -661,107 +689,100 @@ export default function Checkout() {
             </div>
 
             <div className="scan-container staff-checkout-layout">
-              <div className={`camera-preview card-panel staff-checkout-camera-card${sessionForCheckout ? ' has-comparison' : ''}`}>
+              <div className={`card-panel staff-checkout-camera-card${sessionForCheckout ? ' has-comparison' : ''}`}>
                 <div className="scan-card-heading">
                   <span className="checkout-card-icon"><Camera size={19} /></span>
                   <div>
-                    <h3>{sessionForCheckout ? 'Đối chiếu xe vào / ra' : 'Chụp biển số xe ra'}</h3>
-                    <p>{sessionForCheckout ? 'Chụp ảnh lúc ra bằng camera để đối chiếu với ảnh lúc vào.' : 'Dùng camera để chụp biển số, hệ thống sẽ tự nhận diện và điền vào form.'}</p>
+                    <h3>{sessionForCheckout ? 'Đối chiếu ảnh ra/vào' : 'Chụp ảnh checkout'}</h3>
+                    <p>{sessionForCheckout ? 'So sánh ảnh lúc vào và lúc ra để xác thực checkout.' : 'Chụp biển số và khuôn mặt người lái khi xe ra.'}</p>
                   </div>
                 </div>
-                <PlateCameraCapture
-                  disabled={hasPendingCheckout}
-                  busy={uploading}
-                  previewUrl={imagePreviewUrl || exitImageUrl}
-                  previewAlt="Exit plate preview"
-                  fileNamePrefix="checkout-plate"
-                  onCapture={handlePlateCameraCapture}
-                />
 
-                <div className="scan-card-heading">
-                  <div>
-                    <h3>Ảnh người lái lúc ra</h3>
-                    <p>Chụp riêng khuôn mặt để đối chiếu với ảnh người lái lúc vào.</p>
-                  </div>
-                </div>
-                <PlateCameraCapture
-                  disabled={hasPendingCheckout}
-                  busy={driverUploading}
-                  previewUrl={driverImagePreviewUrl || driverExitImageUrl}
-                  previewAlt="Ảnh người lái lúc ra"
-                  fileNamePrefix="checkout-driver"
-                  captureLabel="Chụp khuôn mặt"
-                  helperText="Căn rõ khuôn mặt người lái trong khung rồi bấm chụp."
-                  processingLabel="Đang lưu ảnh người lái..."
-                  facingMode="user"
-                  onCapture={handleDriverCameraCapture}
-                />
-
-                {sessionForCheckout && (
-                  <section className="checkout-vehicle-comparison" aria-label="Đối chiếu xe vào và xe ra">
-                    <div className="manager-session-image-grid">
-                      <article>
-                        <div>
-                          {sessionForCheckout.entryImageUrl ? (
-                            <a href={sessionForCheckout.entryImageUrl} target="_blank" rel="noreferrer">
-                              <img
-                                src={sessionForCheckout.entryImageUrl}
-                                alt={`Xe ${sessionForCheckout.licensePlateIn} lúc vào`}
-                              />
-                            </a>
-                          ) : (
-                            <span className="manager-session-image-empty">
-                              <ImageIcon size={27} aria-hidden />
-                              Chưa có ảnh lúc vào
-                            </span>
-                          )}
-                        </div>
-                        <strong>Ảnh lúc vào</strong>
-                        <small className="checkout-image-plate">
-                          Biển số: <b>{sessionForCheckout.licensePlateIn}</b>
-                        </small>
-                      </article>
-                      <article>
-                        <div className="checkout-exit-image-upload">
-                          {imagePreviewUrl || exitImageUrl ? (
-                            <img
-                              src={imagePreviewUrl || exitImageUrl}
-                              alt={`Xe ${licensePlate || 'chưa nhận diện'} lúc ra`}
-                            />
-                          ) : (
-                            <span className="manager-session-image-empty">
-                              <ImageIcon size={27} aria-hidden />
-                              Chưa có ảnh lúc ra
-                            </span>
-                          )}
-                          {uploading && (
-                            <>
-                              <div className="ocr-scanning-line" />
-                              <div className="ocr-loading-overlay">
-                                <span>Đang nhận diện biển số...</span>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                        <strong>Ảnh lúc ra</strong>
-                        <small className="checkout-image-plate">
-                          Biển số: <b>{licensePlate || 'Chưa nhận diện'}</b>
-                          <span>Chụp bằng camera bên trên</span>
-                        </small>
-                      </article>
+                <div className="checkout-photo-grid">
+                  <article className="scan-entry-camera card-panel checkout-photo-card">
+                    <div className="scan-card-heading">
+                      <div>
+                        <h3>Ảnh biển số ra</h3>
+                        <p>Dùng để nhận diện biển số và đối chiếu với vé.</p>
+                      </div>
                     </div>
-                    {plateMismatch ? (
-                      <p className="alert-inline alert-error" role="alert">
-                        <AlertCircle size={18} aria-hidden />
-                        Biển số ra không khớp biển số vào. Không thể checkout.
-                      </p>
-                    ) : licensePlate.trim() ? (
-                      <p className="checkout-comparison-ok">
-                        <CheckCircle2 size={16} aria-hidden /> Biển số vào và ra trùng khớp.
-                      </p>
-                    ) : null}
-                  </section>
-                )}
+                    <PlateCameraCapture
+                      disabled={hasPendingCheckout}
+                      busy={uploading}
+                      previewUrl={imagePreviewUrl || exitImageUrl}
+                      previewAlt="Ảnh biển số ra"
+                      fileNamePrefix="checkout-plate"
+                      onCapture={handlePlateCameraCapture}
+                    />
+                  </article>
+
+                  <article className="scan-entry-camera card-panel checkout-photo-card">
+                    <div className="scan-card-heading">
+                      <div>
+                        <h3>Ảnh người lái lúc ra</h3>
+                        <p>Chụp rõ mặt người lái để đối chiếu với ảnh lúc vào.</p>
+                      </div>
+                    </div>
+                    <PlateCameraCapture
+                      disabled={hasPendingCheckout}
+                      busy={driverUploading}
+                      previewUrl={driverImagePreviewUrl || driverExitImageUrl}
+                      previewAlt="Ảnh người lái lúc ra"
+                      fileNamePrefix="checkout-driver"
+                      captureLabel="Chụp khuôn mặt"
+                      helperText="Căn rõ khuôn mặt người lái trong khung rồi bấm chụp."
+                      processingLabel="Đang lưu ảnh người lái..."
+                      facingMode="user"
+                      onCapture={handleDriverCameraCapture}
+                    />
+                  </article>
+
+                  <article className="scan-entry-camera card-panel checkout-photo-card">
+                    <div className="scan-card-heading">
+                      <div>
+                        <h3>Ảnh biển số vào</h3>
+                        <p>Ảnh xe lúc vào bãi để so sánh với ảnh ra.</p>
+                      </div>
+                    </div>
+                    <div className="camera-preview">
+                      {sessionForCheckout?.entryImageUrl ? (
+                        <a href={sessionForCheckout.entryImageUrl} target="_blank" rel="noreferrer">
+                          <img src={sessionForCheckout.entryImageUrl} alt={`Xe ${sessionForCheckout.licensePlateIn} lúc vào`} />
+                        </a>
+                      ) : (
+                        <span className="manager-session-image-empty">
+                          <ImageIcon size={27} aria-hidden />
+                          Chưa có ảnh lúc vào
+                        </span>
+                      )}
+                    </div>
+                    <small className="checkout-image-plate">
+                      Biển số: <b>{sessionForCheckout?.licensePlateIn || 'Chưa có'}</b>
+                    </small>
+                  </article>
+
+                  <article className="scan-entry-camera card-panel checkout-photo-card">
+                    <div className="scan-card-heading">
+                      <div>
+                        <h3>Ảnh người lái lúc vào</h3>
+                        <p>Ảnh người lái lúc vào để đối chiếu khi checkout.</p>
+                      </div>
+                    </div>
+                    <div className="camera-preview">
+                      {sessionForCheckout?.driverEntryImageUrl ? (
+                        <a href={sessionForCheckout.driverEntryImageUrl} target="_blank" rel="noreferrer">
+                          <img src={sessionForCheckout.driverEntryImageUrl} alt="Ảnh người lái lúc vào" />
+                        </a>
+                      ) : (
+                        <span className="manager-session-image-empty">
+                          <ImageIcon size={27} aria-hidden />
+                          Chưa có ảnh người lái lúc vào
+                        </span>
+                      )}
+                    </div>
+                    <small className="checkout-image-plate">Dùng để xác thực ngay cả khi không có QR.</small>
+                  </article>
+                </div>
               </div>
 
               <div className="scan-form card-panel staff-checkout-form-card">

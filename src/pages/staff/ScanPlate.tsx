@@ -894,7 +894,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
               <div className="camera-preview scan-entry-camera card-panel">
                 <div className="scan-card-heading">
                   <div>
-                    <h3>Ảnh biển số</h3>
+                    <h3>Ảnh biển số vào</h3>
                     <p>
                       Ảnh dùng để nhận diện, có thể nhập
                       biển số trực tiếp ở bước bên cạnh.

@@ -155,8 +155,8 @@ export default function PlateCameraCapture({
         ) : !cameraOn ? (
           <div className="camera-placeholder">
             <Camera size={52} aria-hidden />
-            <p>Mở camera để chụp biển số</p>
-            <small>Căn biển số rõ trong khung rồi bấm chụp.</small>
+            <p>Mở camera để chụp</p>
+            <small>Căn rõ trong khung rồi bấm chụp.</small>
           </div>
         ) : null}
         {busy && (

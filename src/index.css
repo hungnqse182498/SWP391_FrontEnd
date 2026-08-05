@@ -2164,21 +2164,21 @@ ul, ol { margin: 0; padding: 0; }
 
 .scan-container {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 2rem;
   align-items: start;
 }
 
 .scan-entry-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 0.85fr) minmax(360px, 1.15fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
   align-items: stretch;
 }
 
 .scan-entry-camera {
   min-width: 0;
-  align-self: start;
+  align-self: stretch;
   padding: 1.1rem;
 }
 
@@ -8093,8 +8093,8 @@ ul, ol { margin: 0; padding: 0; }
 .staff-dashboard-action-grid .manager-dashboard-card { min-height: 180px; }
 
 .staff-checkout-layout {
-  align-items: start;
-  grid-template-columns: minmax(340px, 0.82fr) minmax(520px, 1.18fr);
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 1rem;
   margin-top: 1rem;
 }
@@ -8171,7 +8171,7 @@ ul, ol { margin: 0; padding: 0; }
 .staff-checkout-camera-card {
   display: flex;
   flex-direction: column;
-  gap: 0.95rem;
+  gap: 1rem;
 }
 
 .staff-checkout-camera-card.has-comparison {
@@ -8183,46 +8183,78 @@ ul, ol { margin: 0; padding: 0; }
   border-bottom: 1px solid #f1f5f9;
 }
 
-.staff-checkout-camera-card .camera-capture-tool {
-  width: min(100%, 520px);
-  align-self: center;
-  gap: 0.7rem;
+.checkout-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 1rem;
+  width: 100%;
 }
 
-.staff-checkout-camera-card .camera-frame {
+.checkout-photo-card {
+  min-width: 0;
   width: 100%;
-  max-width: none;
-  align-self: center;
-  aspect-ratio: 16 / 9;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.checkout-photo-card .scan-card-heading {
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.checkout-photo-card .camera-capture-tool {
+  width: 100%;
+  gap: 0.75rem;
+}
+
+.checkout-photo-card .camera-frame,
+.checkout-photo-card .camera-preview {
+  width: 100%;
   min-height: 220px;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.checkout-photo-card .camera-frame {
+  aspect-ratio: 16 / 9;
   margin: 0;
   border: 1px solid #cbd5e1;
-  border-radius: 12px;
   background: linear-gradient(145deg, #f8fafc, #eef2f7);
 }
 
-.staff-checkout-camera-card .camera-frame:hover {
-  border-color: #cbd5e1;
-  box-shadow: none;
+.checkout-photo-card .camera-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.staff-checkout-camera-card .camera-placeholder {
-  padding: 1rem;
-  text-align: center;
+.checkout-photo-card .camera-preview .manager-session-image-empty {
+  height: 100%;
+  min-height: 220px;
+  display: grid;
+  place-items: center;
 }
 
-.staff-checkout-camera-card .camera-placeholder svg {
-  width: 44px;
-  height: 44px;
+.checkout-image-plate {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  color: var(--text-muted) !important;
+  font-size: 0.78rem !important;
 }
 
-.staff-checkout-camera-card .camera-tool-actions {
-  justify-content: flex-start;
-}
-
-.staff-checkout-camera-card .camera-tool-actions .btn {
-  min-width: 150px;
-  justify-content: center;
+.checkout-image-plate b {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.2rem 0.45rem;
 }
 
 .staff-checkout-form-card {
@@ -8260,6 +8292,22 @@ ul, ol { margin: 0; padding: 0; }
   flex: 0 0 230px;
   max-width: 100%;
   justify-content: center;
+}
+
+.staff-checkout-form-card .checkout-field-ticket .qr-camera-tool {
+  max-width: 480px;
+  margin: 0.7rem auto 0;
+  gap: 0.65rem;
+}
+
+.staff-checkout-form-card .checkout-field-ticket .qr-camera-frame {
+  min-height: 150px;
+  aspect-ratio: 4 / 3;
+}
+
+.staff-checkout-form-card .checkout-field-ticket .qr-camera-tool .camera-tool-actions {
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .staff-checkout-form-card > .alert-inline {
@@ -8429,6 +8477,33 @@ ul, ol { margin: 0; padding: 0; }
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border);
+}
+
+.checkout-image-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+.checkout-image-grid article > div {
+  min-height: 190px;
+}
+
+.checkout-image-grid article > div img {
+  object-fit: cover;
+}
+
+.checkout-image-grid article > strong {
+  margin-top: 0.7rem;
+  font-size: 0.9rem;
+}
+
+.checkout-image-grid article > small {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.76rem;
 }
 
 .staff-checkout-camera-card.has-comparison > .checkout-vehicle-comparison {
