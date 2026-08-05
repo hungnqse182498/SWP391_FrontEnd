@@ -235,6 +235,9 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
   );
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [entryImageUrl, setEntryImageUrl] = useState("");
+  const [driverImagePreviewUrl, setDriverImagePreviewUrl] = useState("");
+  const [driverEntryImageUrl, setDriverEntryImageUrl] = useState("");
+  const [driverUploading, setDriverUploading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [licensePlate, setLicensePlate] = useState(
     normalizeLicensePlate(operationState?.licensePlate ?? ""),
@@ -403,6 +406,8 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
   const resetScan = (options: { keepResult?: boolean } = {}) => {
     setImagePreviewUrl("");
     setEntryImageUrl("");
+    setDriverImagePreviewUrl("");
+    setDriverEntryImageUrl("");
     setReservationId("");
     setQrPayload("");
     setQrDecode(null);
@@ -453,6 +458,21 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
     }
   };
 
+  const handleDriverCameraCapture = async (file: File, previewUrl: string) => {
+    setDriverImagePreviewUrl(previewUrl);
+    setDriverUploading(true);
+    try {
+      const res = await parkingOperationApi.uploadImage(file);
+      setDriverEntryImageUrl(res.imageUrl || "");
+    } catch (err) {
+      console.error(err);
+      setMessageTone("error");
+      setMessage("Không lưu được ảnh người lái.");
+    } finally {
+      setDriverUploading(false);
+    }
+  };
+
   const handleConfirmCheckIn = async () => {
     if (!licensePlate.trim()) {
       setPlateRecognitionTone("error");
@@ -487,6 +507,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
         qrPayload: qrPayload.trim() || undefined,
         gateId,
         entryImageUrl: entryImageUrl || undefined,
+        driverEntryImageUrl: driverEntryImageUrl || undefined,
       } as const;
       const res = await parkingOperationApi.checkIn(payload);
 
@@ -886,6 +907,26 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                   previewAlt="Ảnh biển số xe"
                   fileNamePrefix="checkin-plate"
                   onCapture={handlePlateCameraCapture}
+                />
+              </div>
+
+              <div className="camera-preview scan-entry-camera card-panel">
+                <div className="scan-card-heading">
+                  <div>
+                    <h3>Ảnh người lái lúc vào</h3>
+                    <p>Chụp rõ khuôn mặt người đang điều khiển xe để đối chiếu khi checkout.</p>
+                  </div>
+                </div>
+                <PlateCameraCapture
+                  busy={driverUploading}
+                  previewUrl={driverImagePreviewUrl || driverEntryImageUrl}
+                  previewAlt="Ảnh người lái lúc vào"
+                  fileNamePrefix="checkin-driver"
+                  captureLabel="Chụp khuôn mặt"
+                  helperText="Căn rõ khuôn mặt người lái trong khung rồi bấm chụp."
+                  processingLabel="Đang lưu ảnh người lái..."
+                  facingMode="user"
+                  onCapture={handleDriverCameraCapture}
                 />
               </div>
 

@@ -172,7 +172,9 @@ export interface ParkingSessionDto {
   licensePlateIn: string
   licensePlateOut?: string
   entryImageUrl?: string
+  driverEntryImageUrl?: string
   exitImageUrl?: string
+  driverExitImageUrl?: string
   vehicleTypeId: string
   vehicleTypeName?: string
   entryTime: string
@@ -260,6 +262,7 @@ export interface ParkingCheckInRequest {
   vehicleTypeId?: string
   gateId: string
   entryImageUrl?: string
+  driverEntryImageUrl?: string
 }
 
 export interface ParkingCheckInResponse extends Partial<ParkingSessionDto> {
@@ -277,6 +280,7 @@ export interface ParkingCheckOutRequest {
   gateId: string
   paymentMethod?: 'Cash' | 'PayOS' | string
   exitImageUrl?: string
+  driverExitImageUrl?: string
 }
 
 export interface ParkingOnlinePayment {
@@ -440,6 +444,12 @@ export const parkingOperationApi = {
       '/ParkingOperation/upload-and-recognize-plate',
       formData
     )
+  },
+
+  uploadImage: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiClient.post<{ imageUrl: string }>('/ParkingOperation/upload-image', formData)
   },
 
   uploadAndDecodeQr: (file: File) => {

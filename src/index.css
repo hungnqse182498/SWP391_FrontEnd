@@ -2182,6 +2182,11 @@ ul, ol { margin: 0; padding: 0; }
   padding: 1.1rem;
 }
 
+/* Check-in records two independent photos: license plate and driver face. */
+.scan-entry-layout > .scan-entry-form {
+  grid-column: 1 / -1;
+}
+
 .manager-page-canvas {
   width: 100%;
   min-width: 0;

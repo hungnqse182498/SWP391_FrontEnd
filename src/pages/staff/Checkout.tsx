@@ -81,6 +81,9 @@ export default function Checkout() {
   )
   const [imagePreviewUrl, setImagePreviewUrl] = useState('')
   const [exitImageUrl, setExitImageUrl] = useState(initialState?.exitImageUrl ?? '')
+  const [driverImagePreviewUrl, setDriverImagePreviewUrl] = useState('')
+  const [driverExitImageUrl, setDriverExitImageUrl] = useState('')
+  const [driverUploading, setDriverUploading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [qrUploading, setQrUploading] = useState(false)
   const [qrDecode, setQrDecode] = useState<ParkingQrDecodeResult | null>(null)
@@ -318,6 +321,20 @@ export default function Checkout() {
     }
   }
 
+  const handleDriverCameraCapture = async (file: File, previewUrl: string) => {
+    setDriverImagePreviewUrl(previewUrl)
+    setDriverUploading(true)
+    try {
+      const res = await parkingOperationApi.uploadImage(file)
+      setDriverExitImageUrl(res.imageUrl || '')
+    } catch (err) {
+      console.error(err)
+      showMessage('Không lưu được ảnh người lái.')
+    } finally {
+      setDriverUploading(false)
+    }
+  }
+
   const handleQrUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -459,6 +476,7 @@ export default function Checkout() {
         gateId,
         paymentMethod,
         exitImageUrl: exitImageUrl || undefined,
+        driverExitImageUrl: driverExitImageUrl || undefined,
       })
       if (res.isSuccess) {
         setCheckoutResult(res.result ?? null)
@@ -471,6 +489,8 @@ export default function Checkout() {
           setPlateForCheckout('')
           setImagePreviewUrl('')
           setExitImageUrl('')
+          setDriverImagePreviewUrl('')
+          setDriverExitImageUrl('')
           setQrPayload('')
           setSessionId('')
           setQrDecode(null)
@@ -578,6 +598,8 @@ export default function Checkout() {
     setPlateForCheckout('')
     setImagePreviewUrl('')
     setExitImageUrl('')
+    setDriverImagePreviewUrl('')
+    setDriverExitImageUrl('')
     setQrPayload('')
     setSessionId('')
     setQrDecode(null)
@@ -654,6 +676,25 @@ export default function Checkout() {
                   previewAlt="Exit plate preview"
                   fileNamePrefix="checkout-plate"
                   onCapture={handlePlateCameraCapture}
+                />
+
+                <div className="scan-card-heading">
+                  <div>
+                    <h3>Ảnh người lái lúc ra</h3>
+                    <p>Chụp riêng khuôn mặt để đối chiếu với ảnh người lái lúc vào.</p>
+                  </div>
+                </div>
+                <PlateCameraCapture
+                  disabled={hasPendingCheckout}
+                  busy={driverUploading}
+                  previewUrl={driverImagePreviewUrl || driverExitImageUrl}
+                  previewAlt="Ảnh người lái lúc ra"
+                  fileNamePrefix="checkout-driver"
+                  captureLabel="Chụp khuôn mặt"
+                  helperText="Căn rõ khuôn mặt người lái trong khung rồi bấm chụp."
+                  processingLabel="Đang lưu ảnh người lái..."
+                  facingMode="user"
+                  onCapture={handleDriverCameraCapture}
                 />
 
                 {sessionForCheckout && (

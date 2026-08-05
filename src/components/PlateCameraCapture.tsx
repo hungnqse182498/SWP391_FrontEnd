@@ -7,6 +7,10 @@ interface PlateCameraCaptureProps {
   previewUrl?: string
   previewAlt?: string
   fileNamePrefix?: string
+  captureLabel?: string
+  helperText?: string
+  processingLabel?: string
+  facingMode?: 'environment' | 'user'
   onCapture: (file: File, previewUrl: string) => Promise<void> | void
 }
 
@@ -39,6 +43,10 @@ export default function PlateCameraCapture({
   previewUrl = '',
   previewAlt = 'Plate capture preview',
   fileNamePrefix = 'plate-capture',
+  captureLabel = 'Capture plate',
+  helperText = 'Position the plate clearly in the frame, then capture it.',
+  processingLabel = 'Processing image...',
+  facingMode = 'environment',
   onCapture,
 }: PlateCameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -65,7 +73,7 @@ export default function PlateCameraCapture({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: { ideal: 'environment' },
+          facingMode: { ideal: facingMode },
           width: { ideal: 1280 },
           height: { ideal: 720 },
         },
@@ -128,7 +136,12 @@ export default function PlateCameraCapture({
   const hasPreview = Boolean(previewUrl)
 
   return (
-    <div className="camera-capture-tool">
+    <div
+      className="camera-capture-tool"
+      aria-label={captureLabel}
+      data-helper-text={helperText}
+      data-processing-label={processingLabel}
+    >
       <div className={`camera-frame camera-live-frame${cameraOn ? ' is-live' : ''}`}>
         <video
           ref={videoRef}
