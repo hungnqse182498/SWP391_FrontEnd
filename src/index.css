@@ -2199,6 +2199,11 @@ ul, ol { margin: 0; padding: 0; }
   gap: 0.75rem;
 }
 
+.scan-entry-layout > .card-panel > .scan-card-heading {
+  gap: 0;
+  min-height: 54px;
+}
+
 .scan-card-heading h3 {
   margin: 0 0 0.25rem;
   color: var(--text-heading);
@@ -2291,6 +2296,72 @@ ul, ol { margin: 0; padding: 0; }
   object-fit: cover;
 }
 
+.camera-capture-tool,
+.qr-camera-tool {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.camera-live-frame,
+.qr-camera-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  min-height: 220px;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.qr-camera-frame {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+}
+
+.camera-live-frame.is-live,
+.qr-camera-frame.is-live {
+  border-color: var(--blue-500);
+  background: #020617;
+}
+
+.camera-live-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #020617;
+}
+
+.camera-live-video.is-hidden {
+  display: none;
+}
+
+.qr-camera-frame .camera-placeholder {
+  position: absolute;
+  inset: 0;
+}
+
+.camera-tool-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.qr-camera-tool .camera-tool-actions {
+  flex-direction: row;
+}
+
+.camera-tool-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .ocr-loading-overlay {
   position: absolute;
   inset: 0;
@@ -2360,12 +2431,25 @@ ul, ol { margin: 0; padding: 0; }
   gap: 0.9rem;
 }
 
-.scan-entry-grid .form-field:first-child {
+.scan-entry-grid .form-field--full {
   grid-column: 1 / -1;
 }
 
-.scan-entry-grid .form-field--full {
-  grid-column: 1 / -1;
+.scan-entry-form .form-field {
+  min-width: 0;
+  margin: 0;
+}
+
+.scan-entry-form .form-field label {
+  color: #334155;
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.scan-entry-form .input-standalone,
+.scan-entry-form .input-readonly {
+  min-height: 43px;
+  border-radius: 10px;
 }
 
 .checkin-type-selector {
@@ -2510,6 +2594,29 @@ ul, ol { margin: 0; padding: 0; }
   border: 1px solid #86efac;
   background: #f0fdf4;
   color: #166534;
+}
+
+.plate-recognition-inline {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.plate-recognition-inline svg {
+  flex: 0 0 auto;
+  margin-top: 0.05rem;
+}
+
+.plate-recognition-inline.is-success {
+  color: #166534;
+}
+
+.plate-recognition-inline.is-error {
+  color: #b91c1c;
 }
 
 .scan-result {
@@ -7982,8 +8089,8 @@ ul, ol { margin: 0; padding: 0; }
 
 .staff-checkout-layout {
   align-items: start;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1.15rem;
+  grid-template-columns: minmax(340px, 0.82fr) minmax(520px, 1.18fr);
+  gap: 1rem;
   margin-top: 1rem;
 }
 
@@ -8059,26 +8166,58 @@ ul, ol { margin: 0; padding: 0; }
 .staff-checkout-camera-card {
   display: flex;
   flex-direction: column;
+  gap: 0.95rem;
 }
 
 .staff-checkout-camera-card.has-comparison {
   display: flex;
 }
 
+.staff-checkout-camera-card .scan-card-heading {
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.staff-checkout-camera-card .camera-capture-tool {
+  width: min(100%, 520px);
+  align-self: center;
+  gap: 0.7rem;
+}
+
 .staff-checkout-camera-card .camera-frame {
   width: 100%;
-  max-width: 420px;
+  max-width: none;
   align-self: center;
   aspect-ratio: 16 / 9;
-  margin-top: 1rem;
-  border: 1px dashed #94a3b8;
-  border-radius: 14px;
+  min-height: 220px;
+  margin: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
   background: linear-gradient(145deg, #f8fafc, #eef2f7);
 }
 
 .staff-checkout-camera-card .camera-frame:hover {
-  border-color: #f59e0b;
-  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.09);
+  border-color: #cbd5e1;
+  box-shadow: none;
+}
+
+.staff-checkout-camera-card .camera-placeholder {
+  padding: 1rem;
+  text-align: center;
+}
+
+.staff-checkout-camera-card .camera-placeholder svg {
+  width: 44px;
+  height: 44px;
+}
+
+.staff-checkout-camera-card .camera-tool-actions {
+  justify-content: flex-start;
+}
+
+.staff-checkout-camera-card .camera-tool-actions .btn {
+  min-width: 150px;
+  justify-content: center;
 }
 
 .staff-checkout-form-card {
@@ -8089,10 +8228,33 @@ ul, ol { margin: 0; padding: 0; }
 
 .staff-checkout-form-card > .scan-card-heading,
 .staff-checkout-form-card > .checkout-session-banner,
+.staff-checkout-form-card > .checkout-priority-fields,
+.staff-checkout-form-card > .checkout-payment-field,
 .staff-checkout-form-card > .checkout-field-ticket,
 .staff-checkout-form-card > .alert-inline,
 .staff-checkout-form-card > .scan-result {
   grid-column: 1 / -1;
+}
+
+.checkout-priority-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.checkout-priority-fields .form-field {
+  min-width: 0;
+}
+
+.checkout-priority-fields .checkout-license-field {
+  grid-column: 1 / -1;
+}
+
+.checkout-field-ticket .qr-camera-tool .camera-tool-actions > .btn {
+  flex: 0 0 230px;
+  max-width: 100%;
+  justify-content: center;
 }
 
 .staff-checkout-form-card > .alert-inline {
@@ -8345,7 +8507,7 @@ ul, ol { margin: 0; padding: 0; }
 
 .checkout-exit-image-upload {
   position: relative;
-  cursor: pointer;
+  cursor: default;
   outline: 1px dashed transparent;
   outline-offset: -4px;
   transition: outline-color 0.2s, box-shadow 0.2s;
@@ -8353,8 +8515,8 @@ ul, ol { margin: 0; padding: 0; }
 
 .checkout-exit-image-upload:hover,
 .checkout-exit-image-upload:focus-visible {
-  outline-color: #f59e0b;
-  box-shadow: inset 0 0 0 4px rgba(245, 158, 11, 0.08);
+  outline-color: transparent;
+  box-shadow: none;
 }
 
 .checkout-exit-image-upload.is-disabled {
@@ -8774,6 +8936,7 @@ ul, ol { margin: 0; padding: 0; }
   }
   .checkout-progress > i { width: 1px; min-height: 10px; margin-left: 15px; }
   .checkout-progress small { white-space: normal; }
+  .checkout-priority-fields { grid-template-columns: 1fr; }
   .staff-checkout-form-card { grid-template-columns: 1fr; }
   .staff-checkout-form-card > * { grid-column: 1 !important; }
   .checkout-session-banner { grid-template-columns: auto minmax(0, 1fr); }

@@ -24,7 +24,6 @@ import {
   RotateCcw,
   Search,
   Smartphone,
-  Upload,
   UserCheck,
   UserRound,
   UsersRound,
@@ -32,6 +31,8 @@ import {
 } from "lucide-react";
 import StaffPageShell from "../../components/StaffPageShell";
 import ParkingTicketModal from "../../components/ParkingTicketModal";
+import PlateCameraCapture from "../../components/PlateCameraCapture";
+import QrCameraScanner from "../../components/QrCameraScanner";
 import { navigateStaffNav } from "../../config/staffNav";
 import { useParkingFeePreviews } from "../../hooks/useParkingFeePreviews";
 import {
@@ -61,6 +62,10 @@ import {
   readStaffGateContext,
   staffGateSelectionPath,
 } from "../../utils/staffGateContext";
+import {
+  buildPlateRecognitionExceptionFeedback,
+  buildPlateRecognitionFeedback,
+} from "../../utils/plateRecognitionFeedback";
 
 type GatePanel = "scan" | "reservations" | "active-vehicles";
 
@@ -223,7 +228,6 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
       !gateContext.isResident &&
       isCarVehicleTypeName(gateContext.dedicatedVehicleTypeName),
   );
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const qrInputRef = useRef<HTMLInputElement>(null);
 
   const [activePanel, setActivePanel] = useState<GatePanel>(
@@ -255,6 +259,11 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
   const [qrUploading, setQrUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"success" | "error">("error");
+  const [plateRecognitionNotice, setPlateRecognitionNotice] = useState("");
+  const [plateRecognitionTone, setPlateRecognitionTone] = useState<
+    "success" | "error"
+  >("error");
   const [checkInTicket, setCheckInTicket] = useState<CheckInTicketView | null>(
     null,
   );
@@ -397,22 +406,24 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
     setReservationId("");
     setQrPayload("");
     setQrDecode(null);
+    setMessageTone("error");
+    setPlateRecognitionTone("error");
+    setPlateRecognitionNotice("");
     setPlateForConfirm("");
     if (!options.keepResult) {
       setMessage("");
       setCheckInTicket(null);
     }
-    if (fileInputRef.current) fileInputRef.current.value = "";
     if (qrInputRef.current) qrInputRef.current.value = "";
   };
 
-  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setImagePreviewUrl(URL.createObjectURL(file));
+  const handlePlateCameraCapture = async (file: File, previewUrl: string) => {
+    setImagePreviewUrl(previewUrl);
     setUploading(true);
     setMessage("");
+    setMessageTone("error");
+    setPlateRecognitionTone("error");
+    setPlateRecognitionNotice("");
     setCheckInTicket(null);
     setPlateForConfirm("");
 
@@ -420,33 +431,46 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
       const res = await parkingOperationApi.uploadAndRecognizePlate(file);
       if (res?.imageUrl) {
         setEntryImageUrl(res.imageUrl);
+        const feedback = buildPlateRecognitionFeedback(res);
+        setPlateRecognitionTone(feedback.ok ? "success" : "error");
+        setPlateRecognitionNotice(
+          feedback.ok ? "Nhận diện biển số thành công." : feedback.message,
+        );
         if (res.licensePlate) {
           setPlateForConfirm(res.licensePlate);
-        } else {
-          setMessage(res.message || "Không nhận diện được biển số.");
         }
       } else {
-        setMessage("Tải ảnh thất bại hoặc không nhận được đường dẫn ảnh.");
+        setPlateRecognitionTone("error");
+        setPlateRecognitionNotice("Không lưu được ảnh biển số.");
       }
     } catch (err) {
       console.error(err);
-      setMessage(
-        err instanceof Error ? err.message : "Lỗi kết nối khi upload ảnh.",
-      );
+      const feedback = buildPlateRecognitionExceptionFeedback(err);
+      setPlateRecognitionTone("error");
+      setPlateRecognitionNotice(feedback.message);
     } finally {
       setUploading(false);
     }
   };
 
   const handleConfirmCheckIn = async () => {
-    if (!licensePlate.trim() || !gateId) return;
+    if (!licensePlate.trim()) {
+      setPlateRecognitionTone("error");
+      setPlateRecognitionNotice("Vui lòng nhập hoặc chụp biển số xe.");
+      return;
+    }
+    if (!gateId) return;
     if (checkInType !== "reservation" && !vehicleTypeId) return;
     if (checkInType === "reservation" && !reservationId && !qrPayload.trim()) {
+      setMessageTone("error");
       setMessage("Vui lòng upload ảnh QR đặt chỗ hoặc nhập mã QR đặt chỗ");
       return;
     }
     setLoading(true);
     setMessage("");
+    setMessageTone("error");
+    setPlateRecognitionNotice("");
+    setPlateRecognitionTone("error");
     setCheckInTicket(null);
     try {
       const payload = {
@@ -470,13 +494,18 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
         const ticket = toCheckInTicketView(res.result);
         resetScan({ keepResult: true });
         setCheckInTicket(ticket);
+        setMessageTone("success");
+        setPlateRecognitionNotice("");
+        setPlateRecognitionTone("error");
         setMessage(res.message || "Check-in thành công");
         loadGateLists();
       } else {
+        setMessageTone("error");
         setMessage(res.message || "Check-in thất bại");
       }
     } catch (err) {
       console.error(err);
+      setMessageTone("error");
       setMessage(err instanceof Error ? err.message : "Lỗi kết nối API");
     } finally {
       setLoading(false);
@@ -489,6 +518,9 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
 
     setQrUploading(true);
     setMessage("");
+    setMessageTone("error");
+    setPlateRecognitionNotice("");
+    setPlateRecognitionTone("error");
     setCheckInTicket(null);
     setQrDecode(null);
     setReservationId("");
@@ -502,7 +534,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
         setReservationId(res.result.reservationId || "");
         if (!res.result.reservationId) {
           setMessage(
-            "QR đã đọc được nhưng không phải mã đặt chỗ. Vui lòng dùng QR reservation để check-in đặt trước.",
+            "QR đã đọc được nhưng không phải mã đặt chỗ. Vui lòng dùng QR đặt chỗ để check-in đặt trước.",
           );
         }
       } else {
@@ -513,6 +545,41 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
       setMessage(
         err instanceof Error ? err.message : "Lỗi kết nối khi upload QR.",
       );
+    } finally {
+      setQrUploading(false);
+    }
+  };
+
+  const handleQrCameraDecoded = async (payload: string) => {
+    setQrUploading(true);
+    setMessage("");
+    setMessageTone("error");
+    setPlateRecognitionNotice("");
+    setPlateRecognitionTone("error");
+    setCheckInTicket(null);
+    setQrDecode(null);
+    setReservationId("");
+    setQrPayload(payload.trim());
+
+    try {
+      const res = await parkingOperationApi.resolveQrPayload(payload);
+      if (res.isSuccess && res.result) {
+        setQrDecode(res.result);
+        setQrPayload(res.result.qrPayload);
+        setReservationId(res.result.reservationId || "");
+        if (!res.result.reservationId) {
+          setMessage(
+            "QR đã đọc được nhưng không phải mã đặt chỗ. Vui lòng dùng QR đặt chỗ để check-in đặt trước.",
+          );
+        }
+      } else {
+        setMessageTone("error");
+        setMessage(res.message || "Không đọc được mã QR.");
+      }
+    } catch (err) {
+      console.error(err);
+      setMessageTone("error");
+      setMessage(err instanceof Error ? err.message : "Lỗi kết nối khi kiểm tra QR.");
     } finally {
       setQrUploading(false);
     }
@@ -731,6 +798,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
     gateId &&
     (checkInType === "reservation" ? hasReservationCode : vehicleTypeId),
   );
+  const checkInMessageIsSuccess = messageTone === "success" || Boolean(checkInTicket);
 
   return (
     <StaffPageShell activeItem={activePanel} onSelectItem={handleSelectSidebar}>
@@ -804,7 +872,6 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
             <div className="scan-entry-layout">
               <div className="camera-preview scan-entry-camera card-panel">
                 <div className="scan-card-heading">
-                  <span className="scan-step-badge">1</span>
                   <div>
                     <h3>Ảnh biển số</h3>
                     <p>
@@ -813,63 +880,17 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                     </p>
                   </div>
                 </div>
-                <div
-                  className="camera-frame clickable camera-frame--compact"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {imagePreviewUrl ? (
-                    <img
-                      src={imagePreviewUrl}
-                      className="camera-preview-img"
-                      alt="Ảnh biển số xe"
-                    />
-                  ) : (
-                    <div className="camera-placeholder">
-                      <svg
-                        width="52"
-                        height="52"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                        <circle cx="12" cy="13" r="4" />
-                      </svg>
-                      <p>Nhấn để chọn ảnh biển số nếu cần</p>
-                      <small>Hỗ trợ JPG, PNG từ camera hoặc thiết bị</small>
-                    </div>
-                  )}
-
-                  {uploading && (
-                    <>
-                      <div className="ocr-scanning-line" />
-                      <div className="ocr-loading-overlay">
-                        <span>Đang nhận diện biển số...</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="upload-input-hidden"
-                  accept="image/*"
-                  onChange={handleImageUpload}
+                <PlateCameraCapture
+                  busy={uploading}
+                  previewUrl={imagePreviewUrl}
+                  previewAlt="Ảnh biển số xe"
+                  fileNamePrefix="checkin-plate"
+                  onCapture={handlePlateCameraCapture}
                 />
-                <button
-                  type="button"
-                  className="btn btn-outline btn-block"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload size={17} aria-hidden />
-                  {imagePreviewUrl ? "Đổi ảnh khác" : "Chọn ảnh"}
-                </button>
               </div>
 
               <div className="scan-entry-form card-panel">
                 <div className="scan-card-heading">
-                  <span className="scan-step-badge">2</span>
                   <div>
                     <h3>Xác nhận thông tin xe</h3>
                     <p>
@@ -878,18 +899,49 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                   </div>
                 </div>
                 <div className="scan-entry-grid">
-                  <div className="form-field">
+                  <div className="form-field form-field--full">
                     <label htmlFor="license-plate">Biển số xe</label>
                     <input
                       id="license-plate"
                       type="text"
-                      className="input-standalone plate-input"
+                      className="input-standalone"
                       placeholder="Nhập biển số"
                       value={licensePlate}
-                      onChange={(event) =>
+                      onChange={(event) => {
                         setPlateForConfirm(event.target.value)
-                      }
+                        setPlateRecognitionNotice("")
+                        setPlateRecognitionTone("error")
+                      }}
                     />
+                    {plateRecognitionNotice && (
+                      <p
+                        className={`plate-recognition-inline ${
+                          plateRecognitionTone === "success"
+                            ? "is-success"
+                            : "is-error"
+                        }`}
+                        role={
+                          plateRecognitionTone === "success"
+                            ? "status"
+                            : "alert"
+                        }
+                      >
+                        {plateRecognitionTone === "success" ? (
+                          <CheckCircle2 size={15} aria-hidden />
+                        ) : (
+                          <AlertCircle size={15} aria-hidden />
+                        )}
+                        {plateRecognitionNotice}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="form-field">
+                    <label>Loại phương tiện</label>
+                    <div className="input-readonly">
+                      {gateContext?.dedicatedVehicleTypeName ||
+                        "Tầng chưa cấu hình loại phương tiện"}
+                    </div>
                   </div>
 
                   <div className="form-field">
@@ -953,26 +1005,14 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                     </div>
                   </div>
 
-                  {checkInType !== "reservation" && (
-                    <div className="form-field">
-                      <label>Loại phương tiện</label>
-                      <div className="input-readonly">
-                        {gateContext?.dedicatedVehicleTypeName ||
-                          "Tầng chưa cấu hình loại phương tiện"}
-                      </div>
-                    </div>
-                  )}
-
                   {checkInType === "reservation" && (
                     <div className="form-field form-field--full reservation-code-field">
                       <label>Mã QR đặt chỗ</label>
-                      <div
-                        className={`input-readonly${reservationId ? " input-readonly--success" : ""}`}
-                      >
-                        {reservationId
-                          ? `ReservationId: ${reservationId}`
-                          : "Upload QR hoặc nhập payload bên dưới"}
-                      </div>
+                      {reservationId && (
+                        <div className="input-readonly input-readonly--success">
+                          ReservationId: {reservationId}
+                        </div>
+                      )}
                       <input
                         type="text"
                         className="input-standalone"
@@ -984,16 +1024,22 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                           setQrDecode(null);
                         }}
                       />
+                      <QrCameraScanner
+                        busy={qrUploading}
+                        onDecoded={handleQrCameraDecoded}
+                        actions={
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            disabled={qrUploading}
+                            onClick={() => qrInputRef.current?.click()}
+                          >
+                            <QrCode size={16} aria-hidden />
+                            {qrUploading ? "Đang đọc QR..." : "Tải ảnh QR"}
+                          </button>
+                        }
+                      />
                       <div className="reservation-code-actions">
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          disabled={qrUploading}
-                          onClick={() => qrInputRef.current?.click()}
-                        >
-                          <QrCode size={16} aria-hidden />
-                          {qrUploading ? "Đang đọc QR..." : "Quét QR từ ảnh"}
-                        </button>
                         {hasReservationCode && (
                           <span className="scan-ready-label">
                             <CheckCircle2 size={16} aria-hidden /> Đã nhận mã
@@ -1033,10 +1079,10 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
 
                 {message && (
                   <p
-                    className={`alert-inline ${checkInTicket ? "alert-success" : "alert-error"}`}
-                    role="status"
+                    className={`alert-inline ${checkInMessageIsSuccess ? "alert-success" : "alert-error"}`}
+                    role={checkInMessageIsSuccess ? "status" : "alert"}
                   >
-                    {checkInTicket ? (
+                    {checkInMessageIsSuccess ? (
                       <CheckCircle2 size={18} aria-hidden />
                     ) : (
                       <AlertCircle size={18} aria-hidden />

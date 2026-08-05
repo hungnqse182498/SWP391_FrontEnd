@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+﻿import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   AlertCircle,
@@ -17,6 +17,8 @@ import {
   XCircle,
 } from 'lucide-react'
 import StaffPageShell from '../../components/StaffPageShell'
+import PlateCameraCapture from '../../components/PlateCameraCapture'
+import QrCameraScanner from '../../components/QrCameraScanner'
 import {
   parkingOperationApi,
   parkingSessionApi,
@@ -35,6 +37,10 @@ import { formatCurrency } from '../../utils/pricing'
 import { normalizeLicensePlate } from '../../utils/licensePlate'
 import { readStaffGateContext, staffGateSelectionPath } from '../../utils/staffGateContext'
 import { savePaymentReturnContext } from '../../utils/paymentReturnContext'
+import {
+  buildPlateRecognitionExceptionFeedback,
+  buildPlateRecognitionFeedback,
+} from '../../utils/plateRecognitionFeedback'
 
 function getOnlinePaymentUrl(payment: ParkingOnlinePayment | null) {
   return payment?.paymentUrl || payment?.PaymentUrl || ''
@@ -68,7 +74,6 @@ export default function Checkout() {
     paymentMethod?: string
     gateAccessGranted?: boolean
   } | null
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const qrInputRef = useRef<HTMLInputElement>(null)
 
   const [checkOutType, setCheckOutType] = useState<'auto' | 'guest' | 'resident' | 'reservation'>(
@@ -103,12 +108,20 @@ export default function Checkout() {
   const [feePreview, setFeePreview] = useState<ParkingFeePreview | null>(null)
   const [feePreviewError, setFeePreviewError] = useState('')
   const [message, setMessage] = useState('')
+  const [messageTone, setMessageTone] = useState<'success' | 'error'>('error')
+  const [plateRecognitionNotice, setPlateRecognitionNotice] = useState('')
+  const [plateRecognitionTone, setPlateRecognitionTone] = useState<'success' | 'error'>('error')
   const [onlinePayment, setOnlinePayment] = useState<ParkingOnlinePayment | null>(null)
   const [checkoutResult, setCheckoutResult] = useState<ParkingCheckOutResponse | null>(null)
   const [checkoutPayment, setCheckoutPayment] = useState<ParkingCheckoutPayment | null>(null)
   const checkoutPaymentId = checkoutPayment?.paymentId
   const checkoutPaymentMethod = checkoutPayment?.paymentMethod
   const checkoutPaymentStatus = checkoutPayment?.paymentStatus
+
+  const showMessage = (text: string, tone: 'success' | 'error' = 'error') => {
+    setMessageTone(tone)
+    setMessage(text)
+  }
 
   useEffect(() => {
     if (!gateContext || !initialState?.gateAccessGranted) {
@@ -237,10 +250,12 @@ export default function Checkout() {
         const status = nextPayment.paymentStatus.toLowerCase()
         if (status === 'success') {
           setOnlinePayment(null)
-          setMessage('Thanh toán PayOS thành công. Checkout đã hoàn tất và xe có thể rời bãi.')
+          setPlateRecognitionNotice('')
+          setPlateRecognitionTone('error')
+          showMessage('Thanh toán PayOS thành công. Checkout đã hoàn tất và xe có thể rời bãi.', 'success')
         } else if (status === 'failed') {
           setOnlinePayment(null)
-          setMessage('Thanh toán PayOS thất bại hoặc đã bị hủy. Phiên gửi xe vẫn đang hoạt động.')
+          showMessage('Thanh toán PayOS thất bại hoặc đã bị hủy. Phiên gửi xe vẫn đang hoạt động.')
         }
       } catch {
         // Webhook có thể đến chậm; lần kiểm tra kế tiếp sẽ thử lại.
@@ -265,13 +280,13 @@ export default function Checkout() {
     setPlateForCheckout(plate)
   }
 
-  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    setImagePreviewUrl(URL.createObjectURL(file))
+  const handlePlateCameraCapture = async (file: File, previewUrl: string) => {
+    setImagePreviewUrl(previewUrl)
     setUploading(true)
     setMessage('')
+    setMessageTone('error')
+    setPlateRecognitionNotice('')
+    setPlateRecognitionTone('error')
     setOnlinePayment(null)
     setCheckoutResult(null)
     setCheckoutPayment(null)
@@ -281,18 +296,23 @@ export default function Checkout() {
       const res = await parkingOperationApi.uploadAndRecognizePlate(file)
       if (res?.imageUrl) {
         setExitImageUrl(res.imageUrl)
+        const feedback = buildPlateRecognitionFeedback(res)
+        setPlateRecognitionTone(feedback.ok ? 'success' : 'error')
+        setPlateRecognitionNotice(
+          feedback.ok ? 'Nhận diện biển số thành công.' : feedback.message,
+        )
         if (res.licensePlate) {
-          const recognizedPlate = normalizeLicensePlate(res.licensePlate)
-          preparePlateForCheckout(recognizedPlate)
-        } else {
-          setMessage(res.message || 'Không nhận diện được biển số.')
+          preparePlateForCheckout(normalizeLicensePlate(res.licensePlate))
         }
       } else {
-        setMessage('Tải ảnh thất bại hoặc không nhận được đường dẫn ảnh.')
+        setPlateRecognitionTone('error')
+        setPlateRecognitionNotice('Không lưu được ảnh biển số.')
       }
     } catch (err) {
       console.error(err)
-      setMessage(err instanceof Error ? err.message : 'Lỗi kết nối khi upload ảnh.')
+      const feedback = buildPlateRecognitionExceptionFeedback(err)
+      setPlateRecognitionTone('error')
+      setPlateRecognitionNotice(feedback.message)
     } finally {
       setUploading(false)
     }
@@ -304,6 +324,9 @@ export default function Checkout() {
 
     setQrUploading(true)
     setMessage('')
+    setMessageTone('error')
+    setPlateRecognitionNotice('')
+    setPlateRecognitionTone('error')
     setOnlinePayment(null)
     setCheckoutResult(null)
     setCheckoutPayment(null)
@@ -323,14 +346,52 @@ export default function Checkout() {
         setQrPayload(res.result.qrPayload)
         setSessionId(res.result.sessionId || '')
         if (!res.result.sessionId) {
-          setMessage('QR đã đọc được nhưng không phải mã vé xe/session. Vui lòng dùng QR vé gửi xe để checkout.')
+          showMessage('QR đã đọc được nhưng không phải mã vé xe/session. Vui lòng dùng QR vé gửi xe để checkout.')
         }
       } else {
-        setMessage(res.message || 'Không đọc được mã QR.')
+        showMessage(res.message || 'Không đọc được mã QR.')
       }
     } catch (err) {
       console.error(err)
-      setMessage(err instanceof Error ? err.message : 'Lỗi kết nối khi upload QR.')
+      showMessage(err instanceof Error ? err.message : 'Lỗi kết nối khi upload QR.')
+    } finally {
+      setQrUploading(false)
+    }
+  }
+
+  const handleQrCameraDecoded = async (payload: string) => {
+    setQrUploading(true)
+    setMessage('')
+    setMessageTone('error')
+    setPlateRecognitionNotice('')
+    setPlateRecognitionTone('error')
+    setOnlinePayment(null)
+    setCheckoutResult(null)
+    setCheckoutPayment(null)
+    setQrDecode(null)
+    setFloorValidationError('')
+    setValidatingFloor(false)
+    setSessionForCheckout(null)
+    setFeePreview(null)
+    setFeePreviewError('')
+    setQrPayload(payload.trim())
+    setSessionId('')
+
+    try {
+      const res = await parkingOperationApi.resolveQrPayload(payload)
+      if (res.isSuccess && res.result) {
+        setQrDecode(res.result)
+        setQrPayload(res.result.qrPayload)
+        setSessionId(res.result.sessionId || '')
+        if (!res.result.sessionId) {
+          showMessage('QR đã đọc được nhưng không phải mã vé xe/session. Vui lòng dùng QR vé gửi xe để checkout.')
+        }
+      } else {
+        showMessage(res.message || 'Không đọc được mã QR.')
+      }
+    } catch (err) {
+      console.error(err)
+      showMessage(err instanceof Error ? err.message : 'Lỗi kết nối khi kiểm tra QR.')
     } finally {
       setQrUploading(false)
     }
@@ -338,39 +399,44 @@ export default function Checkout() {
 
   const handleCheckout = async () => {
     if (validatingFloor) {
-      setMessage('Đang kiểm tra tầng và cổng checkout, vui lòng chờ.')
+      showMessage('Đang kiểm tra tầng và cổng checkout, vui lòng chờ.')
       return
     }
     if (floorValidationError) {
-      setMessage(floorValidationError)
+      showMessage(floorValidationError)
       return
     }
     if (!sessionForCheckout || !feePreview) {
-      setMessage(feePreviewError || 'Vui lòng chờ tải thông tin xe và phí tạm tính trước khi checkout.')
+      showMessage(feePreviewError || 'Vui lòng chờ tải thông tin xe và phí tạm tính trước khi checkout.')
+      return
+    }
+    if (!licensePlate.trim()) {
+      setPlateRecognitionTone('error')
+      setPlateRecognitionNotice('Vui lòng nhập hoặc chụp biển số xe ra.')
       return
     }
     if (
       normalizeLicensePlate(licensePlate) !==
       normalizeLicensePlate(sessionForCheckout.licensePlateIn)
     ) {
-      setMessage('Biển số xe ra không khớp biển số xe vào.')
-      return
-    }
-    if (!licensePlate.trim()) {
-      setMessage('Vui lòng nhập hoặc nhận diện biển số xe ra')
+      setPlateRecognitionTone('error')
+      setPlateRecognitionNotice('Biển số xe ra không khớp biển số xe vào.')
       return
     }
     if (!sessionId && !qrPayload.trim()) {
-      setMessage('Vui lòng upload ảnh QR vé xe hoặc nhập SessionId/QR payload')
+      showMessage('Vui lòng upload ảnh QR vé xe hoặc nhập SessionId/QR payload')
       return
     }
     if (!gateId) {
-      setMessage('Vui lòng chọn cổng ra')
+      showMessage('Vui lòng chọn cổng ra')
       return
     }
 
     setLoading(true)
     setMessage('')
+    setMessageTone('error')
+    setPlateRecognitionNotice('')
+    setPlateRecognitionTone('error')
     setOnlinePayment(null)
     setCheckoutResult(null)
     setCheckoutPayment(null)
@@ -400,7 +466,7 @@ export default function Checkout() {
         const createdPayment = getCheckoutPayment(res.result ?? null)
         setOnlinePayment(payment)
         setCheckoutPayment(createdPayment)
-        setMessage(res.message || (createdPayment ? 'Đã tạo yêu cầu thanh toán' : 'Checkout thành công'))
+        showMessage(res.message || (createdPayment ? 'Đã tạo yêu cầu thanh toán' : 'Checkout thành công'), 'success')
         if (!createdPayment) {
           setPlateForCheckout('')
           setImagePreviewUrl('')
@@ -416,11 +482,11 @@ export default function Checkout() {
           if (qrInputRef.current) qrInputRef.current.value = ''
         }
       } else {
-        setMessage(res.message || 'Checkout thất bại')
+        showMessage(res.message || 'Checkout thất bại')
       }
     } catch (err) {
       console.error(err)
-      setMessage(err instanceof Error ? err.message : 'Lỗi kết nối API')
+      showMessage(err instanceof Error ? err.message : 'Lỗi kết nối API')
     } finally {
       setLoading(false)
     }
@@ -430,17 +496,20 @@ export default function Checkout() {
     if (!checkoutPayment) return
     setLoading(true)
     setMessage('')
+    setMessageTone('error')
+    setPlateRecognitionNotice('')
+    setPlateRecognitionTone('error')
     try {
       const res = await parkingOperationApi.confirmCashCheckout(checkoutPayment.paymentId)
       if (!res.isSuccess || !res.result) {
-        setMessage(res.message || 'Không thể xác nhận thanh toán tiền mặt')
+        showMessage(res.message || 'Không thể xác nhận thanh toán tiền mặt')
         return
       }
       setCheckoutResult((current) => ({ ...current, ...res.result }))
       setCheckoutPayment(getCheckoutPayment(res.result))
-      setMessage(res.message || 'Đã nhận tiền và checkout thành công')
+      showMessage(res.message || 'Đã nhận tiền và checkout thành công', 'success')
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Lỗi kết nối khi xác nhận thanh toán')
+      showMessage(err instanceof Error ? err.message : 'Lỗi kết nối khi xác nhận thanh toán')
     } finally {
       setLoading(false)
     }
@@ -450,18 +519,21 @@ export default function Checkout() {
     if (!checkoutPayment) return
     setLoading(true)
     setMessage('')
+    setMessageTone('error')
+    setPlateRecognitionNotice('')
+    setPlateRecognitionTone('error')
     try {
       const res = await parkingOperationApi.cancelCheckout(checkoutPayment.paymentId)
       if (!res.isSuccess) {
-        setMessage(res.message || 'Không thể hủy checkout')
+        showMessage(res.message || 'Không thể hủy checkout')
         return
       }
       setCheckoutResult((current) => ({ ...current, ...res.result }))
       setCheckoutPayment(getCheckoutPayment(res.result ?? null))
       setOnlinePayment(null)
-      setMessage(res.message || 'Đã hủy checkout')
+      showMessage(res.message || 'Đã hủy checkout', 'success')
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Lỗi kết nối khi hủy checkout')
+      showMessage(err instanceof Error ? err.message : 'Lỗi kết nối khi hủy checkout')
     } finally {
       setLoading(false)
     }
@@ -471,7 +543,7 @@ export default function Checkout() {
   const hasPendingCheckout = checkoutStatus === 'pending'
   const checkoutSucceeded = checkoutStatus === 'success'
   const checkoutFailed = checkoutStatus === 'failed'
-  const checkoutMessageIsSuccess = Boolean(checkoutResult && !checkoutFailed)
+  const checkoutMessageIsSuccess = messageTone === 'success'
   const plateMismatch = Boolean(
     sessionForCheckout &&
     licensePlate.trim() &&
@@ -498,6 +570,9 @@ export default function Checkout() {
     setCheckoutResult(null)
     setOnlinePayment(null)
     setMessage('')
+    setMessageTone('error')
+    setPlateRecognitionNotice('')
+    setPlateRecognitionTone('error')
     if (keepVehicleData) return
 
     setPlateForCheckout('')
@@ -512,7 +587,6 @@ export default function Checkout() {
     setFeePreview(null)
     setFeePreviewError('')
     if (qrInputRef.current) qrInputRef.current.value = ''
-    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   return (
@@ -569,46 +643,17 @@ export default function Checkout() {
                 <div className="scan-card-heading">
                   <span className="checkout-card-icon"><Camera size={19} /></span>
                   <div>
-                    <h3>{sessionForCheckout ? 'Đối chiếu xe vào / ra' : 'Hình ảnh phương tiện'}</h3>
-                    <p>{sessionForCheckout ? 'Bấm vào ảnh lúc ra để tải hoặc thay ảnh đối chiếu.' : 'Ảnh chỉ dùng để dự phòng và hỗ trợ nhận diện biển số.'}</p>
+                    <h3>{sessionForCheckout ? 'Đối chiếu xe vào / ra' : 'Chụp biển số xe ra'}</h3>
+                    <p>{sessionForCheckout ? 'Chụp ảnh lúc ra bằng camera để đối chiếu với ảnh lúc vào.' : 'Dùng camera để chụp biển số, hệ thống sẽ tự nhận diện và điền vào form.'}</p>
                   </div>
                 </div>
-                {!sessionForCheckout && (
-                  <div
-                    className={`camera-frame clickable${hasPendingCheckout ? ' is-disabled' : ''}`}
-                    onClick={() => {
-                      if (!hasPendingCheckout) fileInputRef.current?.click()
-                    }}
-                  >
-                    {imagePreviewUrl ? (
-                      <img src={imagePreviewUrl} className="camera-preview-img" alt="Exit Plate Preview" />
-                    ) : (
-                      <div className="camera-placeholder">
-                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                          <circle cx="12" cy="13" r="4" />
-                        </svg>
-                        <p>Tải ảnh xe ra bãi</p>
-                      </div>
-                    )}
-
-                    {uploading && (
-                      <>
-                        <div className="ocr-scanning-line" />
-                        <div className="ocr-loading-overlay">
-                          <span>Đang nhận diện biển số...</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="upload-input-hidden"
-                  accept="image/*"
+                <PlateCameraCapture
                   disabled={hasPendingCheckout}
-                  onChange={handleImageUpload}
+                  busy={uploading}
+                  previewUrl={imagePreviewUrl || exitImageUrl}
+                  previewAlt="Exit plate preview"
+                  fileNamePrefix="checkout-plate"
+                  onCapture={handlePlateCameraCapture}
                 />
 
                 {sessionForCheckout && (
@@ -636,21 +681,7 @@ export default function Checkout() {
                         </small>
                       </article>
                       <article>
-                        <div
-                          className={`checkout-exit-image-upload${hasPendingCheckout ? ' is-disabled' : ''}`}
-                          role="button"
-                          tabIndex={hasPendingCheckout ? -1 : 0}
-                          aria-label={imagePreviewUrl || exitImageUrl ? 'Thay ảnh xe lúc ra' : 'Tải ảnh xe lúc ra'}
-                          onClick={() => {
-                            if (!hasPendingCheckout) fileInputRef.current?.click()
-                          }}
-                          onKeyDown={(event) => {
-                            if (!hasPendingCheckout && (event.key === 'Enter' || event.key === ' ')) {
-                              event.preventDefault()
-                              fileInputRef.current?.click()
-                            }
-                          }}
-                        >
+                        <div className="checkout-exit-image-upload">
                           {imagePreviewUrl || exitImageUrl ? (
                             <img
                               src={imagePreviewUrl || exitImageUrl}
@@ -659,7 +690,7 @@ export default function Checkout() {
                           ) : (
                             <span className="manager-session-image-empty">
                               <ImageIcon size={27} aria-hidden />
-                              Nhấn để tải ảnh lúc ra
+                              Chưa có ảnh lúc ra
                             </span>
                           )}
                           {uploading && (
@@ -674,7 +705,7 @@ export default function Checkout() {
                         <strong>Ảnh lúc ra</strong>
                         <small className="checkout-image-plate">
                           Biển số: <b>{licensePlate || 'Chưa nhận diện'}</b>
-                          <span>Nhấn ảnh để thay đổi</span>
+                          <span>Chụp bằng camera bên trên</span>
                         </small>
                       </article>
                     </div>
@@ -713,36 +744,122 @@ export default function Checkout() {
                   </div>
                 )}
 
-                <div className="form-field checkout-field-half">
-                  <label>Loại checkout</label>
-                  <select
-                    className="input-standalone select"
-                    value={checkOutType}
-                    disabled={hasPendingCheckout || Boolean(sessionForCheckout)}
-                    onChange={(event) => {
-                      setCheckOutType(event.target.value as 'auto' | 'guest' | 'resident' | 'reservation')
-                      setMessage('')
-                      setOnlinePayment(null)
-                      setCheckoutResult(null)
-                    }}
-                  >
-                    <option value="auto" disabled={Boolean(gateContext?.isResident)}>Tự nhận diện từ vé QR</option>
-                    <option value="guest" disabled={Boolean(gateContext?.isResident)}>Khách vãng lai</option>
-                    <option value="resident" disabled={!gateContext?.isResident}>Cư dân (Khách tháng)</option>
-                    <option value="reservation" disabled={Boolean(gateContext?.isResident)}>Xe đặt trước</option>
-                  </select>
-                  <small className="field-hint">
-                    {sessionForCheckout
-                      ? 'Đã tự xác định từ phiên gửi xe, không thể thay đổi.'
-                      : 'Loại checkout sẽ được tự xác định sau khi đọc vé.'}
-                  </small>
+                <div className="checkout-priority-fields">
+                  <div className="form-field checkout-license-field">
+                    <label htmlFor="license-plate-checkout">Biển số xe</label>
+                    <input
+                      id="license-plate-checkout"
+                      type="text"
+                      className="input-standalone"
+                      placeholder="Nhập biển số"
+                      value={licensePlate}
+                      disabled={hasPendingCheckout}
+                      onChange={(event) => {
+                        setPlateForCheckout(event.target.value)
+                        setMessageTone('error')
+                        setPlateRecognitionNotice('')
+                        setPlateRecognitionTone('error')
+                        setOnlinePayment(null)
+                        setCheckoutResult(null)
+                      }}
+                      onBlur={() => preparePlateForCheckout(licensePlate)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') preparePlateForCheckout(licensePlate)
+                      }}
+                    />
+                    {plateRecognitionNotice && (
+                      <p
+                        className={`plate-recognition-inline ${
+                          plateRecognitionTone === 'success' ? 'is-success' : 'is-error'
+                        }`}
+                        role={plateRecognitionTone === 'success' ? 'status' : 'alert'}
+                      >
+                        {plateRecognitionTone === 'success' ? (
+                          <CheckCircle2 size={15} aria-hidden />
+                        ) : (
+                          <AlertCircle size={15} aria-hidden />
+                        )}
+                        {plateRecognitionNotice}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="form-field">
+                    <label>Cổng ra</label>
+                    <select
+                      className="input-standalone select"
+                      value={gateId}
+                      disabled
+                      onChange={(event) => {
+                        setGateId(event.target.value)
+                        setOnlinePayment(null)
+                        setCheckoutResult(null)
+                      }}
+                    >
+                      {exitGates.length === 0 && <option value="">Chưa có cổng ra</option>}
+                      {exitGates.map((gate) => (
+                        <option key={gate.gateId} value={gate.gateId}>
+                          {gate.gateName}
+                          {gate.floorName ? ` · ${gate.floorName}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-field">
+                    <label>Loại checkout</label>
+                    <select
+                      className="input-standalone select"
+                      value={checkOutType}
+                      disabled={hasPendingCheckout || Boolean(sessionForCheckout)}
+                      onChange={(event) => {
+                        setCheckOutType(event.target.value as 'auto' | 'guest' | 'resident' | 'reservation')
+                        setMessage('')
+                        setMessageTone('error')
+                        setPlateRecognitionNotice('')
+                        setPlateRecognitionTone('error')
+                        setOnlinePayment(null)
+                        setCheckoutResult(null)
+                      }}
+                    >
+                      <option value="auto" disabled={Boolean(gateContext?.isResident)}>Tự nhận diện từ vé QR</option>
+                      <option value="guest" disabled={Boolean(gateContext?.isResident)}>Khách vãng lai</option>
+                      <option value="resident" disabled={!gateContext?.isResident}>Cư dân (Khách tháng)</option>
+                      <option value="reservation" disabled={Boolean(gateContext?.isResident)}>Xe đặt trước</option>
+                    </select>
+                    <small className="field-hint">
+                      {sessionForCheckout
+                        ? 'Đã tự xác định từ phiên gửi xe, không thể thay đổi.'
+                        : 'Loại checkout sẽ được tự xác định sau khi đọc vé.'}
+                    </small>
+                  </div>
                 </div>
+
+                {checkOutType !== 'resident' && (
+                  <div className="form-field checkout-payment-field">
+                    <label>Thanh toán</label>
+                    <select
+                      className="input-standalone select"
+                      value={paymentMethod}
+                      disabled={hasPendingCheckout}
+                      onChange={(event) => {
+                        setPaymentMethod(event.target.value)
+                        setMessageTone('error')
+                        setPlateRecognitionNotice('')
+                        setPlateRecognitionTone('error')
+                        setOnlinePayment(null)
+                        setCheckoutResult(null)
+                      }}
+                    >
+                      <option value="Cash">Tiền mặt</option>
+                      <option value="PayOS">PayOS</option>
+                    </select>
+                  </div>
+                )}
 
                 <div className="form-field checkout-field-ticket">
                   <label>Mã vé xe / SessionId</label>
-                  <div className="input-readonly">
-                    {sessionId ? `SessionId: ${sessionId}` : 'Upload QR hoặc nhập payload bên dưới'}
-                  </div>
+                  {sessionId && <div className="input-readonly">SessionId: {sessionId}</div>}
                   <input
                     type="text"
                     className="input-standalone"
@@ -751,6 +868,9 @@ export default function Checkout() {
                     disabled={hasPendingCheckout}
                     onChange={(event) => {
                       setQrPayload(event.target.value.trim())
+                      setMessageTone('error')
+                      setPlateRecognitionNotice('')
+                      setPlateRecognitionTone('error')
                       setSessionId('')
                       setQrDecode(null)
                       setFloorValidationError('')
@@ -762,15 +882,22 @@ export default function Checkout() {
                       setCheckoutResult(null)
                     }}
                   />
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    disabled={qrUploading || hasPendingCheckout}
-                    onClick={() => qrInputRef.current?.click()}
-                  >
-                    <QrCode size={16} aria-hidden />
-                    {qrUploading ? 'Đang đọc QR...' : 'Tải ảnh QR vé'}
-                  </button>
+                  <QrCameraScanner
+                    disabled={hasPendingCheckout}
+                    busy={qrUploading}
+                    onDecoded={handleQrCameraDecoded}
+                    actions={
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        disabled={qrUploading || hasPendingCheckout}
+                        onClick={() => qrInputRef.current?.click()}
+                      >
+                        <QrCode size={16} aria-hidden />
+                        {qrUploading ? 'Đang đọc QR...' : 'Tải ảnh QR vé'}
+                      </button>
+                    }
+                  />
                   <input
                     type="file"
                     ref={qrInputRef}
@@ -779,68 +906,6 @@ export default function Checkout() {
                     onChange={handleQrUpload}
                   />
                 </div>
-
-                <div className="form-field checkout-field-half">
-                  <label htmlFor="license-plate-checkout">Biển số xe</label>
-                  <input
-                    id="license-plate-checkout"
-                    type="text"
-                    className="input-standalone"
-                    placeholder="Nhập biển số"
-                    value={licensePlate}
-                    disabled={hasPendingCheckout}
-                    onChange={(event) => {
-                      setPlateForCheckout(event.target.value)
-                      setOnlinePayment(null)
-                      setCheckoutResult(null)
-                    }}
-                    onBlur={() => preparePlateForCheckout(licensePlate)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') preparePlateForCheckout(licensePlate)
-                    }}
-                  />
-                </div>
-
-                <div className="form-field checkout-field-half">
-                  <label>Cổng ra</label>
-                  <select
-                    className="input-standalone select"
-                    value={gateId}
-                    disabled
-                    onChange={(event) => {
-                      setGateId(event.target.value)
-                      setOnlinePayment(null)
-                      setCheckoutResult(null)
-                    }}
-                  >
-                    {exitGates.length === 0 && <option value="">Chưa có cổng ra</option>}
-                    {exitGates.map((gate) => (
-                      <option key={gate.gateId} value={gate.gateId}>
-                        {gate.gateName}
-                        {gate.floorName ? ` · ${gate.floorName}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {checkOutType !== 'resident' && (
-                  <div className="form-field checkout-field-half">
-                    <label>Thanh toán</label>
-                    <select
-                      className="input-standalone select"
-                      value={paymentMethod}
-                      disabled={hasPendingCheckout}
-                      onChange={(event) => {
-                        setPaymentMethod(event.target.value)
-                        setOnlinePayment(null)
-                        setCheckoutResult(null)
-                      }}
-                    >
-                      <option value="Cash">Tiền mặt</option>
-                      <option value="PayOS">PayOS</option>
-                    </select>
-                  </div>
-                )}
 
                 {validatingFloor && <p className="alert-inline">Đang kiểm tra tầng và cổng checkout...</p>}
                 {floorValidationError && (
@@ -913,7 +978,7 @@ export default function Checkout() {
                       </a>
                     </div>
                   </div>
-                )}
+                  )}
 
                 <div className="scan-result">
                   <div className="checkout-summary-heading">
