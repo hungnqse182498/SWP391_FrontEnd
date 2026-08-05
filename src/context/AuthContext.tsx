@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true)
       try {
         const response = await authService.login({
-          email: email.trim(),
+          email: email.trim().toLowerCase(),
           password: password.trim(),
         })
 
@@ -141,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ): Promise<RegisterResult> => {
       const trimmedUserName = userName.trim()
       const trimmedName = fullName.trim()
-      const trimmedEmail = email.trim()
+      const trimmedEmail = email.trim().toLowerCase()
       const trimmedPhone = phoneNumber.trim()
 
       if (!trimmedUserName) return { ok: false, message: 'Vui lòng nhập tên đăng nhập.' }
