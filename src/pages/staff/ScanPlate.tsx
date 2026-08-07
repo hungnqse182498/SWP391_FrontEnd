@@ -1919,6 +1919,77 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                   </div>
                 </section>
 
+                <section className="manager-session-detail-section">
+                  <div className="manager-session-section-heading">
+                    <UserRound size={17} aria-hidden />
+                    <div>
+                      <h4>Ảnh người lái vào / ra</h4>
+                      <p>
+                        Ảnh khuôn mặt người lái xe được ghi nhận tại thời điểm
+                        check-in và checkout.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="manager-session-image-grid">
+                    <article>
+                      <div>
+                        {activeDetailSession.driverEntryImageUrl ? (
+                          <a
+                            href={activeDetailSession.driverEntryImageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label="Mở ảnh người lái lúc vào"
+                          >
+                            <img
+                              src={activeDetailSession.driverEntryImageUrl}
+                              alt={`Người lái xe ${activeDetailSession.licensePlateIn} lúc vào`}
+                              loading="lazy"
+                            />
+                          </a>
+                        ) : (
+                          <span className="manager-session-image-empty">
+                            <UserRound size={28} aria-hidden />
+                            Chưa có ảnh người lái lúc vào
+                          </span>
+                        )}
+                      </div>
+                      <strong>Người lái lúc vào</strong>
+                      <small>
+                        {formatDateTime(activeDetailSession.entryTime)}
+                      </small>
+                    </article>
+                    <article>
+                      <div>
+                        {activeDetailSession.driverExitImageUrl ? (
+                          <a
+                            href={activeDetailSession.driverExitImageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label="Mở ảnh người lái lúc ra"
+                          >
+                            <img
+                              src={activeDetailSession.driverExitImageUrl}
+                              alt={`Người lái xe ${activeDetailSession.licensePlateOut || activeDetailSession.licensePlateIn} lúc ra`}
+                              loading="lazy"
+                            />
+                          </a>
+                        ) : (
+                          <span className="manager-session-image-empty">
+                            <UserRound size={28} aria-hidden />
+                            Chưa có ảnh người lái lúc ra
+                          </span>
+                        )}
+                      </div>
+                      <strong>Người lái lúc ra</strong>
+                      <small>
+                        {activeDetailSession.exitTime
+                          ? formatDateTime(activeDetailSession.exitTime)
+                          : "Xe chưa checkout"}
+                      </small>
+                    </article>
+                  </div>
+                </section>
+
                 {activeDetailSession.ticket?.qrCodeDataUrl && (
                   <div className="manager-session-ticket">
                     <QrCode size={21} aria-hidden />

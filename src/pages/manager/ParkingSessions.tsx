@@ -523,6 +523,19 @@ export default function ManagerParkingSessions() {
                 </article>
               </div>
             </section>
+            <section className="manager-session-detail-section">
+              <div className="manager-session-section-heading"><UserRound size={17} aria-hidden /><div><h4>Ảnh người lái vào / ra</h4><p>Ảnh khuôn mặt người lái xe được ghi nhận tại thời điểm check-in và checkout.</p></div></div>
+              <div className="manager-session-image-grid">
+                <article>
+                  <div>{selectedSession.driverEntryImageUrl ? <a href={selectedSession.driverEntryImageUrl} target="_blank" rel="noreferrer" aria-label="Mở ảnh người lái lúc vào"><img src={selectedSession.driverEntryImageUrl} alt={`Người lái xe ${selectedSession.licensePlateIn} lúc vào`} loading="lazy" /></a> : <span className="manager-session-image-empty"><UserRound size={28} aria-hidden />Chưa có ảnh người lái lúc vào</span>}</div>
+                  <strong>Người lái lúc vào</strong><small>{formatUtcToVietnamDateTime(selectedSession.entryTime)}</small>
+                </article>
+                <article>
+                  <div>{selectedSession.driverExitImageUrl ? <a href={selectedSession.driverExitImageUrl} target="_blank" rel="noreferrer" aria-label="Mở ảnh người lái lúc ra"><img src={selectedSession.driverExitImageUrl} alt={`Người lái xe ${selectedSession.licensePlateOut || selectedSession.licensePlateIn} lúc ra`} loading="lazy" /></a> : <span className="manager-session-image-empty"><UserRound size={28} aria-hidden />Chưa có ảnh người lái lúc ra</span>}</div>
+                  <strong>Người lái lúc ra</strong><small>{selectedSession.exitTime ? formatUtcToVietnamDateTime(selectedSession.exitTime) : 'Xe chưa checkout'}</small>
+                </article>
+              </div>
+            </section>
             {selectedSession.ticket && <div className="manager-session-ticket"><QrCode size={21} aria-hidden /><div><strong>Mã vé phiên đang hoạt động</strong><code>{selectedSession.ticket.qrPayload}</code></div><img src={selectedSession.ticket.qrCodeDataUrl} alt={`QR vé xe ${selectedSession.licensePlateIn}`} /></div>}
             <div className="form-actions manager-session-modal-actions">
               <button
