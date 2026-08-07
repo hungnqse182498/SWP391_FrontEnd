@@ -2171,9 +2171,15 @@ ul, ol { margin: 0; padding: 0; }
 
 .scan-entry-layout {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 2fr 3fr;
   gap: 1rem;
-  align-items: stretch;
+  align-items: start;
+}
+
+.scan-entry-camera-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .scan-entry-camera {
@@ -2184,7 +2190,7 @@ ul, ol { margin: 0; padding: 0; }
 
 /* Check-in records two independent photos: license plate and driver face. */
 .scan-entry-layout > .scan-entry-form {
-  grid-column: 1 / -1;
+  grid-column: auto;
 }
 
 .manager-page-canvas {
@@ -2428,6 +2434,19 @@ ul, ol { margin: 0; padding: 0; }
   justify-content: space-between;
   gap: 1rem;
   padding: 1.1rem;
+  padding-bottom: 5.5rem;
+}
+
+.scan-entry-camera-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.1rem;
+}
+
+.scan-entry-camera-card .scan-card-heading {
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .scan-entry-grid {
@@ -2557,12 +2576,19 @@ ul, ol { margin: 0; padding: 0; }
 }
 
 .scan-entry-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   align-items: center;
-  padding-top: 0.25rem;
+  margin: 0.5rem -1.1rem -1.1rem;
+  padding: 1rem 1.1rem;
   border-top: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(10px);
 }
 
 .scan-entry-actions .btn-success {
@@ -2593,6 +2619,15 @@ ul, ol { margin: 0; padding: 0; }
   padding: 0.75rem 0.85rem;
   border-radius: var(--radius-sm);
   text-align: left;
+}
+
+.scan-entry-alert {
+  flex-wrap: wrap;
+}
+
+.scan-entry-alert > span {
+  flex: 1;
+  min-width: 0;
 }
 
 .scan-entry-form > .alert-success {
@@ -2970,6 +3005,9 @@ ul, ol { margin: 0; padding: 0; }
   .scan-entry-layout {
     grid-template-columns: 1fr;
   }
+  .staff-checkout-layout {
+    grid-template-columns: 1fr;
+  }
   .staff-gate-grid {
     grid-template-columns: 1fr;
   }
@@ -3179,7 +3217,10 @@ ul, ol { margin: 0; padding: 0; }
   .scan-entry-grid { grid-template-columns: 1fr; }
   .checkin-type-selector { grid-template-columns: 1fr; }
   .checkin-type-selector > button small { white-space: normal; }
+  .scan-entry-actions { align-items: stretch; flex-direction: column-reverse; }
   .scan-entry-actions .btn { width: 100%; justify-content: center; }
+  .staff-checkin-title-row { align-items: flex-start; flex-direction: column; }
+  .staff-gate-context-badge { border-radius: 10px; }
 }
 
 @media (max-width: 640px) {
@@ -8094,9 +8135,10 @@ ul, ol { margin: 0; padding: 0; }
 
 .staff-checkout-layout {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 2fr 3fr;
   gap: 1rem;
   margin-top: 1rem;
+  align-items: start;
 }
 
 .badge-pending {
@@ -8864,6 +8906,37 @@ ul, ol { margin: 0; padding: 0; }
   margin-bottom: 1rem;
   border-color: #dbeafe;
   background: #f8fbff;
+}
+
+.staff-checkin-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.staff-checkin-title-row h2 {
+  margin: 0;
+}
+
+.staff-gate-context-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.28rem 0.7rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 0.76rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.staff-gate-context-badge small {
+  color: #64748b;
+  font-weight: 500;
 }
 
 .checkin-type-selector button:disabled {
